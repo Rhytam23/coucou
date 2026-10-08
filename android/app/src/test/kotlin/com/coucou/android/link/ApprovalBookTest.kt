@@ -26,8 +26,22 @@ class ApprovalBookTest {
         assertEquals(1, book.active().size)
         now += 1
         assertEquals(0, book.active().size)
-        book.add(req("b", created = now - Protocol.APPROVAL_TTL_MS))
-        assertNull(book.claim("b"))
+    }
+
+    @Test fun theDesktopsClockDoesNotDecideWhetherARequestIsExpired() {
+        // A computer whose clock is 10 minutes behind (or ahead) of the phone's.
+        book.add(req("slow", created = now - 600_000))
+        book.add(req("fast", created = now + 600_000))
+        assertNotNull("a fresh request must be decidable", book.claim("slow"))
+        assertNotNull("a fresh request must be decidable", book.claim("fast"))
+    }
+
+    @Test fun aRequestSentAgainKeepsItsFirstArrivalTime() {
+        book.add(req("a"))
+        now += Protocol.APPROVAL_TTL_MS - 1_000
+        book.add(req("a")) // the link dropped and came back: the desktop offers it again
+        now += 1_000
+        assertNull("it must not live longer for having been sent twice", book.claim("a"))
     }
 
     @Test fun resolvedByTheDesktopDisappears() {

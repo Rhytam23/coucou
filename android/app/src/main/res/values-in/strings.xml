@@ -12,7 +12,7 @@
     <string name="demo_mode">Mode demo</string>
     <string name="demo_try">Coba mode demo</string>
     <string name="pair_title">Hubungkan ke komputer Anda</string>
-    <string name="pair_hint">Buka Coucou di komputer Anda, tampilkan kode penyandingan, lalu pindai dengan kamera ponsel. Atau tempel tautan penyandingan di bawah.</string>
+    <string name="pair_hint">Di komputer, buka Pengaturan → Ponsel Android, aktifkan dan tampilkan kode penyandingan. Pindai dengan kamera, atau salin tautan dan tempel di sini.</string>
     <string name="pair_paste">Tautan penyandingan</string>
     <string name="pair_button">Sandingkan</string>
     <string name="sessions_title">Agen</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">Putuskan komputer ini</string>
     <string name="demo_leave">Keluar dari mode demo</string>
     <string name="gallery">Galeri Mochi</string>
+    <string name="pair_clipboard">Tempel dari papan klip</string>
+    <string name="notif_unlock">Buka kunci untuk melihat permintaan</string>
+    <string name="msg_not_pending">Permintaan itu sudah tidak tertunda.</string>
+    <string name="msg_bad_link">Itu bukan tautan penyandingan Coucou.</string>
+    <string name="msg_rejected">Komputer menolak ponsel ini. Sandingkan ulang.</string>
+    <string name="msg_link_error">Kesalahan tautan</string>
+    <string name="msg_need_lock">Setel kunci layar untuk menyetujui dari ponsel.</string>
+    <string name="approval_hint">Mengizinkan di ponsel meminta sidik jari atau kunci layar. Menolak tidak.</string>
 </resources>

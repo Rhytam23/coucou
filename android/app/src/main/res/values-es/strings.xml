@@ -12,7 +12,7 @@
     <string name="demo_mode">Modo demo</string>
     <string name="demo_try">Probar el modo demo</string>
     <string name="pair_title">Conectar con tu ordenador</string>
-    <string name="pair_hint">Abre Coucou en tu ordenador, muestra el código de emparejamiento y escanéalo con la cámara del móvil. O pega abajo el enlace de emparejamiento.</string>
+    <string name="pair_hint">En tu equipo, abre Ajustes → Teléfono Android, actívalo y muestra el código de emparejamiento. Escanéalo con la cámara o copia el enlace y pégalo aquí.</string>
     <string name="pair_paste">Enlace de emparejamiento</string>
     <string name="pair_button">Emparejar</string>
     <string name="sessions_title">Agentes</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">Desconectar este ordenador</string>
     <string name="demo_leave">Salir del modo demo</string>
     <string name="gallery">Galería de Mochi</string>
+    <string name="pair_clipboard">Pegar del portapapeles</string>
+    <string name="notif_unlock">Desbloquea para ver la solicitud</string>
+    <string name="msg_not_pending">Esa solicitud ya no está pendiente.</string>
+    <string name="msg_bad_link">Ese no es un enlace de emparejamiento de Coucou.</string>
+    <string name="msg_rejected">El equipo rechazó este teléfono. Vuelve a emparejar.</string>
+    <string name="msg_link_error">Error de enlace</string>
+    <string name="msg_need_lock">Configura un bloqueo de pantalla para aprobar desde el teléfono.</string>
+    <string name="approval_hint">Permitir en el teléfono pide la huella o el bloqueo de pantalla. Denegar no.</string>
 </resources>

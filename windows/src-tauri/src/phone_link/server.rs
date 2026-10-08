@@ -192,7 +192,7 @@ where
         return;
     }
     let _ = say(json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS })).await;
-    let id = shared.hub.subscribe(tx.clone(), (shared.clock)());
+    let (id, evicted) = shared.hub.subscribe(tx.clone(), (shared.clock)());
 
     // 2. the conversation
     loop {
@@ -205,6 +205,11 @@ where
             _ => break, // closed, failed or silent for too long
         };
         let Ok(msg) = serde_json::from_slice::<serde_json::Value>(&line) else { break };
+        // The hub stopped sending to this phone because it could not keep up:
+        // close, and the phone reconnects to a fresh picture (it pings every 20 s).
+        if evicted.load(Ordering::SeqCst) {
+            break;
+        }
         match msg["type"].as_str() {
             Some("ping") => {
                 let _ = say(json!({ "type": "pong" })).await;

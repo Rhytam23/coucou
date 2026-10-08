@@ -33,11 +33,25 @@ export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
     if (!status?.running) return;
     const show = h("button", { text: t("Show pairing code") });
     show.addEventListener("click", () => void reveal(status, false));
+    const address = status.host ? `${status.host}:${status.port}` : `:${status.port}`;
+    clients.textContent = t("Phones connected: {count}", { count: status.clients });
     detail.append(
       h("div", { class: "row" }, show),
-      h("div", { class: "hint", text: t("Phones connected: {count}", { count: status.clients }) }),
+      clients,
+      h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
+      h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
     );
   };
+
+  /** Kept up to date while the window is open and the link is on; nothing runs otherwise. */
+  const clients = h("div", { class: "hint" });
+  const watch = window.setInterval(() => {
+    if (!section.isConnected) return window.clearInterval(watch);
+    if (document.visibilityState !== "visible" || !clients.isConnected) return;
+    void Bridge.phoneLinkStatus().then((s) => {
+      if (s?.running) clients.textContent = t("Phones connected: {count}", { count: s.clients });
+    });
+  }, 5000);
 
   const switchEl = makeToggle(on, (next) => {
     void (async () => {
@@ -55,7 +69,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
 
   void Bridge.phoneLinkStatus().then(draw);
 
-  return h(
+  const section = h(
     "section",
     {},
     h("h2", {}, h("span", { text: t("Android phone") })),
@@ -65,6 +79,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
     note,
     detail,
   );
+  return section;
 }
 
 function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[] {

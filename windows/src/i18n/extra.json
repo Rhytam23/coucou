@@ -3426,6 +3426,28 @@
    "pt-BR": "O celular pareado é desconectado e precisa do novo código.",
    "ru": "Сопряжённый телефон отключится, и ему понадобится новый код.",
    "id": "Ponsel yang tersandingkan akan terputus dan memerlukan kode baru."
+  },
+  "If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.": {
+   "zh-Hans": "如果 Windows 询问防火墙，请允许 Coucou 在专用网络上通信。手机和这台电脑必须连接同一个 Wi-Fi。",
+   "hi": "अगर Windows फ़ायरवॉल के बारे में पूछे, तो Coucou को निजी नेटवर्क पर अनुमति दें। फ़ोन और यह कंप्यूटर एक ही Wi-Fi पर होने चाहिए।",
+   "es": "Si Windows pregunta por el firewall, permite Coucou en redes privadas. El teléfono y este equipo deben estar en la misma Wi-Fi.",
+   "ar": "إذا سأل Windows عن جدار الحماية، فاسمح لـ Coucou على الشبكات الخاصة. يجب أن يكون الهاتف وهذا الكمبيوتر على شبكة Wi-Fi نفسها.",
+   "fr": "Si Windows te interroge sur le pare-feu, autorise Coucou sur les réseaux privés. Le téléphone et cet ordinateur doivent être sur le même Wi-Fi.",
+   "bn": "Windows ফায়ারওয়াল নিয়ে জিজ্ঞেস করলে Coucou-কে প্রাইভেট নেটওয়ার্কে অনুমতি দিন। ফোন ও এই কম্পিউটার একই Wi-Fi-তে থাকতে হবে।",
+   "pt-BR": "Se o Windows perguntar sobre o firewall, permita o Coucou em redes privadas. O celular e este computador precisam estar no mesmo Wi-Fi.",
+   "ru": "Если Windows спросит про брандмауэр, разрешите Coucou в частных сетях. Телефон и этот компьютер должны быть в одной сети Wi-Fi.",
+   "id": "Jika Windows menanyakan firewall, izinkan Coucou di jaringan pribadi. Ponsel dan komputer ini harus berada di Wi-Fi yang sama."
+  },
+  "The phone connects to {address}": {
+   "zh-Hans": "手机连接的地址：{address}",
+   "hi": "फ़ोन इस पते से जुड़ता है: {address}",
+   "es": "El teléfono se conecta a {address}",
+   "ar": "يتصل الهاتف بالعنوان {address}",
+   "fr": "Le téléphone se connecte à {address}",
+   "bn": "ফোন যে ঠিকানায় সংযুক্ত হয়: {address}",
+   "pt-BR": "O celular se conecta a {address}",
+   "ru": "Телефон подключается к {address}",
+   "id": "Ponsel terhubung ke {address}"
   }
  }
 }

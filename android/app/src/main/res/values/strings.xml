@@ -14,7 +14,7 @@
     <string name="demo_mode">Demo mode</string>
     <string name="demo_try">Try demo mode</string>
     <string name="pair_title">Connect to your computer</string>
-    <string name="pair_hint">Open Coucou on your computer, show the pairing code, and scan it with your phone camera. Or paste the pairing link below.</string>
+    <string name="pair_hint">On your computer, open Settings → Android phone, turn it on and show the pairing code. Scan it with your camera, or copy the link and paste it here.</string>
     <string name="pair_paste">Pairing link</string>
     <string name="pair_button">Pair</string>
     <string name="sessions_title">Agents</string>
@@ -23,4 +23,12 @@
     <string name="action_unpair">Disconnect this computer</string>
     <string name="demo_leave">Leave demo mode</string>
     <string name="gallery">Mochi gallery</string>
+    <string name="pair_clipboard">Paste from clipboard</string>
+    <string name="notif_unlock">Unlock to see the request</string>
+    <string name="msg_not_pending">That request is no longer pending.</string>
+    <string name="msg_bad_link">That is not a Coucou pairing link.</string>
+    <string name="msg_rejected">The desktop rejected this phone. Pair again.</string>
+    <string name="msg_link_error">Link error</string>
+    <string name="msg_need_lock">Set a screen lock to approve from your phone.</string>
+    <string name="approval_hint">Allow on the phone asks for the fingerprint or the screen lock. Deny does not.</string>
 </resources>

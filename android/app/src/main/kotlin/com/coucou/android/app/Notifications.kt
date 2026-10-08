@@ -51,11 +51,11 @@ class Notifications(private val context: Context) {
 
     fun ongoing(model: AppModel?): Notification {
         val text = when {
-            model == null -> "Starting…"
+            model == null -> context.getString(R.string.status_connecting)
             model.linkState == LinkState.CONNECTED ->
-                "Connected to ${model.desktopName ?: "your computer"} · ${model.sessions.size} agent" + if (model.sessions.size == 1) "" else "s"
-            model.linkState == LinkState.CONNECTING -> "Connecting…"
-            else -> "Reconnecting…"
+                listOfNotNull(context.getString(R.string.status_connected), model.desktopName).joinToString(" · ")
+            model.linkState == LinkState.CONNECTING -> context.getString(R.string.status_connecting)
+            else -> context.getString(R.string.status_not_connected)
         }
         return Notification.Builder(context, CH_LINK)
             .setSmallIcon(R.drawable.ic_stat_mochi)
@@ -78,10 +78,11 @@ class Notifications(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val publicVersion = Notification.Builder(context, CH_APPROVAL)
-            .setSmallIcon(R.drawable.ic_stat_mochi).setContentTitle("Approval needed").setContentText("Unlock to see the request").build()
+            .setSmallIcon(R.drawable.ic_stat_mochi).setContentTitle(context.getString(R.string.approval_title)).setContentText(context.getString(R.string.notif_unlock)).build()
         val n = Notification.Builder(context, CH_APPROVAL)
             .setSmallIcon(R.drawable.ic_stat_mochi)
-            .setContentTitle("$agentName needs your approval")
+            .setContentTitle(agentName)
+            .setSubText(context.getString(R.string.approval_title))
             .setContentText("${r.tool}: ${r.command}")
             .setStyle(Notification.BigTextStyle().bigText("${r.tool}: ${r.command}"))
             .setCategory(Notification.CATEGORY_ALARM)
@@ -90,8 +91,8 @@ class Notifications(private val context: Context) {
             .setAutoCancel(true)
             .setTimeoutAfter(com.coucou.android.link.Protocol.APPROVAL_TTL_MS)
             .setContentIntent(open(r.fingerprint, false, id))
-            .addAction(Notification.Action.Builder(null, "Deny", deny).build())
-            .addAction(Notification.Action.Builder(null, "Allow", open(r.fingerprint, true, id + 1)).build())
+            .addAction(Notification.Action.Builder(null, context.getString(R.string.action_deny), deny).build())
+            .addAction(Notification.Action.Builder(null, context.getString(R.string.action_allow), open(r.fingerprint, true, id + 1)).build())
             .build()
         runCatching { nm.notify(id, n) } // POST_NOTIFICATIONS may be denied: the in-app card still works
     }

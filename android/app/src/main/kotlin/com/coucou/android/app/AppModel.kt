@@ -7,7 +7,9 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.coucou.android.R
 import com.coucou.android.core.Pills
+import com.coucou.android.link.Protocol
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.DemoLink
 import com.coucou.android.link.DesktopLink
@@ -35,6 +37,13 @@ class AppModel(private val context: Context) : LinkListener {
     var approvals by mutableStateOf<List<ApprovalRequest>>(emptyList()); private set
     var message by mutableStateOf<String?>(null)
 
+    /**
+     * Allow was tapped on a notification before the link was back (the app had been closed): the
+     * desktop offers the request again as soon as it reconnects, and the biometric prompt opens then.
+     */
+    var wantAllow by mutableStateOf<String?>(null)
+
+    private val expiry = HashMap<String, Runnable>()
     private var link: DesktopLink? = null
     private val lastState = HashMap<String, BotState>()
 
@@ -53,7 +62,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     fun pair(text: String): Boolean {
         val p = PairingPayload.parse(text)
-        if (p == null) { message = "That is not a Coucou pairing link."; return false }
+        if (p == null) { message = "That is not a Coucou X
         stopLink()
         store.savePairing(p)
         connect(p)
@@ -89,21 +98,42 @@ class AppModel(private val context: Context) : LinkListener {
         linkState = LinkState.DISCONNECTED
         desktopName = null
         sessions = emptyList()
-        approvals.forEach { notifier.cancelApproval(it.fingerprint) }
-        approvals = emptyList()
+        dropApprovals()
+        wantAllow = null
         lastState.clear()
     }
 
     /** True if the decision was sent (or applied to the demo). Allow is gated by the biometric prompt in the UI. */
     fun decide(fingerprint: String, allow: Boolean): Boolean {
         val ok = link?.decide(fingerprint, allow) ?: false
-        if (!ok) message = "That request is no longer pending."
+        if (!ok) message = context.getString(R.string.msg_not_pending)
         return ok
+    }
+
+    /** Every card goes: the desktop offers a request again if it is still pending once we reconnect. */
+    private fun dropApprovals() {
+        expiry.values.forEach { main.removeCallbacks(it) }
+        expiry.clear()
+        approvals.forEach { notifier.cancelApproval(it.fingerprint) }
+        approvals = emptyList()
+    }
+
+    private fun removeApproval(fingerprint: String) {
+        expiry.remove(fingerprint)?.let { main.removeCallbacks(it) }
+        approvals = approvals.filter { it.fingerprint != fingerprint }
+        notifier.cancelApproval(fingerprint)
     }
 
     // ── LinkListener (link thread) ───────────────────────────────────────────
 
-    override fun onState(state: LinkState) { main.post { linkState = state; notifier.updateOngoing(this) } }
+    override fun onState(state: LinkState) {
+        main.post {
+            linkState = state
+            // A card for a request we can no longer answer would only produce "no longer pending".
+            if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
+            notifier.updateOngoing(this)
+        }
+    }
 
     override fun onWelcome(desktopName: String, os: String) {
         main.post { if (mode != Mode.DEMO && desktopName.isNotBlank()) this.desktopName = desktopName }
@@ -125,18 +155,26 @@ class AppModel(private val context: Context) : LinkListener {
         main.post {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
             notifier.showApproval(request, agentName(request.pillId))
+            // Offered for 120 s from now, by this phone's clock (the notification times out then too).
+            expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
+            val gone = Runnable { removeApproval(request.fingerprint) }
+            expiry[request.fingerprint] = gone
+            main.postDelayed(gone, Protocol.APPROVAL_TTL_MS)
         }
     }
 
     override fun onApprovalResolved(fingerprint: String) {
         main.post {
-            approvals = approvals.filter { it.fingerprint != fingerprint }
-            notifier.cancelApproval(fingerprint)
+            removeApproval(fingerprint)
+            if (wantAllow == fingerprint) wantAllow = null
         }
     }
 
     override fun onError(code: String, message: String) {
-        main.post { this.message = if (code == "auth") "The desktop rejected this phone. Pair again." else "Link error: $message" }
+        main.post {
+            this.message = if (code == "auth") context.getString(R.string.msg_rejected)
+            else "${context.getString(R.string.msg_link_error)}: $message"
+        }
     }
 
     private companion object {

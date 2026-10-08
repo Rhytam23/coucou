@@ -34,17 +34,6 @@
       "ru": "Подключение к компьютеру",
       "id": "Hubungkan ke komputer Anda"
     },
-    "Open Coucou on your computer, show the pairing code, and scan it with your phone camera. Or paste the pairing link below.": {
-      "zh-Hans": "在电脑上打开 Coucou，显示配对码，然后用手机相机扫描。也可以在下方粘贴配对链接。",
-      "hi": "अपने कंप्यूटर पर Coucou खोलें, पेयरिंग कोड दिखाएँ और उसे अपने फ़ोन के कैमरे से स्कैन करें। या नीचे पेयरिंग लिंक पेस्ट करें।",
-      "es": "Abre Coucou en tu ordenador, muestra el código de emparejamiento y escanéalo con la cámara del móvil. O pega abajo el enlace de emparejamiento.",
-      "ar": "افتح Coucou على حاسوبك، وأظهر رمز الاقتران، ثم امسحه بكاميرا هاتفك. أو الصق رابط الاقتران أدناه.",
-      "fr": "Ouvrez Coucou sur votre ordinateur, affichez le code d'appairage et scannez-le avec l'appareil photo du téléphone. Ou collez le lien d'appairage ci-dessous.",
-      "bn": "আপনার কম্পিউটারে Coucou খুলুন, পেয়ারিং কোড দেখান এবং ফোনের ক্যামেরা দিয়ে স্ক্যান করুন। অথবা নিচে পেয়ারিং লিংক পেস্ট করুন।",
-      "pt-BR": "Abra o Coucou no computador, mostre o código de pareamento e escaneie com a câmera do celular. Ou cole o link de pareamento abaixo.",
-      "ru": "Откройте Coucou на компьютере, покажите код сопряжения и отсканируйте его камерой телефона. Или вставьте ссылку для сопряжения ниже.",
-      "id": "Buka Coucou di komputer Anda, tampilkan kode penyandingan, lalu pindai dengan kamera ponsel. Atau tempel tautan penyandingan di bawah."
-    },
     "Pairing link": {
       "zh-Hans": "配对链接",
       "hi": "पेयरिंग लिंक",
@@ -121,6 +110,105 @@
       "pt-BR": "Galeria do Mochi",
       "ru": "Галерея Mochi",
       "id": "Galeri Mochi"
+    },
+    "On your computer, open Settings → Android phone, turn it on and show the pairing code. Scan it with your camera, or copy the link and paste it here.": {
+      "zh-Hans": "在电脑上打开“设置 → Android 手机”，开启并显示配对码。用相机扫描，或复制链接粘贴到这里。",
+      "hi": "अपने कंप्यूटर पर सेटिंग्स → Android फ़ोन खोलें, उसे चालू करें और पेयरिंग कोड दिखाएँ। कैमरे से स्कैन करें, या लिंक कॉपी करके यहाँ पेस्ट करें।",
+      "es": "En tu equipo, abre Ajustes → Teléfono Android, actívalo y muestra el código de emparejamiento. Escanéalo con la cámara o copia el enlace y pégalo aquí.",
+      "ar": "على الكمبيوتر، افتح الإعدادات ← هاتف Android وفعّله وأظهر رمز الاقتران. امسحه بالكاميرا أو انسخ الرابط والصقه هنا.",
+      "fr": "Sur ton ordinateur, ouvre Réglages → Téléphone Android, active-le et affiche le code d'association. Scanne-le avec l'appareil photo, ou copie le lien et colle-le ici.",
+      "bn": "কম্পিউটারে সেটিংস → Android ফোন খুলুন, চালু করে পেয়ারিং কোড দেখান। ক্যামেরা দিয়ে স্ক্যান করুন, অথবা লিংক কপি করে এখানে পেস্ট করুন।",
+      "pt-BR": "No computador, abra Ajustes → Celular Android, ative e mostre o código de pareamento. Escaneie com a câmera ou copie o link e cole aqui.",
+      "ru": "На компьютере откройте Настройки → Телефон Android, включите и покажите код сопряжения. Отсканируйте камерой или скопируйте ссылку и вставьте сюда.",
+      "id": "Di komputer, buka Pengaturan → Ponsel Android, aktifkan dan tampilkan kode penyandingan. Pindai dengan kamera, atau salin tautan dan tempel di sini."
+    },
+    "Paste from clipboard": {
+      "zh-Hans": "从剪贴板粘贴",
+      "hi": "क्लिपबोर्ड से पेस्ट करें",
+      "es": "Pegar del portapapeles",
+      "ar": "لصق من الحافظة",
+      "fr": "Coller depuis le presse-papiers",
+      "bn": "ক্লিপবোর্ড থেকে পেস্ট করুন",
+      "pt-BR": "Colar da área de transferência",
+      "ru": "Вставить из буфера обмена",
+      "id": "Tempel dari papan klip"
+    },
+    "Unlock to see the request": {
+      "zh-Hans": "解锁后查看请求",
+      "hi": "अनुरोध देखने के लिए अनलॉक करें",
+      "es": "Desbloquea para ver la solicitud",
+      "ar": "افتح القفل لرؤية الطلب",
+      "fr": "Déverrouille pour voir la demande",
+      "bn": "অনুরোধ দেখতে আনলক করুন",
+      "pt-BR": "Desbloqueie para ver o pedido",
+      "ru": "Разблокируйте, чтобы увидеть запрос",
+      "id": "Buka kunci untuk melihat permintaan"
+    },
+    "That request is no longer pending.": {
+      "zh-Hans": "该请求已不在等待中。",
+      "hi": "वह अनुरोध अब लंबित नहीं है।",
+      "es": "Esa solicitud ya no está pendiente.",
+      "ar": "لم يعد هذا الطلب معلّقًا.",
+      "fr": "Cette demande n'est plus en attente.",
+      "bn": "সেই অনুরোধটি আর অপেক্ষমাণ নেই।",
+      "pt-BR": "Esse pedido não está mais pendente.",
+      "ru": "Этот запрос больше не ожидает ответа.",
+      "id": "Permintaan itu sudah tidak tertunda."
+    },
+    "That is not a Coucou pairing link.": {
+      "zh-Hans": "这不是 Coucou 配对链接。",
+      "hi": "यह Coucou पेयरिंग लिंक नहीं है।",
+      "es": "Ese no es un enlace de emparejamiento de Coucou.",
+      "ar": "هذا ليس رابط اقتران Coucou.",
+      "fr": "Ce n'est pas un lien d'association Coucou.",
+      "bn": "এটি Coucou পেয়ারিং লিংক নয়।",
+      "pt-BR": "Esse não é um link de pareamento do Coucou.",
+      "ru": "Это не ссылка сопряжения Coucou.",
+      "id": "Itu bukan tautan penyandingan Coucou."
+    },
+    "The desktop rejected this phone. Pair again.": {
+      "zh-Hans": "电脑拒绝了这部手机。请重新配对。",
+      "hi": "कंप्यूटर ने इस फ़ोन को अस्वीकार कर दिया। फिर से पेयर करें।",
+      "es": "El equipo rechazó este teléfono. Vuelve a emparejar.",
+      "ar": "رفض الكمبيوتر هذا الهاتف. أعد الاقتران.",
+      "fr": "L'ordinateur a refusé ce téléphone. Associe-le à nouveau.",
+      "bn": "কম্পিউটার এই ফোনটি প্রত্যাখ্যান করেছে। আবার পেয়ার করুন।",
+      "pt-BR": "O computador recusou este celular. Pareie de novo.",
+      "ru": "Компьютер отклонил этот телефон. Выполните сопряжение заново.",
+      "id": "Komputer menolak ponsel ini. Sandingkan ulang."
+    },
+    "Link error": {
+      "zh-Hans": "连接错误",
+      "hi": "लिंक त्रुटि",
+      "es": "Error de enlace",
+      "ar": "خطأ في الاتصال",
+      "fr": "Erreur de liaison",
+      "bn": "লিংক ত্রুটি",
+      "pt-BR": "Erro de conexão",
+      "ru": "Ошибка связи",
+      "id": "Kesalahan tautan"
+    },
+    "Set a screen lock to approve from your phone.": {
+      "zh-Hans": "请先设置锁屏，才能在手机上批准。",
+      "hi": "फ़ोन से मंज़ूरी देने के लिए स्क्रीन लॉक सेट करें।",
+      "es": "Configura un bloqueo de pantalla para aprobar desde el teléfono.",
+      "ar": "اضبط قفل الشاشة للموافقة من هاتفك.",
+      "fr": "Configure un verrouillage d'écran pour autoriser depuis le téléphone.",
+      "bn": "ফোন থেকে অনুমোদন দিতে স্ক্রিন লক সেট করুন।",
+      "pt-BR": "Configure um bloqueio de tela para aprovar pelo celular.",
+      "ru": "Настройте блокировку экрана, чтобы разрешать с телефона.",
+      "id": "Setel kunci layar untuk menyetujui dari ponsel."
+    },
+    "Allow on the phone asks for the fingerprint or the screen lock. Deny does not.": {
+      "zh-Hans": "在手机上点“允许”需要指纹或锁屏验证；“拒绝”则不需要。",
+      "hi": "फ़ोन पर अनुमति देने के लिए फ़िंगरप्रिंट या स्क्रीन लॉक माँगा जाता है। अस्वीकार के लिए नहीं।",
+      "es": "Permitir en el teléfono pide la huella o el bloqueo de pantalla. Denegar no.",
+      "ar": "السماح على الهاتف يتطلب بصمة الإصبع أو قفل الشاشة. أما الرفض فلا يتطلبها.",
+      "fr": "Autoriser sur le téléphone demande l'empreinte ou le verrouillage d'écran. Refuser, non.",
+      "bn": "ফোনে অনুমতি দিতে ফিঙ্গারপ্রিন্ট বা স্ক্রিন লক লাগে। প্রত্যাখ্যানে লাগে না।",
+      "pt-BR": "Permitir no celular pede a digital ou o bloqueio de tela. Negar não pede.",
+      "ru": "Чтобы разрешить на телефоне, нужен отпечаток пальца или блокировка экрана. Для отказа — не нужен.",
+      "id": "Mengizinkan di ponsel meminta sidik jari atau kunci layar. Menolak tidak."
     }
   }
 }

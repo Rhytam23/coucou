@@ -12,7 +12,7 @@
     <string name="demo_mode">وضع العرض</string>
     <string name="demo_try">تجربة وضع العرض</string>
     <string name="pair_title">الاتصال بحاسوبك</string>
-    <string name="pair_hint">افتح Coucou على حاسوبك، وأظهر رمز الاقتران، ثم امسحه بكاميرا هاتفك. أو الصق رابط الاقتران أدناه.</string>
+    <string name="pair_hint">على الكمبيوتر، افتح الإعدادات ← هاتف Android وفعّله وأظهر رمز الاقتران. امسحه بالكاميرا أو انسخ الرابط والصقه هنا.</string>
     <string name="pair_paste">رابط الاقتران</string>
     <string name="pair_button">اقتران</string>
     <string name="sessions_title">الوكلاء</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">قطع الاتصال بهذا الحاسوب</string>
     <string name="demo_leave">الخروج من وضع العرض</string>
     <string name="gallery">معرض Mochi</string>
+    <string name="pair_clipboard">لصق من الحافظة</string>
+    <string name="notif_unlock">افتح القفل لرؤية الطلب</string>
+    <string name="msg_not_pending">لم يعد هذا الطلب معلّقًا.</string>
+    <string name="msg_bad_link">هذا ليس رابط اقتران Coucou.</string>
+    <string name="msg_rejected">رفض الكمبيوتر هذا الهاتف. أعد الاقتران.</string>
+    <string name="msg_link_error">خطأ في الاتصال</string>
+    <string name="msg_need_lock">اضبط قفل الشاشة للموافقة من هاتفك.</string>
+    <string name="approval_hint">السماح على الهاتف يتطلب بصمة الإصبع أو قفل الشاشة. أما الرفض فلا يتطلبها.</string>
 </resources>

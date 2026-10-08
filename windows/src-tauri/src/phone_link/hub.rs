@@ -14,6 +14,7 @@
 //   * nothing here can block the agent: the desktop's own card keeps working,
 //     and a phone that never answers changes nothing.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use ring::digest;
@@ -114,6 +115,10 @@ pub enum Out {
 struct Sub {
     id: u64,
     tx: mpsc::Sender<Out>,
+    /// Set when the hub gives up on a phone that cannot keep up, so its
+    /// connection can be closed (and the phone reconnect to a fresh picture)
+    /// instead of staying open and silently going stale.
+    evicted: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
@@ -212,7 +217,7 @@ impl Hub {
 
     /// Registers a connection that has authenticated. The returned lines bring it
     /// up to date: the sessions, then the request still waiting, if any.
-    pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64) -> u64 {
+    pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64) -> (u64, Arc<AtomicBool>) {
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -221,8 +226,9 @@ impl Hub {
         if let Some(a) = &inner.approval {
             let _ = tx.try_send(Out::Line(approval_line(a).into()));
         }
-        inner.subs.push(Sub { id, tx });
-        id
+        let evicted = Arc::new(AtomicBool::new(false));
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone() });
+        (id, evicted)
     }
 
     pub fn unsubscribe(&self, id: u64) {
@@ -283,7 +289,13 @@ fn expire(inner: &mut Inner, now: u64) {
 /// has gone is dropped rather than waited for.
 fn broadcast(inner: &mut Inner, line: &str) {
     let shared: Arc<str> = line.into();
-    inner.subs.retain(|s| s.tx.try_send(Out::Line(shared.clone())).is_ok());
+    inner.subs.retain(|s| {
+        let kept = s.tx.try_send(Out::Line(shared.clone())).is_ok();
+        if !kept {
+            s.evicted.store(true, Ordering::SeqCst);
+        }
+        kept
+    });
 }
 
 fn sessions_line(sessions: &[Session]) -> String {
@@ -540,6 +552,24 @@ mod tests {
             hub.publish(vec![SessionIn { status_text: format!("{i}"), ..session("working") }], None, 1_000);
         }
         assert_eq!(hub.clients(), 0);
+    }
+
+    #[test]
+    fn a_phone_that_was_dropped_is_marked_so_its_connection_can_close() {
+        let (hub, _) = hub();
+        let (tx, _rx) = mpsc::channel(1); // never read
+        let (_, evicted) = hub.subscribe(tx, 0);
+        assert!(!evicted.load(Ordering::SeqCst));
+        for i in 0..4 {
+            hub.publish(vec![SessionIn { status_text: format!("{i}"), ..session("working") }], None, 1_000);
+        }
+        assert!(evicted.load(Ordering::SeqCst), "a dropped phone must be told apart from a healthy one");
+        // A healthy phone is never marked.
+        let (tx, mut rx) = mpsc::channel(16);
+        let (_, ok) = hub.subscribe(tx, 0);
+        hub.publish(vec![session("finished")], None, 2_000);
+        drain(&mut rx);
+        assert!(!ok.load(Ordering::SeqCst));
     }
 
     #[test]

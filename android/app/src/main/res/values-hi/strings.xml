@@ -12,7 +12,7 @@
     <string name="demo_mode">डेमो मोड</string>
     <string name="demo_try">डेमो मोड आज़माएँ</string>
     <string name="pair_title">अपने कंप्यूटर से कनेक्ट करें</string>
-    <string name="pair_hint">अपने कंप्यूटर पर Coucou खोलें, पेयरिंग कोड दिखाएँ और उसे अपने फ़ोन के कैमरे से स्कैन करें। या नीचे पेयरिंग लिंक पेस्ट करें।</string>
+    <string name="pair_hint">अपने कंप्यूटर पर सेटिंग्स → Android फ़ोन खोलें, उसे चालू करें और पेयरिंग कोड दिखाएँ। कैमरे से स्कैन करें, या लिंक कॉपी करके यहाँ पेस्ट करें।</string>
     <string name="pair_paste">पेयरिंग लिंक</string>
     <string name="pair_button">पेयर करें</string>
     <string name="sessions_title">एजेंट्स</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">इस कंप्यूटर को डिस्कनेक्ट करें</string>
     <string name="demo_leave">डेमो मोड छोड़ें</string>
     <string name="gallery">Mochi गैलरी</string>
+    <string name="pair_clipboard">क्लिपबोर्ड से पेस्ट करें</string>
+    <string name="notif_unlock">अनुरोध देखने के लिए अनलॉक करें</string>
+    <string name="msg_not_pending">वह अनुरोध अब लंबित नहीं है।</string>
+    <string name="msg_bad_link">यह Coucou पेयरिंग लिंक नहीं है।</string>
+    <string name="msg_rejected">कंप्यूटर ने इस फ़ोन को अस्वीकार कर दिया। फिर से पेयर करें।</string>
+    <string name="msg_link_error">लिंक त्रुटि</string>
+    <string name="msg_need_lock">फ़ोन से मंज़ूरी देने के लिए स्क्रीन लॉक सेट करें।</string>
+    <string name="approval_hint">फ़ोन पर अनुमति देने के लिए फ़िंगरप्रिंट या स्क्रीन लॉक माँगा जाता है। अस्वीकार के लिए नहीं।</string>
 </resources>

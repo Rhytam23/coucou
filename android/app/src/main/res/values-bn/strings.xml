@@ -12,7 +12,7 @@
     <string name="demo_mode">ডেমো মোড</string>
     <string name="demo_try">ডেমো মোড চেষ্টা করুন</string>
     <string name="pair_title">আপনার কম্পিউটারের সাথে সংযুক্ত হন</string>
-    <string name="pair_hint">আপনার কম্পিউটারে Coucou খুলুন, পেয়ারিং কোড দেখান এবং ফোনের ক্যামেরা দিয়ে স্ক্যান করুন। অথবা নিচে পেয়ারিং লিংক পেস্ট করুন।</string>
+    <string name="pair_hint">কম্পিউটারে সেটিংস → Android ফোন খুলুন, চালু করে পেয়ারিং কোড দেখান। ক্যামেরা দিয়ে স্ক্যান করুন, অথবা লিংক কপি করে এখানে পেস্ট করুন।</string>
     <string name="pair_paste">পেয়ারিং লিংক</string>
     <string name="pair_button">পেয়ার করুন</string>
     <string name="sessions_title">এজেন্টস</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">এই কম্পিউটারের সংযোগ বিচ্ছিন্ন করুন</string>
     <string name="demo_leave">ডেমো মোড থেকে বের হন</string>
     <string name="gallery">Mochi গ্যালারি</string>
+    <string name="pair_clipboard">ক্লিপবোর্ড থেকে পেস্ট করুন</string>
+    <string name="notif_unlock">অনুরোধ দেখতে আনলক করুন</string>
+    <string name="msg_not_pending">সেই অনুরোধটি আর অপেক্ষমাণ নেই।</string>
+    <string name="msg_bad_link">এটি Coucou পেয়ারিং লিংক নয়।</string>
+    <string name="msg_rejected">কম্পিউটার এই ফোনটি প্রত্যাখ্যান করেছে। আবার পেয়ার করুন।</string>
+    <string name="msg_link_error">লিংক ত্রুটি</string>
+    <string name="msg_need_lock">ফোন থেকে অনুমোদন দিতে স্ক্রিন লক সেট করুন।</string>
+    <string name="approval_hint">ফোনে অনুমতি দিতে ফিঙ্গারপ্রিন্ট বা স্ক্রিন লক লাগে। প্রত্যাখ্যানে লাগে না।</string>
 </resources>

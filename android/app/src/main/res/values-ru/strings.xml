@@ -12,7 +12,7 @@
     <string name="demo_mode">Демо-режим</string>
     <string name="demo_try">Попробовать демо</string>
     <string name="pair_title">Подключение к компьютеру</string>
-    <string name="pair_hint">Откройте Coucou на компьютере, покажите код сопряжения и отсканируйте его камерой телефона. Или вставьте ссылку для сопряжения ниже.</string>
+    <string name="pair_hint">На компьютере откройте Настройки → Телефон Android, включите и покажите код сопряжения. Отсканируйте камерой или скопируйте ссылку и вставьте сюда.</string>
     <string name="pair_paste">Ссылка для сопряжения</string>
     <string name="pair_button">Сопрячь</string>
     <string name="sessions_title">Агенты</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">Отключить этот компьютер</string>
     <string name="demo_leave">Выйти из демо-режима</string>
     <string name="gallery">Галерея Mochi</string>
+    <string name="pair_clipboard">Вставить из буфера обмена</string>
+    <string name="notif_unlock">Разблокируйте, чтобы увидеть запрос</string>
+    <string name="msg_not_pending">Этот запрос больше не ожидает ответа.</string>
+    <string name="msg_bad_link">Это не ссылка сопряжения Coucou.</string>
+    <string name="msg_rejected">Компьютер отклонил этот телефон. Выполните сопряжение заново.</string>
+    <string name="msg_link_error">Ошибка связи</string>
+    <string name="msg_need_lock">Настройте блокировку экрана, чтобы разрешать с телефона.</string>
+    <string name="approval_hint">Чтобы разрешить на телефоне, нужен отпечаток пальца или блокировка экрана. Для отказа — не нужен.</string>
 </resources>

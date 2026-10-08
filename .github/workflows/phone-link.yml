@@ -9,7 +9,7 @@ on:
     branches: [android]
     paths:
       - 'windows/**'
-      - 'android/app/src/**'
+      - 'android/**'
       - 'docs/ANDROID_LINK.md'
       - '.github/workflows/phone-link.yml'
   workflow_dispatch:
@@ -71,3 +71,21 @@ jobs:
         env:
           COUCOU_RUST_INTEROP: '1'
         run: ./gradlew testDebugUnitTest --tests '*RustDesktopInteropTest' --console=plain
+
+  android:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: android } }
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Translations are up to date
+        run: node scripts/gen-strings.mjs --check
+      - name: Tests, debug build, lint
+        run: ./gradlew test assembleDebug lint --console=plain
+      - name: No ads, billing or analytics (condition of the author's permission)
+        run: "! grep -rEi 'admob|play-services-ads|billingclient|firebase-analytics|crashlytics|com.google.android.gms' app/build.gradle.kts"

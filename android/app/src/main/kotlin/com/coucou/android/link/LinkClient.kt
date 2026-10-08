@@ -102,19 +102,22 @@ class LinkClient(
     override fun decide(fingerprint: String, allow: Boolean): Boolean {
         val w = writer
         if (out == null || w == null) return false
+        val age = approvals.ageMs(fingerprint) ?: 0L
         val request = approvals.claim(fingerprint) ?: return false
+        // If it cannot be sent it goes back with the time it has already used, not a fresh 120 s.
+        val back = { approvals.restore(request, clockMs() - age) }
         return try {
             w.execute {
                 try {
                     send(ClientMsg.Decision(request.fingerprint, allow))
                 } catch (_: IOException) {
-                    approvals.add(request) // not sent: keep it so the user can retry while it is still valid
+                    back() // not sent: keep it so the user can retry while it is still valid
                     listener.onError("send", "could not reach the desktop")
                 }
             }
             true
         } catch (_: java.util.concurrent.RejectedExecutionException) {
-            approvals.add(request)
+            back()
             false
         }
     }

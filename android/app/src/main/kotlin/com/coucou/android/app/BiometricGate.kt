@@ -15,8 +15,8 @@ object BiometricGate {
     fun available(activity: Activity): Boolean =
         activity.getSystemService(BiometricManager::class.java).canAuthenticate(AUTH) == BiometricManager.BIOMETRIC_SUCCESS
 
-    fun confirm(activity: Activity, title: String, subtitle: String, onSuccess: () -> Unit, onFail: (String) -> Unit) {
-        if (!available(activity)) { onFail("Set a screen lock to approve from your phone."); return }
+    fun confirm(activity: Activity, title: String, subtitle: String, noLockMessage: String, onSuccess: () -> Unit, onFail: (String) -> Unit) {
+        if (!available(activity)) { onFail(noLockMessage); return }
         BiometricPrompt.Builder(activity)
             .setTitle(title)
             .setSubtitle(subtitle)

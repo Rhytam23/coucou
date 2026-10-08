@@ -14,7 +14,7 @@
     "demo_mode": "Demo mode",
     "demo_try": "Try demo mode",
     "pair_title": "Connect to your computer",
-    "pair_hint": "Open Coucou on your computer, show the pairing code, and scan it with your phone camera. Or paste the pairing link below.",
+    "pair_hint": "On your computer, open Settings → Android phone, turn it on and show the pairing code. Scan it with your camera, or copy the link and paste it here.",
     "pair_paste": "Pairing link",
     "pair_button": "Pair",
     "sessions_title": "Agents",
@@ -22,7 +22,15 @@
     "approval_title": "Approval needed",
     "action_unpair": "Disconnect this computer",
     "demo_leave": "Leave demo mode",
-    "gallery": "Mochi gallery"
+    "gallery": "Mochi gallery",
+    "pair_clipboard": "Paste from clipboard",
+    "notif_unlock": "Unlock to see the request",
+    "msg_not_pending": "That request is no longer pending.",
+    "msg_bad_link": "That is not a Coucou pairing link.",
+    "msg_rejected": "The desktop rejected this phone. Pair again.",
+    "msg_link_error": "Link error",
+    "msg_need_lock": "Set a screen lock to approve from your phone.",
+    "approval_hint": "Allow on the phone asks for the fingerprint or the screen lock. Deny does not."
   },
   "_untranslatable": [
     "app_name",

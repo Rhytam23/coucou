@@ -12,7 +12,7 @@
     <string name="demo_mode">Modo demo</string>
     <string name="demo_try">Experimentar modo demo</string>
     <string name="pair_title">Conectar ao seu computador</string>
-    <string name="pair_hint">Abra o Coucou no computador, mostre o código de pareamento e escaneie com a câmera do celular. Ou cole o link de pareamento abaixo.</string>
+    <string name="pair_hint">No computador, abra Ajustes → Celular Android, ative e mostre o código de pareamento. Escaneie com a câmera ou copie o link e cole aqui.</string>
     <string name="pair_paste">Link de pareamento</string>
     <string name="pair_button">Parear</string>
     <string name="sessions_title">Agentes</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">Desconectar este computador</string>
     <string name="demo_leave">Sair do modo demo</string>
     <string name="gallery">Galeria do Mochi</string>
+    <string name="pair_clipboard">Colar da área de transferência</string>
+    <string name="notif_unlock">Desbloqueie para ver o pedido</string>
+    <string name="msg_not_pending">Esse pedido não está mais pendente.</string>
+    <string name="msg_bad_link">Esse não é um link de pareamento do Coucou.</string>
+    <string name="msg_rejected">O computador recusou este celular. Pareie de novo.</string>
+    <string name="msg_link_error">Erro de conexão</string>
+    <string name="msg_need_lock">Configure um bloqueio de tela para aprovar pelo celular.</string>
+    <string name="approval_hint">Permitir no celular pede a digital ou o bloqueio de tela. Negar não pede.</string>
 </resources>

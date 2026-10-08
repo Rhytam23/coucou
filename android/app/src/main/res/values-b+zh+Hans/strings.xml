@@ -12,7 +12,7 @@
     <string name="demo_mode">演示模式</string>
     <string name="demo_try">试用演示模式</string>
     <string name="pair_title">连接到你的电脑</string>
-    <string name="pair_hint">在电脑上打开 Coucou，显示配对码，然后用手机相机扫描。也可以在下方粘贴配对链接。</string>
+    <string name="pair_hint">在电脑上打开“设置 → Android 手机”，开启并显示配对码。用相机扫描，或复制链接粘贴到这里。</string>
     <string name="pair_paste">配对链接</string>
     <string name="pair_button">配对</string>
     <string name="sessions_title">代理</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">断开此电脑</string>
     <string name="demo_leave">退出演示模式</string>
     <string name="gallery">Mochi 画廊</string>
+    <string name="pair_clipboard">从剪贴板粘贴</string>
+    <string name="notif_unlock">解锁后查看请求</string>
+    <string name="msg_not_pending">该请求已不在等待中。</string>
+    <string name="msg_bad_link">这不是 Coucou 配对链接。</string>
+    <string name="msg_rejected">电脑拒绝了这部手机。请重新配对。</string>
+    <string name="msg_link_error">连接错误</string>
+    <string name="msg_need_lock">请先设置锁屏，才能在手机上批准。</string>
+    <string name="approval_hint">在手机上点“允许”需要指纹或锁屏验证；“拒绝”则不需要。</string>
 </resources>

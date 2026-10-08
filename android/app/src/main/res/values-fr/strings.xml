@@ -12,7 +12,7 @@
     <string name="demo_mode">Mode démo</string>
     <string name="demo_try">Essayer la démo</string>
     <string name="pair_title">Se connecter à votre ordinateur</string>
-    <string name="pair_hint">Ouvrez Coucou sur votre ordinateur, affichez le code d\'appairage et scannez-le avec l\'appareil photo du téléphone. Ou collez le lien d\'appairage ci-dessous.</string>
+    <string name="pair_hint">Sur ton ordinateur, ouvre Réglages → Téléphone Android, active-le et affiche le code d\'association. Scanne-le avec l\'appareil photo, ou copie le lien et colle-le ici.</string>
     <string name="pair_paste">Lien d\'appairage</string>
     <string name="pair_button">Appairer</string>
     <string name="sessions_title">Agents</string>
@@ -21,4 +21,12 @@
     <string name="action_unpair">Déconnecter cet ordinateur</string>
     <string name="demo_leave">Quitter le mode démo</string>
     <string name="gallery">Galerie de Mochi</string>
+    <string name="pair_clipboard">Coller depuis le presse-papiers</string>
+    <string name="notif_unlock">Déverrouille pour voir la demande</string>
+    <string name="msg_not_pending">Cette demande n\'est plus en attente.</string>
+    <string name="msg_bad_link">Ce n\'est pas un lien d\'association Coucou.</string>
+    <string name="msg_rejected">L\'ordinateur a refusé ce téléphone. Associe-le à nouveau.</string>
+    <string name="msg_link_error">Erreur de liaison</string>
+    <string name="msg_need_lock">Configure un verrouillage d\'écran pour autoriser depuis le téléphone.</string>
+    <string name="approval_hint">Autoriser sur le téléphone demande l\'empreinte ou le verrouillage d\'écran. Refuser, non.</string>
 </resources>
