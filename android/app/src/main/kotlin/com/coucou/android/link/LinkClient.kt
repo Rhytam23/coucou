@@ -8,6 +8,8 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.SecureRandom
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import javax.net.ssl.SSLContext
 
 enum class LinkState { DISCONNECTED, CONNECTING, CONNECTED }
@@ -72,31 +74,47 @@ class LinkClient(
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
     private val writeLock = Any()
+    /** Android forbids network I/O on the main thread, and the UI calls decide() and stop(): writes happen here. */
+    @Volatile private var writer: ExecutorService? = null
 
     @Synchronized override fun start() {
         if (running) return
         running = true
         fatal = false
+        writer = Executors.newSingleThreadExecutor { r -> Thread(r, "coucou-link-writer").apply { isDaemon = true } }
         thread = Thread(::loop, "coucou-link").apply { isDaemon = true; start() }
     }
 
     @Synchronized override fun stop() {
         running = false
-        runCatching { send(ClientMsg.Bye) }
-        runCatching { socket?.close() }
+        val s = socket
+        // Sent and closed off the caller's thread; "bye" is best effort.
+        writer?.let { w ->
+            runCatching { w.execute { runCatching { send(ClientMsg.Bye) }; runCatching { s?.close() } } }
+            w.shutdown()
+        } ?: runCatching { s?.close() }
+        writer = null
         thread?.interrupt()
         thread = null
     }
 
     /** Sends allow/deny for a pending approval. False if it is unknown, expired, decided or the link is down. */
     override fun decide(fingerprint: String, allow: Boolean): Boolean {
-        if (out == null) return false
+        val w = writer
+        if (out == null || w == null) return false
         val request = approvals.claim(fingerprint) ?: return false
         return try {
-            send(ClientMsg.Decision(request.fingerprint, allow))
+            w.execute {
+                try {
+                    send(ClientMsg.Decision(request.fingerprint, allow))
+                } catch (_: IOException) {
+                    approvals.add(request) // not sent: keep it so the user can retry while it is still valid
+                    listener.onError("send", "could not reach the desktop")
+                }
+            }
             true
-        } catch (_: IOException) {
-            approvals.add(request) // not sent: keep it so the user can retry while it is still valid
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            approvals.add(request)
             false
         }
     }

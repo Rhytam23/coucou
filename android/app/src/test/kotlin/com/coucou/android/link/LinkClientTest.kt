@@ -235,6 +235,41 @@ class LinkClientTest {
         assertTrue(ping)
     }
 
+    @Test fun decisionsAndStopNeverTouchTheNetworkOnTheCallersThread() {
+        // Android throws NetworkOnMainThreadException if the UI thread writes to a socket.
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        val writers = CopyOnWriteArrayList<Pair<String, Thread>>()
+        val p = payload(d)
+        val connector = Connector { ms ->
+            object : Socket() {
+                override fun getOutputStream(): java.io.OutputStream {
+                    val real = super.getOutputStream()
+                    return object : java.io.OutputStream() {
+                        override fun write(b: Int) = real.write(b)
+                        override fun write(b: ByteArray, off: Int, len: Int) {
+                            writers.add(String(b, off, len) to Thread.currentThread())
+                            real.write(b, off, len)
+                        }
+                        override fun flush() = real.flush()
+                    }
+                }
+            }.apply { connect(java.net.InetSocketAddress(p.host, p.port), ms) }
+        }
+        val c = LinkClient(p, "Pixel", rec, connector, clockMs = { now }, readTimeoutMs = 2_000, pingEveryMs = 60_000)
+        closeables.add(AutoCloseable { c.stop() })
+        c.start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        d.push(d.approvalJson(now))
+        val req = rec.approvals.poll(5, TimeUnit.SECONDS)!!
+        val caller = Thread.currentThread()
+        assertTrue(c.decide(req.fingerprint, allow = false))
+        c.stop()
+        assertTrue(generateSequence { d.received.poll(3, TimeUnit.SECONDS) }.take(6).any { it.contains("\"decision\":\"deny\"") })
+        assertTrue("nothing was written", writers.isNotEmpty())
+        assertTrue("a write happened on the caller's thread", writers.none { it.second === caller && it.first.contains("decision") })
+    }
+
     @Test fun stopEndsTheLinkAndStaysStopped() {
         val d = FakeDesktop(tls = true).track()
         val rec = Recorder()
