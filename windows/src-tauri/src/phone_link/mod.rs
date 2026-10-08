@@ -14,6 +14,8 @@
 // that is still pending (hub.rs). The desktop's own card keeps working all along.
 
 mod hub;
+#[cfg(test)]
+mod interop;
 mod pairing;
 mod server;
 #[cfg(test)]
