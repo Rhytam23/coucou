@@ -1,0 +1,37 @@
+{
+  "_about": "English source for the Android app. Strings whose English text also exists in windows/src/i18n/strings.json (the desktop catalog, 10 languages) are translated from it by scripts/gen-strings.mjs; the others fall back to English until someone translates them in i18n/extra.json. Edit this file, then run: node android/scripts/gen-strings.mjs",
+  "strings": {
+    "app_name": "Coucou for Android",
+    "about_unofficial": "Unofficial Android port based on Coucou by Louis Raillé.",
+    "about_repo": "github.com/Louis-CFM/coucou",
+    "about_assets": "The name Coucou, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission. The code is released under the MIT License.",
+    "action_allow": "Allow",
+    "action_deny": "Deny",
+    "action_always": "Always",
+    "action_cancel": "Cancel",
+    "action_close": "Close",
+    "action_connect": "Connect",
+    "status_connected": "Connected",
+    "status_connecting": "Connecting…",
+    "status_not_connected": "Not connected",
+    "setting_language": "Language",
+    "setting_volume": "Volume",
+    "setting_sounds": "Enable sounds",
+    "demo_mode": "Demo mode",
+    "demo_try": "Try demo mode",
+    "pair_title": "Connect to your computer",
+    "pair_hint": "Open Coucou on your computer, show the pairing code, and scan it with your phone camera. Or paste the pairing link below.",
+    "pair_paste": "Pairing link",
+    "pair_button": "Pair",
+    "sessions_title": "Agents",
+    "sessions_empty": "No agent is running right now.",
+    "approval_title": "Approval needed",
+    "action_unpair": "Disconnect this computer",
+    "demo_leave": "Leave demo mode",
+    "gallery": "Mochi gallery"
+  },
+  "_untranslatable": [
+    "app_name",
+    "about_repo"
+  ]
+}

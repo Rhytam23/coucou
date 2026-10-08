@@ -1,0 +1,144 @@
+#!/usr/bin/env node
+// A pretend Coucou desktop for developing and testing the Android app without the real one.
+// Speaks docs/ANDROID_LINK.md (v1): TLS with a self-signed certificate, newline-delimited JSON.
+//
+//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once]
+//
+// It prints a pairing link (paste it in the app, or open it on the phone). Needs `openssl` on PATH.
+// Not for production: the real desktop link lives in the Tauri app.
+import tls from "node:tls";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+
+const arg = (name, def) => {
+  const i = process.argv.indexOf(`--${name}`);
+  return i > 0 ? process.argv[i + 1] : def;
+};
+const flag = (name) => process.argv.includes(`--${name}`);
+
+const V = 1;
+const MAX_LINE = 64 * 1024;
+const NAME = arg("name", os.hostname());
+const STEP_MS = Number(arg("step", "2500"));
+const TOKEN = arg("token", crypto.randomBytes(18).toString("base64url"));
+const lanIp = () => {
+  for (const list of Object.values(os.networkInterfaces()))
+    for (const a of list ?? []) if (a.family === "IPv4" && !a.internal) return a.address;
+  return "127.0.0.1";
+};
+const HOST = arg("host", lanIp());
+
+// The Mac's ApprovalRelay.fingerprint: SHA-256 of the fields joined by U+001F.
+export const fingerprint = (pill, session, tool, command, inputKey) =>
+  crypto.createHash("sha256").update([pill, session, tool, command, inputKey].join("\u001f"), "utf8").digest("hex");
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "coucou-dev-"));
+execFileSync("openssl", [
+  "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes",
+  "-keyout", path.join(dir, "key.pem"), "-out", path.join(dir, "cert.pem"),
+  "-days", "30", "-subj", "/CN=coucou-dev-desktop",
+], { stdio: "ignore" });
+const key = fs.readFileSync(path.join(dir, "key.pem"));
+const cert = fs.readFileSync(path.join(dir, "cert.pem"));
+fs.rmSync(dir, { recursive: true, force: true });
+const certSha256 = new crypto.X509Certificate(cert).fingerprint256.replaceAll(":", "").toLowerCase();
+
+const log = (...a) => console.log(...a);
+
+function script(now) {
+  const s = (pillId, agent, state, statusText, stepIndex, stepCount) => ({ pillId, agent, state, statusText, stepIndex, stepCount, updatedAt: now });
+  return [
+    [s("integration_claude", "Claude Code", "thinking", "Reading the project", 1, 6)],
+    [s("integration_claude", "Claude Code", "working", "Editing files", 2, 6), s("agent_codex", "Codex", "searching", "Searching the code", 1, 4)],
+    "approval",
+    [s("integration_claude", "Claude Code", "working", "Building", 4, 6), s("agent_codex", "Codex", "question", "Which branch?", 3, 4)],
+    [s("integration_claude", "Claude Code", "finished", "Done", 6, 6), s("agent_codex", "Codex", "error", "Tests failed", 3, 4)],
+    [s("agent_gemini", "Gemini CLI", "sleeping", "Idle", 0, 0)],
+  ];
+}
+
+const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => {
+  sock.setNoDelay(true);
+  sock.setTimeout(90_000, () => sock.destroy());
+  const send = (o) => sock.writable && sock.write(JSON.stringify(o) + "\n");
+  let buf = "";
+  let authed = false;
+  let timer = null;
+  let pending = null; // { fingerprint }
+  let step = 0;
+
+  const advance = () => {
+    const entries = script(Date.now());
+    const e = entries[step % entries.length];
+    step++;
+    if (e === "approval") {
+      const command = "npm run build";
+      const fp = fingerprint("integration_claude", "dev_session", "Bash", command, `n${step}`);
+      pending = { fingerprint: fp };
+      send({ type: "sessions", sessions: [
+        { pillId: "integration_claude", agent: "Claude Code", state: "approval", statusText: "Waiting for your approval", stepIndex: 3, stepCount: 6, updatedAt: Date.now() },
+      ] });
+      send({ type: "approval", pillId: "integration_claude", fingerprint: fp, tool: "Bash", command, createdAt: Date.now() });
+      log(`APPROVAL sent ${fp}`);
+    } else {
+      send({ type: "sessions", sessions: e });
+    }
+  };
+
+  const handle = (line) => {
+    let m;
+    try { m = JSON.parse(line); } catch { return sock.destroy(); }
+    if (!authed) {
+      if (m.type !== "hello") return sock.destroy();
+      const ok = m.v === V && typeof m.token === "string" &&
+        m.token.length === TOKEN.length && crypto.timingSafeEqual(Buffer.from(m.token), Buffer.from(TOKEN));
+      if (!ok) { send({ type: "error", code: "auth", message: "bad token or version" }); log("AUTH rejected"); return sock.end(); }
+      authed = true;
+      log(`HELLO ok device=${JSON.stringify(m.device)}`);
+      send({ type: "welcome", v: V, desktop: NAME, os: process.platform });
+      advance();
+      timer = setInterval(advance, STEP_MS);
+      return;
+    }
+    switch (m.type) {
+      case "ping": return send({ type: "pong" });
+      case "bye": log("BYE"); return sock.end();
+      case "decision": {
+        if (pending && m.fingerprint === pending.fingerprint && (m.decision === "allow" || m.decision === "deny")) {
+          log(`DECISION ${m.decision} ${m.fingerprint}`);
+          send({ type: "approvalResolved", fingerprint: pending.fingerprint });
+          pending = null;
+          if (flag("once")) setTimeout(() => process.exit(0), 200);
+        } else {
+          log(`DECISION ignored ${m.fingerprint}`);
+        }
+        return;
+      }
+      default: return;
+    }
+  };
+
+  sock.on("data", (d) => {
+    buf += d.toString("utf8");
+    if (buf.length > MAX_LINE * 2) return sock.destroy();
+    let i;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, i);
+      buf = buf.slice(i + 1);
+      if (line.length > MAX_LINE) return sock.destroy();
+      if (line) handle(line);
+    }
+  });
+  sock.on("close", () => { if (timer) clearInterval(timer); });
+  sock.on("error", () => {});
+});
+
+server.listen(Number(arg("port", "47821")), "0.0.0.0", () => {
+  const port = server.address().port;
+  const link = `coucou://pair?v=${V}&host=${HOST}&port=${port}&fp=${certSha256}&token=${TOKEN}&name=${encodeURIComponent(NAME)}`;
+  log(JSON.stringify({ listening: port, fp: certSha256, link }));
+  if (!flag("quiet")) console.error(`\nPairing link (paste it in Coucou for Android):\n${link}\n`);
+});

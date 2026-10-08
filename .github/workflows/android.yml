@@ -1,7 +1,7 @@
 name: android
 on:
   pull_request:
-    paths: ['android/**', '.github/workflows/android.yml']
+    paths: ['android/**', 'docs/ANDROID_LINK.md', '.github/workflows/android.yml']
   push:
     branches: [main]
     paths: ['android/**']
@@ -13,8 +13,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
       - uses: gradle/actions/setup-gradle@v4
-        with: { gradle-version: '8.10.2' }
-      - run: gradle test assembleDebug lint
-      - name: No ads, billing or analytics (permission condition)
-        run: "! grep -rEi 'admob|play-services-ads|billingclient|firebase-analytics|crashlytics' app/build.gradle.kts"
+      - name: Translations are up to date
+        run: node scripts/gen-strings.mjs --check
+      - name: Tests, debug build, lint
+        run: ./gradlew test assembleDebug lint --console=plain
+      - name: No ads, billing or analytics (condition of the author's permission)
+        run: "! grep -rEi 'admob|play-services-ads|billingclient|firebase-analytics|crashlytics|com.google.android.gms' app/build.gradle.kts"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-reports
+          path: android/app/build/reports

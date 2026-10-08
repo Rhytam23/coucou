@@ -1,0 +1,126 @@
+{
+  "_about": "Translations for Android-only strings, keyed by the English text, same shape as windows/src/i18n/extra.json. Languages: zh-Hans, hi, es, ar, fr, bn, pt-BR, ru, id. Native review welcome.",
+  "strings": {
+    "Unofficial Android port based on Coucou by Louis Raillé.": {
+      "zh-Hans": "基于 Louis Raillé 的 Coucou 的非官方 Android 移植版。",
+      "hi": "Louis Raillé के Coucou पर आधारित अनौपचारिक Android पोर्ट।",
+      "es": "Port no oficial para Android basado en Coucou de Louis Raillé.",
+      "ar": "نسخة أندرويد غير رسمية مبنية على Coucou من Louis Raillé.",
+      "fr": "Portage Android non officiel basé sur Coucou de Louis Raillé.",
+      "bn": "Louis Raillé-এর Coucou-এর উপর ভিত্তি করে তৈরি একটি অনানুষ্ঠানিক Android পোর্ট।",
+      "pt-BR": "Port não oficial para Android baseado no Coucou, de Louis Raillé.",
+      "ru": "Неофициальный порт для Android на основе Coucou от Louis Raillé.",
+      "id": "Port Android tidak resmi berdasarkan Coucou karya Louis Raillé."
+    },
+    "The name Coucou, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission. The code is released under the MIT License.": {
+      "zh-Hans": "Coucou 这一名称、Mochi 角色、图标和音效均为 © Louis Raillé 所有，经许可使用。代码以 MIT 许可证发布。",
+      "hi": "Coucou नाम, Mochi किरदार, आइकन और ध्वनियाँ © Louis Raillé की हैं और अनुमति से उपयोग की गई हैं। कोड MIT लाइसेंस के तहत जारी किया गया है।",
+      "es": "El nombre Coucou, el personaje Mochi, el icono y los sonidos son © Louis Raillé y se usan con su permiso. El código se publica bajo la licencia MIT.",
+      "ar": "اسم Coucou وشخصية Mochi والأيقونة والأصوات هي © Louis Raillé وتُستخدم بإذنه. الشيفرة البرمجية منشورة برخصة MIT.",
+      "fr": "Le nom Coucou, le personnage Mochi, l'icône et les sons sont © Louis Raillé et utilisés avec son autorisation. Le code est publié sous licence MIT.",
+      "bn": "Coucou নাম, Mochi চরিত্র, আইকন ও শব্দগুলো © Louis Raillé-এর এবং অনুমতিক্রমে ব্যবহৃত। কোডটি MIT লাইসেন্সে প্রকাশিত।",
+      "pt-BR": "O nome Coucou, o personagem Mochi, o ícone e os sons são © Louis Raillé e usados com permissão. O código é publicado sob a Licença MIT.",
+      "ru": "Название Coucou, персонаж Mochi, значок и звуки принадлежат © Louis Raillé и используются с его разрешения. Код распространяется по лицензии MIT.",
+      "id": "Nama Coucou, karakter Mochi, ikon, dan suara adalah © Louis Raillé dan digunakan dengan izin. Kode dirilis di bawah Lisensi MIT."
+    },
+    "Connect to your computer": {
+      "zh-Hans": "连接到你的电脑",
+      "hi": "अपने कंप्यूटर से कनेक्ट करें",
+      "es": "Conectar con tu ordenador",
+      "ar": "الاتصال بحاسوبك",
+      "fr": "Se connecter à votre ordinateur",
+      "bn": "আপনার কম্পিউটারের সাথে সংযুক্ত হন",
+      "pt-BR": "Conectar ao seu computador",
+      "ru": "Подключение к компьютеру",
+      "id": "Hubungkan ke komputer Anda"
+    },
+    "Open Coucou on your computer, show the pairing code, and scan it with your phone camera. Or paste the pairing link below.": {
+      "zh-Hans": "在电脑上打开 Coucou，显示配对码，然后用手机相机扫描。也可以在下方粘贴配对链接。",
+      "hi": "अपने कंप्यूटर पर Coucou खोलें, पेयरिंग कोड दिखाएँ और उसे अपने फ़ोन के कैमरे से स्कैन करें। या नीचे पेयरिंग लिंक पेस्ट करें।",
+      "es": "Abre Coucou en tu ordenador, muestra el código de emparejamiento y escanéalo con la cámara del móvil. O pega abajo el enlace de emparejamiento.",
+      "ar": "افتح Coucou على حاسوبك، وأظهر رمز الاقتران، ثم امسحه بكاميرا هاتفك. أو الصق رابط الاقتران أدناه.",
+      "fr": "Ouvrez Coucou sur votre ordinateur, affichez le code d'appairage et scannez-le avec l'appareil photo du téléphone. Ou collez le lien d'appairage ci-dessous.",
+      "bn": "আপনার কম্পিউটারে Coucou খুলুন, পেয়ারিং কোড দেখান এবং ফোনের ক্যামেরা দিয়ে স্ক্যান করুন। অথবা নিচে পেয়ারিং লিংক পেস্ট করুন।",
+      "pt-BR": "Abra o Coucou no computador, mostre o código de pareamento e escaneie com a câmera do celular. Ou cole o link de pareamento abaixo.",
+      "ru": "Откройте Coucou на компьютере, покажите код сопряжения и отсканируйте его камерой телефона. Или вставьте ссылку для сопряжения ниже.",
+      "id": "Buka Coucou di komputer Anda, tampilkan kode penyandingan, lalu pindai dengan kamera ponsel. Atau tempel tautan penyandingan di bawah."
+    },
+    "Pairing link": {
+      "zh-Hans": "配对链接",
+      "hi": "पेयरिंग लिंक",
+      "es": "Enlace de emparejamiento",
+      "ar": "رابط الاقتران",
+      "fr": "Lien d'appairage",
+      "bn": "পেয়ারিং লিংক",
+      "pt-BR": "Link de pareamento",
+      "ru": "Ссылка для сопряжения",
+      "id": "Tautan penyandingan"
+    },
+    "Pair": {
+      "zh-Hans": "配对",
+      "hi": "पेयर करें",
+      "es": "Emparejar",
+      "ar": "اقتران",
+      "fr": "Appairer",
+      "bn": "পেয়ার করুন",
+      "pt-BR": "Parear",
+      "ru": "Сопрячь",
+      "id": "Sandingkan"
+    },
+    "No agent is running right now.": {
+      "zh-Hans": "目前没有正在运行的智能体。",
+      "hi": "अभी कोई एजेंट नहीं चल रहा है।",
+      "es": "Ningún agente se está ejecutando ahora.",
+      "ar": "لا يوجد أي وكيل قيد التشغيل حاليًا.",
+      "fr": "Aucun agent n'est en cours d'exécution.",
+      "bn": "এই মুহূর্তে কোনো এজেন্ট চলছে না।",
+      "pt-BR": "Nenhum agente está em execução agora.",
+      "ru": "Сейчас ни один агент не запущен.",
+      "id": "Tidak ada agen yang berjalan saat ini."
+    },
+    "Approval needed": {
+      "zh-Hans": "需要你的批准",
+      "hi": "अनुमति आवश्यक है",
+      "es": "Se necesita tu aprobación",
+      "ar": "مطلوب موافقتك",
+      "fr": "Approbation requise",
+      "bn": "অনুমোদন প্রয়োজন",
+      "pt-BR": "Aprovação necessária",
+      "ru": "Требуется подтверждение",
+      "id": "Perlu persetujuan"
+    },
+    "Disconnect this computer": {
+      "zh-Hans": "断开此电脑",
+      "hi": "इस कंप्यूटर को डिस्कनेक्ट करें",
+      "es": "Desconectar este ordenador",
+      "ar": "قطع الاتصال بهذا الحاسوب",
+      "fr": "Déconnecter cet ordinateur",
+      "bn": "এই কম্পিউটারের সংযোগ বিচ্ছিন্ন করুন",
+      "pt-BR": "Desconectar este computador",
+      "ru": "Отключить этот компьютер",
+      "id": "Putuskan komputer ini"
+    },
+    "Leave demo mode": {
+      "zh-Hans": "退出演示模式",
+      "hi": "डेमो मोड छोड़ें",
+      "es": "Salir del modo demo",
+      "ar": "الخروج من وضع العرض",
+      "fr": "Quitter le mode démo",
+      "bn": "ডেমো মোড থেকে বের হন",
+      "pt-BR": "Sair do modo demo",
+      "ru": "Выйти из демо-режима",
+      "id": "Keluar dari mode demo"
+    },
+    "Mochi gallery": {
+      "zh-Hans": "Mochi 画廊",
+      "hi": "Mochi गैलरी",
+      "es": "Galería de Mochi",
+      "ar": "معرض Mochi",
+      "fr": "Galerie de Mochi",
+      "bn": "Mochi গ্যালারি",
+      "pt-BR": "Galeria do Mochi",
+      "ru": "Галерея Mochi",
+      "id": "Galeri Mochi"
+    }
+  }
+}
