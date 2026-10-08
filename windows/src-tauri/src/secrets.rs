@@ -53,3 +53,47 @@ pub fn clear(key: &str) -> Result<(), String> {
 pub fn present(key: &str) -> bool {
     get(key).is_some()
 }
+
+// ── Entries only Rust reads and writes ───────────────────────────────────────
+//
+// The phone link's certificate key and pairing token. They are not in KNOWN_KEYS
+// on purpose: the island has `secret_present` / `secret_set` / `secret_clear`
+// for those, and none of the three may be reachable from a webview.
+
+/// Every entry of that kind. Anything outside this list is refused.
+pub const INTERNAL_KEYS: &[&str] = &["phone-link-cert", "phone-link-key", "phone-link-token"];
+
+fn internal_entry(key: &str) -> Result<Entry, String> {
+    if !INTERNAL_KEYS.contains(&key) {
+        return Err(format!("unknown key {key}"));
+    }
+    Entry::new(SERVICE, key).map_err(|e| e.to_string())
+}
+
+pub fn get_internal(key: &str) -> Option<String> {
+    internal_entry(key).ok()?.get_password().ok().filter(|v| !v.is_empty())
+}
+
+pub fn set_internal(key: &str, value: &str) -> Result<(), String> {
+    internal_entry(key)?.set_password(value).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_phone_links_secrets_cannot_be_reached_from_the_island() {
+        // The island's commands go through `get`/`set`/`clear`/`present`, which
+        // only know KNOWN_KEYS.
+        for key in INTERNAL_KEYS {
+            assert!(!KNOWN_KEYS.contains(key), "{key}");
+            assert!(entry(key).is_none(), "{key}");
+            assert!(set(key, "x").is_err(), "{key}");
+            assert!(clear(key).is_err(), "{key}");
+            assert!(!present(key), "{key}");
+        }
+        // And the other way round: a key of the island is not an internal one.
+        assert!(set_internal("github-token", "x").is_err());
+    }
+}

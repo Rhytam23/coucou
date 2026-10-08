@@ -18,6 +18,7 @@ mod local_chat;
 mod log;
 mod net;
 mod openai_compat;
+mod phone_link;
 mod pipe;
 mod platform;
 mod recap;
@@ -88,6 +89,8 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         // Where Mochi sits on the desktop is desktop.rs's to say, not a webview's.
         let mut settings = settings.clone();
         settings.desktop_mochi = current.desktop_mochi.clone();
+        // Same for the phone link: only its own commands turn it on or off.
+        settings.phone_link = current.phone_link;
         *current = settings;
         (screen_changed, autostart_changed, shortcuts_changed)
     };
@@ -692,6 +695,11 @@ pub fn run() {
             set_paused,
             shortcuts_status,
             shortcuts_suspend,
+            phone_link::phone_link_status,
+            phone_link::phone_link_set_enabled,
+            phone_link::phone_link_pairing,
+            phone_link::phone_link_new_pairing,
+            phone_link::phone_link_publish,
             recap::recap_history,
             recap::recap_prefs,
             recap::recap_set_enabled,
@@ -713,6 +721,7 @@ pub fn run() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            app.manage(phone_link::PhoneLink::new(handle.clone()));
             tray::build(&handle)?;
             // Before the island: see create_settings_window.
             create_settings_window(&handle);
@@ -745,6 +754,7 @@ pub fn run() {
             log::line(format!("--- Coucou {} started ---", env!("CARGO_PKG_VERSION")));
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
+            phone_link::start_if_enabled(&handle);
             integrations::start(handle.clone());
             shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())

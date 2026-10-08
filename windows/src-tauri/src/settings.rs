@@ -66,6 +66,10 @@ pub struct Settings {
     /// Mochi on the desktop: whether he lives there, and his spot. Owned by
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
+    /// The phone link (phone_link/) is on: a TLS server for the Android app on
+    /// the local network. Off until the user turns it on in Settings → Phone;
+    /// owned by the Rust side, so what a webview sends back is ignored.
+    pub phone_link: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -120,6 +124,7 @@ impl Default for Settings {
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
+            phone_link: false,
         }
     }
 }
@@ -395,7 +400,8 @@ mod tests {
   "mochiOutfit": "witchHat",
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
-  "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } }
+  "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
+  "phoneLink": true
 }"##;
 
     fn custom() -> Value {
@@ -499,6 +505,25 @@ mod tests {
         assert_eq!(loaded.desktop_mochi, DesktopMochiPref::default());
         assert!(!loaded.desktop_mochi.on_desktop);
         assert_eq!(loaded.mochi_outfit, "witchHat");
+    }
+
+    #[test]
+    fn a_file_from_before_the_phone_link_keeps_it_off() {
+        // The link opens a port on the local network: it is never on by default,
+        // and an older file must not be read as consent.
+        assert!(!Settings::default().phone_link);
+        let loaded = parse(&custom_with("phoneLink", None)).unwrap();
+        assert!(!loaded.phone_link);
+        assert_eq!(loaded.mochi_outfit, "witchHat");
+        assert!(parse(&custom_with("phoneLink", Some(serde_json::json!(true)))).unwrap().phone_link);
+
+        // A value of the wrong type does not switch it on either, and costs nothing else.
+        let (dir, file) = scratch("phone-link");
+        std::fs::write(&file, custom_with("phoneLink", Some(serde_json::json!("yes")))).unwrap();
+        let odd = load_from(&file);
+        assert!(!odd.phone_link);
+        assert_eq!(odd.mochi_outfit, "witchHat");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -798,6 +823,7 @@ mod tests {
                 "pillColors",
                 "language",
                 "desktopMochi",
+                "phoneLink",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
