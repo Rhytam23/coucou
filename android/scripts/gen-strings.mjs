@@ -57,7 +57,8 @@ for (const l of langs) {
 if (process.argv.includes("--check")) {
   let stale = 0;
   for (const [file, content] of outputs) {
-    if (!fs.existsSync(file) || fs.readFileSync(file, "utf8") !== content) {
+    // Windows checkouts may turn LF into CRLF; the content is what matters.
+    if (!fs.existsSync(file) || fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n") !== content) {
       console.error(`stale: ${path.relative(root, file)}`);
       stale++;
     }
