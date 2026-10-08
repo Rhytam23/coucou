@@ -3305,6 +3305,127 @@
    "pt-BR": "Só um arquivo solto na ilha pode ser enviado com uma pergunta.",
    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
+  },
+  "Android phone": {
+   "zh-Hans": "Android 手机",
+   "hi": "Android फ़ोन",
+   "es": "Teléfono Android",
+   "ar": "هاتف Android",
+   "fr": "Téléphone Android",
+   "bn": "Android ফোন",
+   "pt-BR": "Celular Android",
+   "ru": "Телефон Android",
+   "id": "Ponsel Android"
+  },
+  "Send your agents' sessions to Coucou for Android and answer permission requests from the phone. Off by default; it only listens on your local network.": {
+   "zh-Hans": "把你的智能体会话发送到 Coucou for Android，并在手机上回应权限请求。默认关闭；仅在本地网络中监听。",
+   "hi": "अपने एजेंट के सत्र Coucou for Android को भेजें और फ़ोन से अनुमति के अनुरोधों का जवाब दें। डिफ़ॉल्ट रूप से बंद; यह केवल आपके स्थानीय नेटवर्क पर सुनता है।",
+   "es": "Envía las sesiones de tus agentes a Coucou for Android y responde a las solicitudes de permiso desde el teléfono. Desactivado por defecto; solo escucha en tu red local.",
+   "ar": "أرسل جلسات وكلائك إلى Coucou for Android وردّ على طلبات الإذن من الهاتف. معطّل افتراضيًا؛ ويستمع فقط على شبكتك المحلية.",
+   "fr": "Envoie les sessions de tes agents à Coucou for Android et réponds aux demandes d'autorisation depuis le téléphone. Désactivé par défaut ; il n'écoute que sur ton réseau local.",
+   "bn": "আপনার এজেন্টদের সেশন Coucou for Android-এ পাঠান এবং ফোন থেকে অনুমতির অনুরোধের উত্তর দিন। ডিফল্টে বন্ধ; এটি শুধু আপনার লোকাল নেটওয়ার্কে শোনে।",
+   "pt-BR": "Envie as sessões dos seus agentes ao Coucou for Android e responda a pedidos de permissão pelo celular. Desativado por padrão; só escuta na sua rede local.",
+   "ru": "Отправляйте сессии ваших агентов в Coucou for Android и отвечайте на запросы разрешений с телефона. По умолчанию выключено; слушает только в вашей локальной сети.",
+   "id": "Kirim sesi agen Anda ke Coucou for Android dan jawab permintaan izin dari ponsel. Nonaktif secara default; hanya mendengarkan di jaringan lokal Anda."
+  },
+  "Allow on the phone asks for the fingerprint or the screen lock. Deny does not.": {
+   "zh-Hans": "在手机上点“允许”需要指纹或锁屏验证；“拒绝”则不需要。",
+   "hi": "फ़ोन पर अनुमति देने के लिए फ़िंगरप्रिंट या स्क्रीन लॉक माँगा जाता है। अस्वीकार के लिए नहीं।",
+   "es": "Permitir en el teléfono pide la huella o el bloqueo de pantalla. Denegar no.",
+   "ar": "السماح على الهاتف يتطلب بصمة الإصبع أو قفل الشاشة. أما الرفض فلا يتطلبها.",
+   "fr": "Autoriser sur le téléphone demande l'empreinte ou le verrouillage d'écran. Refuser, non.",
+   "bn": "ফোনে অনুমতি দিতে ফিঙ্গারপ্রিন্ট বা স্ক্রিন লক লাগে। প্রত্যাখ্যানে লাগে না।",
+   "pt-BR": "Permitir no celular pede a digital ou o bloqueio de tela. Negar não pede.",
+   "ru": "Чтобы разрешить на телефоне, нужен отпечаток пальца или блокировка экрана. Для отказа — не нужен.",
+   "id": "Mengizinkan di ponsel meminta sidik jari atau kunci layar. Menolak tidak."
+  },
+  "Phone link": {
+   "zh-Hans": "手机连接",
+   "hi": "फ़ोन लिंक",
+   "es": "Enlace con el teléfono",
+   "ar": "ربط الهاتف",
+   "fr": "Lien avec le téléphone",
+   "bn": "ফোন লিংক",
+   "pt-BR": "Link com o celular",
+   "ru": "Связь с телефоном",
+   "id": "Tautan ponsel"
+  },
+  "Could not turn it on: {error}": {
+   "zh-Hans": "无法开启：{error}",
+   "hi": "चालू नहीं हो सका: {error}",
+   "es": "No se pudo activar: {error}",
+   "ar": "تعذّر التفعيل: {error}",
+   "fr": "Impossible de l'activer : {error}",
+   "bn": "চালু করা যায়নি: {error}",
+   "pt-BR": "Não foi possível ativar: {error}",
+   "ru": "Не удалось включить: {error}",
+   "id": "Tidak dapat mengaktifkan: {error}"
+  },
+  "Show pairing code": {
+   "zh-Hans": "显示配对码",
+   "hi": "पेयरिंग कोड दिखाएँ",
+   "es": "Mostrar código de emparejamiento",
+   "ar": "إظهار رمز الاقتران",
+   "fr": "Afficher le code d'association",
+   "bn": "পেয়ারিং কোড দেখান",
+   "pt-BR": "Mostrar código de pareamento",
+   "ru": "Показать код сопряжения",
+   "id": "Tampilkan kode penyandingan"
+  },
+  "Phones connected: {count}": {
+   "zh-Hans": "已连接的手机：{count}",
+   "hi": "जुड़े फ़ोन: {count}",
+   "es": "Teléfonos conectados: {count}",
+   "ar": "الهواتف المتصلة: {count}",
+   "fr": "Téléphones connectés : {count}",
+   "bn": "সংযুক্ত ফোন: {count}",
+   "pt-BR": "Celulares conectados: {count}",
+   "ru": "Подключённые телефоны: {count}",
+   "id": "Ponsel terhubung: {count}"
+  },
+  "In Coucou for Android, scan this code with the camera or paste the link.": {
+   "zh-Hans": "在 Coucou for Android 中，用相机扫描此码，或粘贴链接。",
+   "hi": "Coucou for Android में कैमरे से यह कोड स्कैन करें या लिंक पेस्ट करें।",
+   "es": "En Coucou for Android, escanea este código con la cámara o pega el enlace.",
+   "ar": "في Coucou for Android، امسح هذا الرمز بالكاميرا أو الصق الرابط.",
+   "fr": "Dans Coucou for Android, scanne ce code avec l'appareil photo ou colle le lien.",
+   "bn": "Coucou for Android-এ ক্যামেরা দিয়ে এই কোড স্ক্যান করুন বা লিংক পেস্ট করুন।",
+   "pt-BR": "No Coucou for Android, escaneie este código com a câmera ou cole o link.",
+   "ru": "В Coucou for Android отсканируйте этот код камерой или вставьте ссылку.",
+   "id": "Di Coucou for Android, pindai kode ini dengan kamera atau tempel tautannya."
+  },
+  "Copy link": {
+   "zh-Hans": "复制链接",
+   "hi": "लिंक कॉपी करें",
+   "es": "Copiar enlace",
+   "ar": "نسخ الرابط",
+   "fr": "Copier le lien",
+   "bn": "লিংক কপি করুন",
+   "pt-BR": "Copiar link",
+   "ru": "Скопировать ссылку",
+   "id": "Salin tautan"
+  },
+  "Pair again": {
+   "zh-Hans": "重新配对",
+   "hi": "फिर से पेयर करें",
+   "es": "Emparejar de nuevo",
+   "ar": "إعادة الاقتران",
+   "fr": "Associer à nouveau",
+   "bn": "আবার পেয়ার করুন",
+   "pt-BR": "Parear de novo",
+   "ru": "Сопрячь заново",
+   "id": "Sandingkan ulang"
+  },
+  "The phone that was paired is disconnected and needs the new code.": {
+   "zh-Hans": "已配对的手机会断开连接，并需要新的配对码。",
+   "hi": "जो फ़ोन पेयर था वह डिस्कनेक्ट हो जाएगा और उसे नया कोड चाहिए।",
+   "es": "El teléfono emparejado se desconecta y necesita el código nuevo.",
+   "ar": "سيُفصل الهاتف المقترن ويحتاج إلى الرمز الجديد.",
+   "fr": "Le téléphone associé est déconnecté et a besoin du nouveau code.",
+   "bn": "যে ফোনটি পেয়ার করা ছিল সেটি বিচ্ছিন্ন হবে এবং নতুন কোড লাগবে।",
+   "pt-BR": "O celular pareado é desconectado e precisa do novo código.",
+   "ru": "Сопряжённый телефон отключится, и ему понадобится новый код.",
+   "id": "Ponsel yang tersandingkan akan terputus dan memerlukan kode baru."
   }
  }
 }

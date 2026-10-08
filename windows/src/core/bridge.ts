@@ -31,6 +31,44 @@ export interface BootInfo {
   cursorPoll: boolean;
 }
 
+/** The phone link (src-tauri/src/phone_link): how it is, never its secrets. */
+export interface PhoneLinkStatus {
+  enabled: boolean;
+  running: boolean;
+  port: number;
+  host: string;
+  name: string;
+  clients: number;
+  error: string | null;
+}
+
+/** What the settings window shows to pair a phone. Only the settings window may ask. */
+export interface PhoneLinkPairing {
+  link: string;
+  qrSvg: string;
+  host: string;
+  port: number;
+  name: string;
+}
+
+/** One session as the phone sees it; Rust stamps `updatedAt`. */
+export interface PhoneLinkSession {
+  pillId: string;
+  agent: string;
+  state: string;
+  statusText: string;
+  stepIndex: number;
+  stepCount: number;
+}
+
+export interface PhoneLinkApproval {
+  requestId: string;
+  sessionId: string;
+  pillId: string;
+  tool: string;
+  command: string;
+}
+
 export const Bridge = {
   boot: () => call<BootInfo>("boot"),
   /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
@@ -128,6 +166,16 @@ export const Bridge = {
 
   /** "Nobody can act on this" — Claude Code asks in the terminal right away. */
   approvalDecline: (requestId: string) => call<void>("approval_decline", { requestId }),
+
+  // ── Phone link (Coucou for Android) ───────────────────────────────────────
+  phoneLinkStatus: () => call<PhoneLinkStatus>("phone_link_status"),
+  /** Only ever from the switch in Settings. Throws with the reason if it cannot start. */
+  phoneLinkSetEnabled: (enabled: boolean) => callOrThrow<PhoneLinkStatus>("phone_link_set_enabled", { enabled }),
+  phoneLinkPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_pairing"),
+  /** A new code: the phone that had the old one is disconnected. */
+  phoneLinkNewPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_new_pairing"),
+  phoneLinkPublish: (sessions: PhoneLinkSession[], approval: PhoneLinkApproval | null) =>
+    call<void>("phone_link_publish", { sessions, approval }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
   /** One chat turn. The API key and any file bytes never leave Rust. */

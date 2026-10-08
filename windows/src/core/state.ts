@@ -143,6 +143,11 @@ export interface Settings {
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;
+  /**
+   * The phone link for Coucou for Android is on. Rust owns it (only the switch in
+   * Settings → Android phone turns it on): whatever the page sends back is ignored.
+   */
+  phoneLink?: boolean;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;
