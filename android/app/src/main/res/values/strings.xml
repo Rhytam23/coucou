@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Coucou for Android</string>
+    <string name="about_title">About</string>
+    <string name="about_unofficial">Unofficial Android port based on Coucou by Louis Raillé.</string>
+    <string name="about_repo">github.com/Louis-CFM/coucou</string>
+    <string name="about_assets">The name Coucou, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission. The code is released under the MIT License.</string>
+</resources>

@@ -19,3 +19,8 @@ DerivedData/
 # Local only (never published)
 .claude/
 _prive/
+
+# local toolchain config (machine-specific)
+.env
+.env.sh
+env.ps1
