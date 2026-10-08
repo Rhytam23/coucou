@@ -20,6 +20,15 @@ export interface LinkSnapshot {
   approval: PhoneLinkApproval | null;
 }
 
+/**
+ * The island labels what it shows as "Bash · npm test". The phone shows the tool on its own
+ * line, so it gets the bare command.
+ */
+export function bareCommand(tool: string, command: string): string {
+  const prefix = `${tool} · `;
+  return command.startsWith(prefix) ? command.slice(prefix.length) : command;
+}
+
 /** The agents' sessions — not the services — and the request the phone may answer. */
 export function linkSnapshot(): LinkSnapshot {
   const sessions: PhoneLinkSession[] = State.tasks
@@ -43,7 +52,7 @@ export function linkSnapshot(): LinkSnapshot {
   const a = State.pendingApproval;
   const approval =
     a && !a.questions && a.requestId
-      ? { requestId: a.requestId, sessionId: a.sessionId, pillId: a.pillId, tool: a.tool, command: a.command }
+      ? { requestId: a.requestId, sessionId: a.sessionId, pillId: a.pillId, tool: a.tool, command: bareCommand(a.tool, a.command) }
       : null;
   return { sessions, approval };
 }

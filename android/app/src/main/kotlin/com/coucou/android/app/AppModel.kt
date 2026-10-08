@@ -62,7 +62,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     fun pair(text: String): Boolean {
         val p = PairingPayload.parse(text)
-        if (p == null) { message = "That is not a Coucou X
+        if (p == null) { message = context.getString(R.string.msg_bad_link); return false }
         stopLink()
         store.savePairing(p)
         connect(p)

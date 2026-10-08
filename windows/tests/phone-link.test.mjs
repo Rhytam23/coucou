@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { calls, emit, internals, sent } from "./tauri.mjs";
-import { linkSnapshot, registerPhoneLink } from "../src/island/phone-link.ts";
+import { bareCommand, linkSnapshot, registerPhoneLink } from "../src/island/phone-link.ts";
 import { makeDiffStep } from "../src/core/diff.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 
@@ -89,6 +89,15 @@ test("only a permission request goes to the phone, not a question", () => {
   State.endApproval();
   State.beginApproval({ requestId: "", sessionId: "s1", pillId: CLAUDE, tool: "Bash", command: "ls" });
   assert.equal(linkSnapshot().approval, null, "no request id, nothing the phone could answer");
+});
+
+test("the phone gets the bare command, not the island's \"Bash · \" label", () => {
+  State.beginApproval({ requestId: "r1", sessionId: "s1", pillId: CLAUDE, tool: "Bash", command: "Bash · npm run build" });
+  assert.equal(linkSnapshot().approval.command, "npm run build");
+  assert.equal(bareCommand("Edit", "Edit · src/a.ts"), "src/a.ts");
+  // A tool with no command to show, or a command that merely mentions the tool, is left alone.
+  assert.equal(bareCommand("Task", "Task"), "Task");
+  assert.equal(bareCommand("Bash", "echo Bash · hi"), "echo Bash · hi");
 });
 
 test("a burst of changes is one picture, and an unchanged picture is not sent again", async () => {
