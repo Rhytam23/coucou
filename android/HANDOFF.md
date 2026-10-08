@@ -54,19 +54,13 @@ do not restyle existing shipped views; one topic per PR/commit.
 
 ## What is NOT done (the work ahead, in priority order)
 
-1. **The real desktop side.** Nothing in the Windows/Linux Tauri app sends real sessions to the phone yet,
-   so the Android app can only show demo data or the fake dev-desktop. Implement the server described in
-   `docs/ANDROID_LINK.md` in `windows/src-tauri/src` (read `pipe.rs`, `hooks.rs`, `lib.rs`,
-   `settings.rs`, `secrets.rs`, `windows/src/core/state.ts`: where sessions and the pending approval live,
-   and how a decision is sent back, see `pipe.rs` `answer`/`decline`). Requirements: opt-in and **off by
-   default** behind a setting; never block the agent (the desktop's own approval keeps working); apply a
-   phone decision only if its fingerprint matches the approval still pending; store the pairing token in the
-   keystore (`secrets.rs`/keyring); generate the TLS certificate once; show the pairing link/QR in settings;
-   no telemetry. New crates (rustls/tokio-rustls, certificate generation, sha2) are the unavoidable
-   exception to the no-dependencies rule: keep them minimal and justify them. Tests: cargo tests (wrong
-   token, fingerprint mismatch, oversize line, late decision) and an interop test against the Kotlin client
-   (see `DevDesktopInteropTest.kt`, which does this against the Node stand-in).
-2. A short **proposal text for Louis** explaining the desktop change, because changing his app is his call.
+1. **The real desktop side: written, to be tried on a real phone.** `windows/src-tauri/src/phone_link/`
+   (hub = rules, server = TLS, pairing = certificate/token/QR, tests, interop), front end in
+   `windows/src/island/phone-link.ts` and `windows/src/settings/phone.ts`. Verified: cargo tests (Linux),
+   front-end tests, the real Kotlin client against it (kotlinc + JUnit, 5/5). NOT verified: Windows
+   build/tests (CI job `Phone link` / dispatch `Windows`), the Gradle run of `RustDesktopInteropTest`,
+   a real phone on real Wi-Fi, real Claude Code sessions end to end.
+2. **Proposal text for Louis**: drafted in `android/PROPOSAL_FOR_LOUIS.md`; it is for the user to send. Nothing is opened upstream.
 3. Port Mochi's **outfits** (`windows/src/mochi/outfits.ts`, `wardrobe.ts`).
 4. Later: widgets, voice instructions, services tab, FCM relay (`relay/`), Play Store listing (needs Louis).
 

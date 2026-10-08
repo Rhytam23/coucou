@@ -17,7 +17,7 @@ no billing, no analytics.
 | Demo mode (no desktop needed) | done |
 | Pairing (QR via the camera app, or paste), TLS pinning, secure storage | done |
 | Sessions list, approvals, biometric gate, notifications, background service | done, tested with unit tests; **not yet tried on a real phone** |
-| Desktop side in the Windows/Linux app | **not written** (use `tools/dev-desktop.mjs` meanwhile) |
+| Desktop side in the Windows/Linux app | written (`windows/src-tauri/src/phone_link`), off by default, tested; **not yet tried on a real phone**. Waiting for Louis's decision |
 | Widgets, instructions by voice, services tab, FCM relay | not started |
 
 Not published anywhere. Louis must approve the build and the store listing first.

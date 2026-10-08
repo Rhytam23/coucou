@@ -4,9 +4,9 @@ How *Coucou for Android* talks to a desktop Coucou. The iPhone uses iCloud (Clou
 push, neither of which exists on Android, so the Android app connects to the desktop directly over
 the local network.
 
-Status: the Android client and `android/tools/dev-desktop.mjs` (a stand-in desktop for testing)
-implement this. The real desktop server in the Windows/Linux app is **not written yet**; the Mac
-app is left to its author.
+Status: the Android client, `android/tools/dev-desktop.mjs` (a stand-in desktop for testing) and the
+real desktop server of the Windows/Linux app (`windows/src-tauri/src/phone_link/`) implement this.
+The Mac app is left to its author.
 
 ## Transport
 
@@ -63,6 +63,8 @@ unknown value is shown as `idle`. `pillId` values come from the pill catalog
 
 - `fingerprint` is the Mac's derivation (`ApprovalRelay.fingerprint`): lowercase hex SHA-256 of
   `pillId`, `sessionId`, `tool`, `command`, `inputKey` joined by U+001F.
+- On the Windows/Linux desktop `inputKey` is the island's request id, so asking for the same command
+  twice gives two different fingerprints.
 - The desktop applies a `decision` only if its fingerprint matches the approval **still pending**
   (same session, tool, command and input). A late decision, or one for another command, is ignored.
 - The phone offers an approval for at most 120 s (the desktop dismisses it at 115 s), and sends one
@@ -78,6 +80,23 @@ unknown value is shown as `idle`. `pillId` values come from the pill catalog
 - The desktop link is **off by default** and opt-in in settings. It should listen only while it is
   on, and only to the local network.
 
+## Windows/Linux implementation notes
+
+- Settings → Android phone: off by default (`phoneLink` in settings.json, owned by Rust: the webview
+  cannot switch it on). While off, nothing listens, nothing is published and no timer runs.
+- It listens on `0.0.0.0` (port 47821, else any free port) but drops every peer that is not on the
+  local network (private, loopback, link-local). At most 8 connections; 10 s to say hello; 90 s idle.
+- The certificate (ECDSA P-256, self-signed) is generated once; its key and the pairing token live in
+  the OS keystore (Credential Manager / Secret Service) and nowhere else. Without a keystore the link
+  does not start.
+- One token at a time: "Pair again" replaces it and disconnects the phone that had the old one. The
+  pairing code is shown only after a click, and only to the settings window.
+- Only permission requests (Allow/Deny) go to the phone; a question from Claude Code needs its options
+  picked on the island.
+- New crates: `rcgen` (+ `yasna`) makes the certificate once, `qrcode` draws the pairing QR; `rustls`,
+  `tokio-rustls` and `ring` were already in the dependency tree (through `reqwest`) and are now named
+  directly. Hashing, randomness and the constant-time comparison use `ring`; no other crate.
+
 ## Android notes
 
 - Android 16 asks for local network access the first time the app connects.
@@ -88,3 +107,7 @@ unknown value is shown as `idle`. `pillId` values come from the pill catalog
 
 - `android/tools/dev-desktop.mjs` pretends to be a desktop (needs `node` and `openssl`).
 - `DevDesktopInteropTest` runs the Android client against it.
+- `cargo test -p coucou phone_link` tests the real server (wrong token, fingerprint mismatch, oversize
+  line, late decision, answered-at-the-desk, pairing again, local-network filter...).
+- `RustDesktopInteropTest` runs the Android client against the real Rust server
+  (`COUCOU_RUST_INTEROP=1`, needs cargo; the `Phone link` workflow does it).
