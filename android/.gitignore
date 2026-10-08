@@ -6,3 +6,6 @@ local.properties
 *.apk
 *.aab
 .kotlin/
+hs_err_pid*.log
+replay_pid*.log
+*.log
