@@ -5,16 +5,10 @@
     <string name="about_assets">Nama Coucou, karakter Mochi, ikon, dan suara adalah © Louis Raillé dan digunakan dengan izin. Kode dirilis di bawah Lisensi MIT.</string>
     <string name="action_allow">Izinkan</string>
     <string name="action_deny">Tolak</string>
-    <string name="action_always">Selalu</string>
-    <string name="action_cancel">Batal</string>
     <string name="action_close">Tutup</string>
-    <string name="action_connect">Hubungkan</string>
     <string name="status_connected">Terhubung</string>
     <string name="status_connecting">Menghubungkan…</string>
     <string name="status_not_connected">Tidak terhubung</string>
-    <string name="setting_language">Bahasa</string>
-    <string name="setting_volume">Volume</string>
-    <string name="setting_sounds">Aktifkan suara</string>
     <string name="demo_mode">Mode demo</string>
     <string name="demo_try">Coba mode demo</string>
     <string name="pair_title">Hubungkan ke komputer Anda</string>

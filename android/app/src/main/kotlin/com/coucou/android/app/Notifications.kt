@@ -12,7 +12,6 @@ import android.media.AudioAttributes
 import android.net.Uri
 import com.coucou.android.MainActivity
 import com.coucou.android.R
-import com.coucou.android.core.Pills
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.LinkState
 
@@ -59,7 +58,7 @@ class Notifications(private val context: Context) {
             else -> "Reconnecting…"
         }
         return Notification.Builder(context, CH_LINK)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_mochi)
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(text)
             .setOngoing(true)
@@ -72,18 +71,17 @@ class Notifications(private val context: Context) {
         if (model.mode == Mode.PAIRED) runCatching { nm.notify(ONGOING_ID, ongoing(model)) }
     }
 
-    fun showApproval(r: ApprovalRequest) {
+    fun showApproval(r: ApprovalRequest, agentName: String) {
         val id = idFor(r.fingerprint)
-        val pill = Pills.byId(r.pillId)?.name ?: "An agent"
         val deny = PendingIntent.getBroadcast(
             context, id, Intent(context, ActionReceiver::class.java).setAction(ACTION_DENY).putExtra(EXTRA_FP, r.fingerprint),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val publicVersion = Notification.Builder(context, CH_APPROVAL)
-            .setSmallIcon(R.mipmap.ic_launcher).setContentTitle("Approval needed").setContentText("Unlock to see the request").build()
+            .setSmallIcon(R.drawable.ic_stat_mochi).setContentTitle("Approval needed").setContentText("Unlock to see the request").build()
         val n = Notification.Builder(context, CH_APPROVAL)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("$pill needs your approval")
+            .setSmallIcon(R.drawable.ic_stat_mochi)
+            .setContentTitle("$agentName needs your approval")
             .setContentText("${r.tool}: ${r.command}")
             .setStyle(Notification.BigTextStyle().bigText("${r.tool}: ${r.command}"))
             .setCategory(Notification.CATEGORY_ALARM)

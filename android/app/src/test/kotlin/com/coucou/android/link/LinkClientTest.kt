@@ -205,20 +205,25 @@ class LinkClientTest {
         assertTrue(rec.states.count { it == LinkState.CONNECTED } >= 2)
     }
 
-    @Test fun wrongTokenGetsAnAuthErrorAndTheClientKeepsBackingOff() {
+    @Test fun wrongTokenGetsAnAuthErrorAndTheClientStopsRetrying() {
         val d = FakeDesktop(tls = true).track().also { it.expectedToken = "other-token-123456789" }
         val rec = Recorder()
         client(d, rec).start()
         assertEquals("auth", rec.errors.poll(5, TimeUnit.SECONDS))
         assertFalse(rec.connected.await(300, TimeUnit.MILLISECONDS))
+        Thread.sleep(600) // the backoff is 50 ms here: a retrying client would have said hello again by now
+        assertEquals(1, d.received.count { it.contains("\"type\":\"hello\"") })
+        assertEquals(LinkState.DISCONNECTED, rec.states.last())
     }
 
-    @Test fun versionMismatchIsReportedNotAccepted() {
+    @Test fun versionMismatchIsReportedAndNotRetried() {
         val d = FakeDesktop(tls = true).track().also { it.welcomeVersion = 99 }
         val rec = Recorder()
         client(d, rec).start()
         assertEquals("version", rec.errors.poll(5, TimeUnit.SECONDS))
         assertFalse(rec.states.contains(LinkState.CONNECTED))
+        Thread.sleep(600)
+        assertEquals(1, d.received.count { it.contains("\"type\":\"hello\"") })
     }
 
     @Test fun sendsKeepAlivePings() {

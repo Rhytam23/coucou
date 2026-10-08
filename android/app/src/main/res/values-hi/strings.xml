@@ -5,16 +5,10 @@
     <string name="about_assets">Coucou नाम, Mochi किरदार, आइकन और ध्वनियाँ © Louis Raillé की हैं और अनुमति से उपयोग की गई हैं। कोड MIT लाइसेंस के तहत जारी किया गया है।</string>
     <string name="action_allow">अनुमति दें</string>
     <string name="action_deny">अस्वीकार</string>
-    <string name="action_always">हमेशा</string>
-    <string name="action_cancel">रद्द करें</string>
     <string name="action_close">बंद करें</string>
-    <string name="action_connect">कनेक्ट करें</string>
     <string name="status_connected">जुड़ा है</string>
     <string name="status_connecting">कनेक्ट हो रहा है…</string>
     <string name="status_not_connected">कनेक्ट नहीं</string>
-    <string name="setting_language">भाषा</string>
-    <string name="setting_volume">वॉल्यूम</string>
-    <string name="setting_sounds">ध्वनि सक्षम करें</string>
     <string name="demo_mode">डेमो मोड</string>
     <string name="demo_try">डेमो मोड आज़माएँ</string>
     <string name="pair_title">अपने कंप्यूटर से कनेक्ट करें</string>

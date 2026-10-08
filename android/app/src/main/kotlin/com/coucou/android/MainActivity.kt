@@ -60,6 +60,7 @@ import com.coucou.android.mochi.MochiView
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
     private var gallery by mutableStateOf(false)
+    private var confirming = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +89,10 @@ class MainActivity : ComponentActivity() {
     private fun handle(i: Intent?) {
         i ?: return
         i.data?.let { uri ->
-            if (uri.scheme == "coucou") model.pair(uri.toString())
+            if (uri.scheme == "coucou") {
+                model.pair(uri.toString())
+                i.data = null // handled once: a rotation must not pair again
+            }
         }
         val fp = i.getStringExtra(Notifications.EXTRA_FP) ?: return
         if (i.getBooleanExtra(Notifications.EXTRA_ALLOW, false)) {
@@ -100,10 +104,12 @@ class MainActivity : ComponentActivity() {
 
     /** Allow: only after the biometric / screen-lock check. */
     private fun approve(r: ApprovalRequest) {
+        if (confirming) return // a second tap must not open a second prompt
+        confirming = true
         BiometricGate.confirm(
             this, "Allow ${r.tool}?", r.command,
-            onSuccess = { model.decide(r.fingerprint, allow = true) },
-            onFail = { model.message = it },
+            onSuccess = { confirming = false; model.decide(r.fingerprint, allow = true) },
+            onFail = { confirming = false; if (it.isNotBlank()) model.message = it },
         )
     }
 }
@@ -135,7 +141,7 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(R.string.approval_title), style = MaterialTheme.typography.titleMedium)
-                    Text(Pills.byId(r.pillId)?.name.orEmpty(), style = MaterialTheme.typography.labelMedium)
+                    Text(model.agentName(r.pillId), style = MaterialTheme.typography.labelMedium)
                     Text("${r.tool}: ${r.command}", style = MaterialTheme.typography.bodyMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { onApprove(r) }) { Text(stringResource(R.string.action_allow)) }

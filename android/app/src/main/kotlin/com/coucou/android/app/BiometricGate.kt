@@ -26,7 +26,11 @@ object BiometricGate {
                 CancellationSignal(), activity.mainExecutor,
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onSuccess()
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onFail(errString.toString())
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        val cancelled = errorCode == BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED ||
+                            errorCode == BiometricPrompt.BIOMETRIC_ERROR_CANCELED
+                        onFail(if (cancelled) "" else errString.toString()) // empty: the user backed out, say nothing
+                    }
                 },
             )
     }

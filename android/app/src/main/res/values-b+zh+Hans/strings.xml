@@ -5,16 +5,10 @@
     <string name="about_assets">Coucou 这一名称、Mochi 角色、图标和音效均为 © Louis Raillé 所有，经许可使用。代码以 MIT 许可证发布。</string>
     <string name="action_allow">允许</string>
     <string name="action_deny">拒绝</string>
-    <string name="action_always">始终允许</string>
-    <string name="action_cancel">取消</string>
     <string name="action_close">关闭</string>
-    <string name="action_connect">连接</string>
     <string name="status_connected">已连接</string>
     <string name="status_connecting">正在连接…</string>
     <string name="status_not_connected">未连接</string>
-    <string name="setting_language">语言</string>
-    <string name="setting_volume">音量</string>
-    <string name="setting_sounds">启用声音</string>
     <string name="demo_mode">演示模式</string>
     <string name="demo_try">试用演示模式</string>
     <string name="pair_title">连接到你的电脑</string>

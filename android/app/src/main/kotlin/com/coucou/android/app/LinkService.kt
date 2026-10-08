@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 
 /**
@@ -15,7 +16,13 @@ class LinkService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val model = (application as CoucouApp).model
-        startForeground(Notifications.ONGOING_ID, model.notifier.ongoing(model), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        val notification = model.notifier.ongoing(model)
+        // The specialUse type exists from Android 14; older versions reject an unknown type.
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(Notifications.ONGOING_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(Notifications.ONGOING_ID, notification)
+        }
         model.resume()
         return START_STICKY
     }

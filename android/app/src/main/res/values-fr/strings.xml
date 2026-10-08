@@ -5,16 +5,10 @@
     <string name="about_assets">Le nom Coucou, le personnage Mochi, l\'icône et les sons sont © Louis Raillé et utilisés avec son autorisation. Le code est publié sous licence MIT.</string>
     <string name="action_allow">Autoriser</string>
     <string name="action_deny">Refuser</string>
-    <string name="action_always">Toujours</string>
-    <string name="action_cancel">Annuler</string>
     <string name="action_close">Fermer</string>
-    <string name="action_connect">Connecter</string>
     <string name="status_connected">Connecté</string>
     <string name="status_connecting">Connexion…</string>
     <string name="status_not_connected">Non connecté</string>
-    <string name="setting_language">Langue</string>
-    <string name="setting_volume">Volume</string>
-    <string name="setting_sounds">Activer les sons</string>
     <string name="demo_mode">Mode démo</string>
     <string name="demo_try">Essayer la démo</string>
     <string name="pair_title">Se connecter à votre ordinateur</string>

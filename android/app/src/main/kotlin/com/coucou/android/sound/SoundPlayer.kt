@@ -3,6 +3,7 @@ package com.coucou.android.sound
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.SoundPool
+import com.coucou.android.R
 import com.coucou.android.mochi.SoundSink
 
 /** Volume rules from docs/SPEC.md: default 0.12 and the slider never goes above 0.2. */
@@ -38,8 +39,7 @@ class SoundPlayer(private val context: Context) : SoundSink {
     }
 
     private fun load(name: String): Int? = ids.getOrPut(name) {
-        val res = context.resources.getIdentifier(name, "raw", context.packageName)
-        if (res == 0) return null
+        val res = RAW[name] ?: return null
         pool.load(context, res, 1)
     }
 
@@ -50,4 +50,39 @@ class SoundPlayer(private val context: Context) : SoundSink {
     }
 
     fun release() = pool.release()
+
+    private companion object {
+        /** Every bundled sound, by file name (an explicit table: no resource reflection). */
+        val RAW: Map<String, Int> = mapOf(
+            "annoyed" to R.raw.annoyed,
+            "approval" to R.raw.approval,
+            "approve" to R.raw.approve,
+            "attach" to R.raw.attach,
+            "blip" to R.raw.blip,
+            "close" to R.raw.close,
+            "dizzy" to R.raw.dizzy,
+            "error" to R.raw.error,
+            "finish" to R.raw.finish,
+            "greet" to R.raw.greet,
+            "greeting" to R.raw.greeting,
+            "gulp" to R.raw.gulp,
+            "hover" to R.raw.hover,
+            "love" to R.raw.love,
+            "open" to R.raw.open,
+            "peek" to R.raw.peek,
+            "pop" to R.raw.pop,
+            "proud" to R.raw.proud,
+            "question" to R.raw.question,
+            "rate" to R.raw.rate,
+            "search" to R.raw.search,
+            "send" to R.raw.send,
+            "slap" to R.raw.slap,
+            "sleep" to R.raw.sleep,
+            "think" to R.raw.think,
+            "tick" to R.raw.tick,
+            "wink" to R.raw.wink,
+            "work" to R.raw.work,
+            "yawn" to R.raw.yawn,
+        )
+    }
 }

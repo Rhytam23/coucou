@@ -66,6 +66,8 @@ class LinkClient(
     override val approvals = ApprovalBook(clockMs)
 
     @Volatile private var running = false
+    /** Set by an auth or version error: retrying with the same pairing can never work. */
+    @Volatile private var fatal = false
     @Volatile private var socket: Socket? = null
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
@@ -74,6 +76,7 @@ class LinkClient(
     @Synchronized override fun start() {
         if (running) return
         running = true
+        fatal = false
         thread = Thread(::loop, "coucou-link").apply { isDaemon = true; start() }
     }
 
@@ -134,6 +137,7 @@ class LinkClient(
                 socket = null
                 approvals.clear()
             }
+            if (fatal) running = false
             if (!running) break
             listener.onState(LinkState.DISCONNECTED)
             if (connectedOnce) attempt = 0
@@ -163,7 +167,7 @@ class LinkClient(
             if (first) { first = false; onFirstMessage() }
             when (msg) {
                 is ServerMsg.Welcome -> {
-                    if (msg.version != Protocol.VERSION) { listener.onError("version", "desktop speaks v${msg.version}"); return }
+                    if (msg.version != Protocol.VERSION) { listener.onError("version", "desktop speaks v${msg.version}"); fatal = true; return }
                     listener.onState(LinkState.CONNECTED)
                     listener.onWelcome(msg.desktopName, msg.os)
                 }
@@ -171,7 +175,7 @@ class LinkClient(
                 is ServerMsg.Approval -> { approvals.add(msg.request); listener.onApproval(msg.request) }
                 is ServerMsg.ApprovalResolved -> { approvals.resolve(msg.fingerprint); listener.onApprovalResolved(msg.fingerprint) }
                 ServerMsg.Pong -> {}
-                is ServerMsg.Error -> { listener.onError(msg.code, msg.message); if (msg.code == "auth") return }
+                is ServerMsg.Error -> { listener.onError(msg.code, msg.message); if (msg.code == "auth") { fatal = true; return } }
             }
         }
     }

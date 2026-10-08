@@ -7,6 +7,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.coucou.android.core.Pills
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.DemoLink
 import com.coucou.android.link.DesktopLink
@@ -36,6 +37,10 @@ class AppModel(private val context: Context) : LinkListener {
 
     private var link: DesktopLink? = null
     private val lastState = HashMap<String, BotState>()
+
+    /** The name the user knows the agent by: the session's own name, else the pill catalog. */
+    fun agentName(pillId: String): String =
+        sessions.firstOrNull { it.pillId == pillId }?.agent?.takeIf { it.isNotBlank() } ?: Pills.byId(pillId)?.name ?: "An agent"
 
     val isPaired get() = store.loadPairing() != null
 
@@ -119,7 +124,7 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onApproval(request: ApprovalRequest) {
         main.post {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
-            notifier.showApproval(request)
+            notifier.showApproval(request, agentName(request.pillId))
         }
     }
 

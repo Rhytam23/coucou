@@ -32,6 +32,21 @@ class AssetsTest {
         dirs.forEach { assertTrue(it.name, base.containsAll(keys(File(it, "strings.xml")))) }
     }
 
+    @Test fun soundTableCoversEveryBundledSound() {
+        val src = File("src/main/kotlin/com/coucou/android/sound/SoundPlayer.kt").readText()
+        val mapped = Regex("\"(\\w+)\" to R\\.raw\\.(\\w+)").findAll(src).map { assertEquals(it.groupValues[1], it.groupValues[2]); it.groupValues[1] }.toSet()
+        assertEquals(raw.listFiles()!!.map { it.nameWithoutExtension }.toSet(), mapped)
+    }
+
+    @Test fun indonesianUsesTheLegacyFolderCode() {
+        assertTrue(File(res, "values-in/strings.xml").exists())
+        assertTrue(!File(res, "values-id").exists())
+    }
+
+    @Test fun notificationIconIsMonochromeVector() {
+        assertTrue(File(res, "drawable/ic_stat_mochi.xml").readText().contains("#FFFFFFFF"))
+    }
+
     @Test fun launcherIconIsPresent() {
         assertTrue(File(res, "mipmap-xxxhdpi/ic_launcher.png").length() > 1000)
     }

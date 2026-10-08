@@ -19,7 +19,7 @@ const desktop = read(path.resolve(root, "../windows/src/i18n/strings.json"));
 const langs = desktop.languages.filter((l) => l !== "en");
 
 // Android resource qualifier for each language tag.
-const qualifier = { "zh-Hans": "b+zh+Hans", "pt-BR": "pt-rBR" };
+const qualifier = { "zh-Hans": "b+zh+Hans", "pt-BR": "pt-rBR", id: "in" };
 const dirFor = (l) => `values-${qualifier[l] ?? l}`;
 
 const BS = String.fromCharCode(92);

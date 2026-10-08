@@ -1,5 +1,6 @@
 package com.coucou.android.link
 
+import android.annotation.SuppressLint
 import java.net.URI
 import java.net.URLDecoder
 import java.security.MessageDigest
@@ -39,6 +40,7 @@ data class PairingPayload(
 }
 
 /** Accepts exactly one certificate, the one whose SHA-256 was in the QR code. No CA, no hostname check. */
+@SuppressLint("CustomX509TrustManager") // intentional: certificate pinning to the paired desktop
 class PinnedTrustManager(private val pinnedSha256Hex: String) : X509TrustManager {
     override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
         val leaf = chain?.firstOrNull() ?: throw CertificateException("empty certificate chain")
