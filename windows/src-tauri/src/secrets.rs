@@ -96,4 +96,18 @@ mod tests {
         // And the other way round: a key of the island is not an internal one.
         assert!(set_internal("github-token", "x").is_err());
     }
+
+    /// Windows Credential Manager caps a secret's size. The phone link stores its certificate (about
+    /// 600 hex characters) and key there, so prove that a secret of that size round-trips through the
+    /// real store. A separate service name: this can never touch a user's real entries.
+    #[cfg(windows)]
+    #[test]
+    fn a_certificate_sized_secret_round_trips_through_credential_manager() {
+        let entry = keyring::Entry::new("fr.louisraille.coucou.test", "phone-link-size-check").unwrap();
+        let big: String = (0..1_200).map(|i| char::from(b"0123456789abcdef"[i % 16])).collect();
+        entry.set_password(&big).expect("Credential Manager refused a certificate-sized secret");
+        let back = entry.get_password().expect("could not read it back");
+        let _ = entry.delete_credential();
+        assert_eq!(back, big);
+    }
 }
