@@ -44,6 +44,7 @@ do not restyle existing shipped views; one topic per PR/commit.
   Protocol spec: `docs/ANDROID_LINK.md`.
 - `app/.../app`: `AppModel`, notifications (Deny from the notification, Allow opens the app for the
   biometric prompt), foreground `LinkService`, `SecureStore` (Android Keystore), `BiometricGate`.
+- Optional pill over other apps (`ui/IslandOverlay.kt`, `core/OverlayPolicy.kt`): see `android/README.md`. The wish is saved at the tap; a debug-only broadcast (`src/debug`) shows fake pills. Never seen rendered by the author's tools: check it on the phone.
 - Sounds (res/raw), launcher icon, 10 languages (generated from the desktop catalog by
   `scripts/gen-strings.mjs`, Android-only strings in `i18n/`), dark/light theme.
 - `tools/dev-desktop.mjs`: a pretend desktop (Node + openssl) that sends **fake scripted sessions and a

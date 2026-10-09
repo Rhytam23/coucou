@@ -82,8 +82,6 @@ class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
     private var gallery by mutableStateOf(false)
     private var confirming = false
-    private var waitingForOverlayPermission = false
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -107,6 +105,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         model.inForeground = true
+        model.refreshOverlayPermission() // maybe granted meanwhile, from this app's switch or Android's settings
     }
 
     override fun onStop() {
@@ -114,22 +113,17 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Back from the system screen where "display over other apps" is granted.
-        if (waitingForOverlayPermission) {
-            waitingForOverlayPermission = false
-            if (model.overlayPermitted()) model.useOverlay(true)
-        }
-    }
-
-    /** The pill over other apps needs a one-time permission from the system settings. */
+    /**
+     * The pill over other apps needs a one-time system permission. The choice is saved first: even if
+     * Android recreates the app while the user is in Settings, it is remembered, and the pill works as
+     * soon as the permission is there.
+     */
     private fun setOverlay(on: Boolean) {
-        if (!on) { model.useOverlay(false); return }
-        if (model.overlayPermitted()) { model.useOverlay(true); return }
-        model.message = getString(R.string.msg_overlay_permission)
-        waitingForOverlayPermission = true
-        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        model.useOverlay(on)
+        if (on && !model.overlayPermitted()) {
+            model.message = getString(R.string.msg_overlay_permission)
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -390,7 +384,7 @@ private fun OverlayCard(model: AppModel, onOverlay: (Boolean) -> Unit) {
                 Text(stringResource(R.string.overlay_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(12.dp))
-            Switch(checked = model.overlayEnabled && model.overlayPermitted(), onCheckedChange = onOverlay)
+            Switch(checked = model.overlayOn, onCheckedChange = onOverlay)
         }
     }
 }

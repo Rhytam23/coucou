@@ -14,10 +14,42 @@ object OverlayPolicy {
     /** How long a status pill stays before it slides away. */
     const val STATUS_MS = 4_500L
 
-    /** Only a change into one of those states wakes it; the same state sent again does not. */
-    fun shouldFlash(previous: BotState?, now: BotState): Boolean = now in FLASH && previous != now
+    /**
+     * Only a change into one of those states wakes it. The same state sent again does not, and
+     * neither does the first picture after connecting (previous == null): sessions that finished
+     * long ago must not drop the pill every time the phone reconnects.
+     */
+    fun shouldFlash(previous: BotState?, now: BotState): Boolean = previous != null && now in FLASH && previous != now
 
     /** The pill is for when you are in another app; inside Coucou the screen already shows it. */
     fun shouldShow(enabled: Boolean, permitted: Boolean, appInForeground: Boolean): Boolean =
-        enabled && permitted && !appInForeground
+        blocker(enabled, permitted, appInForeground) == null
+
+    /** Why the pill stays away (for the log), or null when it may show. */
+    fun blocker(enabled: Boolean, permitted: Boolean, appInForeground: Boolean): String? = when {
+        !enabled -> "switch is off"
+        !permitted -> "'display over other apps' is not allowed"
+        appInForeground -> "the app is on screen"
+        else -> null
+    }
+}
+
+/** Where the user's wish is kept (SharedPreferences in the app, a plain object in tests). */
+interface WishStore {
+    fun read(): Boolean
+    fun write(on: Boolean)
+}
+
+/**
+ * The switch "Show Mochi over other apps". The wish is saved the moment the user taps, before the
+ * system permission screen opens: if Android recreates the activity or the process while the user is
+ * in Settings, nothing is lost. The permission is asked live each time, so granting it later from
+ * Android's own settings makes the pill work without another tap.
+ */
+class OverlayChoice(private val store: WishStore) {
+    val wished: Boolean get() = store.read()
+    fun choose(on: Boolean) = store.write(on)
+
+    /** What the switch shows, and whether the pill may exist. */
+    fun active(permitted: Boolean): Boolean = wished && permitted
 }

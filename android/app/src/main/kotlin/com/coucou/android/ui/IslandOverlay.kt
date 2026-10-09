@@ -5,6 +5,7 @@ import android.graphics.PixelFormat
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -53,7 +54,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
@@ -99,25 +103,38 @@ class IslandOverlay(
     fun permitted(): Boolean = Settings.canDrawOverlays(context)
 
     /** A short notice (finished, failed, asking…). Never replaces a request waiting for an answer. */
-    fun showStatus(agent: String, state: BotState, text: String) {
-        if (content is Content.Approval) return
-        if (!present(Content.Status(agent, state, text))) return
+    fun showStatus(agent: String, state: BotState, text: String) = safely {
+        if (content is Content.Approval) return@safely
+        if (!present(Content.Status(agent, state, text))) return@safely
         main.removeCallbacks(slideAwayLater)
         main.postDelayed(slideAwayLater, OverlayPolicy.STATUS_MS)
     }
 
     /** A permission request: stays until it is answered, withdrawn or expired. */
-    fun showApproval(request: ApprovalRequest, agent: String) {
+    fun showApproval(request: ApprovalRequest, agent: String) = safely {
         main.removeCallbacks(slideAwayLater)
         present(Content.Approval(request, agent))
     }
 
     /** The request was answered elsewhere, withdrawn or expired. */
-    fun hideApproval(fingerprint: String) {
+    fun hideApproval(fingerprint: String) = safely {
         if ((content as? Content.Approval)?.request?.fingerprint == fingerprint) slideAway()
     }
 
-    fun hide() = slideAway()
+    fun hide() = safely { slideAway() }
+
+    /**
+     * The pill is a nicety on top of the real app: whatever goes wrong with the window (permission
+     * taken away while it shows, a bad token, a SecurityException) must never reach the caller.
+     */
+    private inline fun safely(block: () -> Unit) {
+        try {
+            block()
+        } catch (e: Exception) {
+            Log.w("CoucouOverlay", "overlay failed: ${e.javaClass.simpleName}")
+            runCatching { removeView() }
+        }
+    }
 
     private fun present(c: Content): Boolean {
         if (!permitted()) return false
@@ -168,11 +185,13 @@ class IslandOverlay(
         val v = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+            setViewTreeViewModelStoreOwner(lifecycleOwner)
             setContent { Pill() }
         }
         try {
             wm.addView(v, params)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w("CoucouOverlay", "cannot add the window: ${e.javaClass.simpleName}")
             lifecycleOwner.destroy() // the permission was taken away meanwhile
             return
         }
@@ -254,7 +273,8 @@ class IslandOverlay(
     }
 
     /** A window outside any activity has no lifecycle of its own: Compose needs one to run. */
-    private class Owner : LifecycleOwner, SavedStateRegistryOwner {
+    private class Owner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+        override val viewModelStore = ViewModelStore()
         private val registry = LifecycleRegistry(this)
         private val controller = SavedStateRegistryController.create(this)
         override val lifecycle: Lifecycle get() = registry
@@ -268,6 +288,7 @@ class IslandOverlay(
 
         fun destroy() {
             registry.currentState = Lifecycle.State.DESTROYED
+            viewModelStore.clear()
         }
     }
 }

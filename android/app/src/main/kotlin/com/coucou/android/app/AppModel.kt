@@ -4,11 +4,14 @@ import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.coucou.android.R
+import com.coucou.android.core.OverlayChoice
 import com.coucou.android.core.OverlayPolicy
+import com.coucou.android.core.WishStore
 import com.coucou.android.core.Pills
 import com.coucou.android.ui.IslandOverlay
 import com.coucou.android.link.Protocol
@@ -41,11 +44,24 @@ class AppModel(private val context: Context) : LinkListener {
 
     private val prefs = context.getSharedPreferences("coucou_ui", Context.MODE_PRIVATE)
 
-    /** The pill that drops from the top of the screen over other apps (off until the user turns it on). */
-    var overlayEnabled by mutableStateOf(prefs.getBoolean("overlay", false)); private set
+    private val choice = OverlayChoice(object : WishStore {
+        override fun read() = prefs.getBoolean("overlay", false)
+        // commit(): a tiny file, and it must survive the process being killed while the user is in Settings.
+        override fun write(on: Boolean) { prefs.edit().putBoolean("overlay", on).commit() }
+    })
+
+    /** The user's wish for the pill over other apps (off until they turn it on). Saved when they tap. */
+    var overlayWished by mutableStateOf(choice.wished); private set
+
+    /** The system permission "display over other apps", re-read when the app comes to the front. */
+    var overlayPermission by mutableStateOf(false); private set
 
     /** The app is on screen: it shows everything itself, so the pill stays away. */
     var inForeground = false
+        set(value) {
+            field = value
+            if (value) overlay.hide()
+        }
 
     private val overlay = IslandOverlay(
         context, { android.os.SystemClock.elapsedRealtimeNanos() / 1e6 },
@@ -56,13 +72,24 @@ class AppModel(private val context: Context) : LinkListener {
 
     fun overlayPermitted() = overlay.permitted()
 
+    /** What the switch shows: wished and allowed by the system. */
+    val overlayOn: Boolean get() = overlayWished && overlayPermission
+
+    fun refreshOverlayPermission() { overlayPermission = overlay.permitted() }
+
+    /** The user tapped the switch: remember the choice right now (see [OverlayChoice]). */
     fun useOverlay(on: Boolean) {
-        overlayEnabled = on
-        prefs.edit().putBoolean("overlay", on).apply()
+        choice.choose(on)
+        overlayWished = on
+        refreshOverlayPermission()
         if (!on) overlay.hide()
     }
 
-    private fun overlayWanted() = OverlayPolicy.shouldShow(overlayEnabled, overlay.permitted(), inForeground)
+    private fun overlayWanted(): Boolean {
+        val why = OverlayPolicy.blocker(choice.wished, overlay.permitted(), inForeground)
+        if (why != null) Log.d("CoucouOverlay", "no pill: $why")
+        return why == null
+    }
 
     /**
      * Allow was tapped on a notification before the link was back (the app had been closed): the
@@ -133,7 +160,10 @@ class AppModel(private val context: Context) : LinkListener {
     /** True if the decision was sent (or applied to the demo). Allow is gated by the biometric prompt in the UI. */
     fun decide(fingerprint: String, allow: Boolean): Boolean {
         val ok = link?.decide(fingerprint, allow) ?: false
-        if (!ok) message = context.getString(R.string.msg_not_pending)
+        if (!ok) {
+            message = context.getString(R.string.msg_not_pending)
+            removeApproval(fingerprint) // it cannot be answered any more: no card or pill that lingers
+        }
         return ok
     }
 

@@ -37,6 +37,25 @@ Try it without a desktop: open the app and tap *Try demo mode*. Or run the stand
 node tools/dev-desktop.mjs        # prints a pairing link to paste in the app
 ```
 
+## The pill over other apps (optional)
+
+Like the notch on the computer: a small black pill drops from the top of the screen when an agent
+finishes, fails, asks something or is rate limited, then slides away; a permission request stays as a
+card with Deny / Allow until answered (Allow opens the app for the fingerprint check).
+
+- Off by default. The switch saves the user's choice **at the tap**, then opens Android's "Display over
+  other apps" screen. The permission is read live, so granting it later from Android's settings is enough.
+- It shows only on a *change* into those states (not for sessions already finished when the phone
+  reconnects) and only while Coucou is not on screen. The window exists only while something is shown.
+- Try it without an agent (**debug builds only**, not in release). With the switch on and the app in the
+  background (press Home first):
+
+```bash
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
+# kind = finished | error | question | ratelimit | approval
+adb logcat -s CoucouOverlay   # says why the pill stayed away, if it did
+```
+
 ## Layout
 
 - `app/src/main/kotlin/.../mochi` the engine (pure Kotlin, unit-tested) and the Compose painter
