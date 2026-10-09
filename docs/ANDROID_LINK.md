@@ -145,7 +145,8 @@ and re-reads that switch for every message. The user also chooses which provider
 
 ## Testing
 
-- `android/tools/dev-desktop.mjs` pretends to be a desktop (needs `node` and `openssl`).
+- `android/tools/dev-desktop.mjs` pretends to be a desktop (needs `node` and `openssl`). With `--fake-chat` it offers
+  `chat` with a fake provider (no key, no cost): `/error`, `/auth`, `/slow`, `/long` and `/rewrite` trigger the odd cases.
 - `DevDesktopInteropTest` runs the Android client against it.
 - `cargo test -p coucou phone_link` tests the real server (wrong token, fingerprint mismatch, oversize
   line, late decision, answered-at-the-desk, pairing again, local-network filter...).

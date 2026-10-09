@@ -17,10 +17,16 @@ enum class LinkState { DISCONNECTED, CONNECTING, CONNECTED }
 interface LinkListener {
     fun onState(state: LinkState) {}
     fun onWelcome(desktopName: String, os: String) {}
+    /** The optional features this computer offers right now (after the welcome). */
+    fun onCaps(caps: Set<String>) {}
     fun onSessions(sessions: List<SessionInfo>) {}
     fun onApproval(request: ApprovalRequest) {}
     fun onApprovalResolved(fingerprint: String) {}
     fun onError(code: String, message: String) {}
+    fun onChatModels(models: List<ChatModel>) {}
+    fun onChatDelta(id: String, text: String) {}
+    fun onChatDone(id: String, text: String?) {}
+    fun onChatError(id: String, reason: String, message: String) {}
 }
 
 /** What the UI talks to: the real [LinkClient] or the offline [DemoLink]. */
@@ -30,6 +36,13 @@ interface DesktopLink {
     fun stop()
     /** allow/deny for a pending approval; false if unknown, expired, already decided or not connected. */
     fun decide(fingerprint: String, allow: Boolean): Boolean
+
+    // Chat through the computer (docs/ANDROID_LINK.md). Not offered by the demo.
+    fun chatModels() {}
+    /** False if the link is down; the answer arrives through the listener. */
+    fun chatSend(id: String, model: String, text: String): Boolean = false
+    fun chatCancel(id: String) {}
+    fun chatReset() {}
 }
 
 /** Opens the (TLS) connection to the desktop. Swappable so tests can use plain sockets. */
@@ -64,6 +77,8 @@ class LinkClient(
     private val readTimeoutMs: Int = 60_000,
     private val pingEveryMs: Long = 20_000,
     private val backoffMs: LongArray = longArrayOf(1_000, 2_000, 4_000, 8_000, 16_000, 30_000),
+    /** The optional features asked for in the hello; empty is what an app without them sends. */
+    private val caps: List<String> = Protocol.CAPABILITIES,
 ) : DesktopLink {
     override val approvals = ApprovalBook(clockMs)
 
@@ -122,6 +137,23 @@ class LinkClient(
         }
     }
 
+    /** Queues a message on the writer thread (never on the caller's: it may be the main thread). */
+    private fun queue(m: ClientMsg): Boolean {
+        val w = writer
+        if (out == null || w == null) return false
+        return try {
+            w.execute { try { send(m) } catch (_: IOException) { listener.onError("send", "could not reach the desktop") } }
+            true
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            false
+        }
+    }
+
+    override fun chatModels() { queue(ClientMsg.ChatModels) }
+    override fun chatSend(id: String, model: String, text: String) = queue(ClientMsg.ChatSend(id, model, text))
+    override fun chatCancel(id: String) { queue(ClientMsg.ChatCancel(id)) }
+    override fun chatReset() { queue(ClientMsg.ChatReset) }
+
     private fun send(m: ClientMsg) {
         val o = out ?: throw IOException("not connected")
         synchronized(writeLock) {
@@ -141,7 +173,7 @@ class LinkClient(
                 s.soTimeout = readTimeoutMs
                 s.tcpNoDelay = true
                 out = s.getOutputStream()
-                send(ClientMsg.Hello(Protocol.VERSION, pairing.token, deviceName))
+                send(ClientMsg.Hello(Protocol.VERSION, pairing.token, deviceName, caps))
                 val pinger = startPinger()
                 try {
                     read(BufferedInputStream(s.getInputStream())) { connectedOnce = true }
@@ -191,11 +223,18 @@ class LinkClient(
                     if (msg.version != Protocol.VERSION) { listener.onError("version", "desktop speaks v${msg.version}"); fatal = true; return }
                     listener.onState(LinkState.CONNECTED)
                     listener.onWelcome(msg.desktopName, msg.os)
+                    listener.onCaps(msg.caps)
+                    // Told what it may use right away, so the Chat screen has its list when it opens.
+                    if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
                 }
                 is ServerMsg.Sessions -> listener.onSessions(msg.sessions)
                 is ServerMsg.Approval -> { approvals.add(msg.request); listener.onApproval(msg.request) }
                 is ServerMsg.ApprovalResolved -> { approvals.resolve(msg.fingerprint); listener.onApprovalResolved(msg.fingerprint) }
                 ServerMsg.Pong -> {}
+                is ServerMsg.ChatModels -> listener.onChatModels(msg.models)
+                is ServerMsg.ChatDelta -> listener.onChatDelta(msg.id, msg.text)
+                is ServerMsg.ChatDone -> listener.onChatDone(msg.id, msg.text)
+                is ServerMsg.ChatError -> listener.onChatError(msg.id, msg.reason, msg.message)
                 is ServerMsg.Error -> { listener.onError(msg.code, msg.message); if (msg.code == "auth") { fatal = true; return } }
             }
         }

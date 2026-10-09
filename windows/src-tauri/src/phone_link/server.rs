@@ -56,11 +56,6 @@ pub struct Shared {
 }
 
 impl Shared {
-    #[cfg(test)]
-    pub fn new(hub: Arc<Hub>, token: String, name: String) -> Arc<Shared> {
-        Self::with_chat(hub, token, name, None)
-    }
-
     pub fn with_chat(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>) -> Arc<Shared> {
         Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, connections: AtomicUsize::new(0) })
     }

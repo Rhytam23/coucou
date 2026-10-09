@@ -10,14 +10,17 @@
 //   approval <id> <command>  a permission request starts waiting
 //   clear                    the request was answered at the desk
 //   repair <token>           pair again with a new token (phones are kicked)
+//   chat on|off              the (fake) chat switch; phones learn of it when they connect
 //   quit
 //
 //   DECISION allow|deny <id> printed when a phone's decision is applied
 
 use std::io::BufRead;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use super::chat::{BoxFuture, ChatBackend, ChatConfig, ChatFail, ChatLink, ModelOption};
 use super::hub::{ApprovalIn, Host, Hub, SessionIn};
 use super::pairing::{self, tests::MemStore};
 use super::server;
@@ -29,6 +32,56 @@ impl Host for Printing {
     }
 }
 
+/// A stand-in provider for the Kotlin client to talk to: no key, no network, no cost.
+/// `/error` fails like a provider error, `/auth` like a refused key, `/slow` never ends.
+struct FakeChat {
+    on: AtomicBool,
+}
+
+impl ChatBackend for FakeChat {
+    fn config(&self) -> ChatConfig {
+        ChatConfig {
+            enabled: self.on.load(Ordering::SeqCst),
+            allowed: vec![
+                ModelOption { id: "anthropic/fake-claude".into(), provider: "anthropic".into(), label: "Anthropic · fake-claude".into() },
+                ModelOption { id: "openai/fake-gpt".into(), provider: "openai".into(), label: "OpenAI · fake-gpt".into() },
+            ],
+        }
+    }
+
+    fn send(&self, model_id: &str, text: String, deltas: tokio::sync::mpsc::UnboundedSender<String>) -> BoxFuture<Result<String, ChatFail>> {
+        let model = model_id.to_string();
+        Box::pin(async move {
+            if text.starts_with("/error") {
+                return Err(ChatFail::Provider);
+            }
+            if text.starts_with("/auth") {
+                return Err(ChatFail::Auth);
+            }
+            if text.starts_with("/slow") {
+                let mut so_far = String::new();
+                loop {
+                    so_far.push_str("slow ");
+                    let _ = deltas.send(so_far.clone());
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            }
+            let answer = format!("echo from {model}: {text}");
+            let mut so_far = String::new();
+            for word in answer.split_inclusive(' ') {
+                so_far.push_str(word);
+                let _ = deltas.send(so_far.clone());
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+            Ok(answer)
+        })
+    }
+
+    fn reset(&self) {
+        println!("CHAT reset");
+    }
+}
+
 #[test]
 #[ignore = "driven by android/app/src/test/.../RustDesktopInteropTest.kt"]
 fn interop_server() {
@@ -37,7 +90,8 @@ fn interop_server() {
         let identity = pairing::load_or_create_identity(&MemStore::default()).unwrap();
         let token = std::env::var("COUCOU_INTEROP_TOKEN").unwrap_or_else(|_| "interop-token-0123456789abcdef".into());
         let hub = Hub::new(Arc::new(Printing));
-        let shared = server::Shared::new(hub.clone(), token.clone(), "Rust desktop".into());
+        let fake = Arc::new(FakeChat { on: AtomicBool::new(false) });
+        let shared = server::Shared::with_chat(hub.clone(), token.clone(), "Rust desktop".into(), Some(ChatLink::new(fake.clone())));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let handle = server::serve(listener, server::tls_acceptor(&identity).unwrap(), shared.clone());
@@ -78,6 +132,7 @@ fn interop_server() {
                     *shared.token.lock().unwrap() = new_token.to_string();
                     hub.kick_all("auth", "unpaired");
                 }
+                (Some("chat"), Some(state), _) => fake.on.store(state == "on", Ordering::SeqCst),
                 (Some("quit"), _, _) => break,
                 _ => println!("? {line}"),
             }

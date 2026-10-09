@@ -30,6 +30,8 @@ private class FakeDesktop(tls: Boolean) : AutoCloseable {
     val peerClosed = CountDownLatch(1)
     @Volatile var welcomeVersion = Protocol.VERSION
     @Volatile var expectedToken = "T".repeat(20)
+    /** Extra JSON in the welcome, such as `,"caps":["chat"]`. */
+    @Volatile var welcomeExtra = ""
     private val fp = "f".repeat(64)
 
     init {
@@ -63,7 +65,7 @@ private class FakeDesktop(tls: Boolean) : AutoCloseable {
                     received.add(line)
                     if (line.contains("\"type\":\"hello\"")) {
                         if (!line.contains("\"token\":\"$expectedToken\"")) { send("""{"type":"error","code":"auth","message":"bad token"}"""); break }
-                        send("""{"type":"welcome","v":$welcomeVersion,"desktop":"Test PC","os":"windows"}""")
+                        send("""{"type":"welcome","v":$welcomeVersion,"desktop":"Test PC","os":"windows"$welcomeExtra}""")
                         send("""{"type":"sessions","sessions":[{"pillId":"agent_codex","state":"working"}]}""")
                     }
                     if (line.contains("\"type\":\"ping\"")) send("""{"type":"pong"}""")
@@ -94,6 +96,13 @@ private class Recorder : LinkListener {
     override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
     override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
     override fun onError(code: String, message: String) { errors.add(code) }
+    val caps = LinkedBlockingQueue<Set<String>>()
+    val chatEvents = LinkedBlockingQueue<String>()
+    override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
+    override fun onChatModels(models: List<ChatModel>) { chatEvents.add("models:" + models.joinToString(",") { it.id }) }
+    override fun onChatDelta(id: String, text: String) { chatEvents.add("delta:$id:$text") }
+    override fun onChatDone(id: String, text: String?) { chatEvents.add("done:$id:${text ?: "-"}") }
+    override fun onChatError(id: String, reason: String, message: String) { chatEvents.add("error:$id:$reason") }
 }
 
 class LinkClientTest {
@@ -282,5 +291,87 @@ class LinkClientTest {
         val deadline = System.currentTimeMillis() + 3000
         while (rec.states.lastOrNull() != LinkState.DISCONNECTED && System.currentTimeMillis() < deadline) Thread.sleep(20)
         assertEquals(LinkState.DISCONNECTED, rec.states.last())
+    }
+
+    // ── chat ────────────────────────────────────────────────────────────────
+
+    @Test fun theHelloAsksForChatUnlessTheAppAsksForNothing() {
+        val d = FakeDesktop(tls = true).track()
+        val rec = Recorder()
+        client(d, rec).start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        assertTrue(d.received.poll(2, TimeUnit.SECONDS)!!.contains("\"caps\":[\"chat\"]"))
+
+        val old = FakeDesktop(tls = true).track()
+        val rec2 = Recorder()
+        val p = payload(old)
+        LinkClient(p, "Pixel", rec2, PinnedTls.connector(p), caps = emptyList(), readTimeoutMs = 2_000)
+            .also { closeables.add(AutoCloseable { it.stop() }) }.start()
+        assertTrue(rec2.connected.await(5, TimeUnit.SECONDS))
+        val hello = old.received.poll(2, TimeUnit.SECONDS)!!
+        assertFalse("an app with no optional features sends the plain v1 hello: $hello", hello.contains("caps"))
+    }
+
+    @Test fun aWelcomeWithoutCapsOffersNoChatAndTheModelsAreNotAsked() {
+        val d = FakeDesktop(tls = true).track()
+        val rec = Recorder()
+        client(d, rec).start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        assertEquals(emptySet<String>(), rec.caps.poll(5, TimeUnit.SECONDS))
+        Thread.sleep(300)
+        assertTrue(d.received.none { it.contains("chatModels") })
+    }
+
+    @Test fun whenChatIsOfferedTheModelsAreAskedForAtOnce() {
+        val d = FakeDesktop(tls = true).track().also { it.welcomeExtra = ""","caps":["chat"]""" }
+        val rec = Recorder()
+        client(d, rec).start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        assertEquals(setOf("chat"), rec.caps.poll(5, TimeUnit.SECONDS))
+        val asked = generateSequence { d.received.poll(3, TimeUnit.SECONDS) }.take(6).firstOrNull { it.contains("chatModels") }
+        assertNotNull("the models were never asked for", asked)
+    }
+
+    @Test fun chatMessagesReachTheListener() {
+        val d = FakeDesktop(tls = true).track()
+        val rec = Recorder()
+        client(d, rec).start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        d.push("""{"type":"chatModels","models":[{"id":"openai/gpt","provider":"openai","label":"GPT"}]}""")
+        d.push("""{"type":"chatDelta","id":"c1","text":"Hel"}""")
+        d.push("""{"type":"chatDelta","id":"c1","text":"lo"}""")
+        d.push("""{"type":"chatDone","id":"c1"}""")
+        d.push("""{"type":"chatError","id":"c2","reason":"rate","message":"x"}""")
+        d.push("""{"type":"chatDelta","id":"bad id","text":"ignored"}""")
+        d.push("""{"type":"ping"}""") // an unknown type in the middle changes nothing
+        val got = (1..5).map { rec.chatEvents.poll(5, TimeUnit.SECONDS) }
+        assertEquals(listOf("models:openai/gpt", "delta:c1:Hel", "delta:c1:lo", "done:c1:-", "error:c2:rate"), got)
+        assertNull(rec.chatEvents.poll(300, TimeUnit.MILLISECONDS))
+    }
+
+    @Test fun chatSendIsWrittenOffTheCallersThreadAndOnlyWhileConnected() {
+        val d = FakeDesktop(tls = true).track()
+        val rec = Recorder()
+        val c = client(d, rec)
+        assertFalse("not connected yet", c.chatSend("c0", "openai/gpt", "early"))
+        c.start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        assertTrue(c.chatSend("c1", "openai/gpt", "hello \"there\""))
+        c.chatCancel("c1")
+        c.chatReset()
+        c.chatModels()
+        val lines = generateSequence { d.received.poll(3, TimeUnit.SECONDS) }.take(12).toList()
+        val chat = lines.filter { it.contains("\"type\":\"chat") }
+        assertEquals(
+            listOf("chatSend", "chatCancel", "chatReset", "chatModels"),
+            chat.map { org.json.JSONObject(it).getString("type") },
+        )
+        assertEquals("hello \"there\"", org.json.JSONObject(chat[0]).getString("text"))
+        assertTrue(chat.none { it.contains("early") })
+    }
+
+    @Test fun theDemoOffersNoChat() {
+        val demo = DemoLink(object : LinkListener {}, autoRun = false)
+        assertFalse(demo.chatSend("c1", "a/b", "hi"))
     }
 }

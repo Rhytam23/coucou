@@ -9,6 +9,7 @@ import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -23,13 +24,14 @@ class DevDesktopInteropTest {
 
     @After fun cleanup() { proc?.destroyForcibly() }
 
-    private fun have(cmd: String) = try {
-        ProcessBuilder(cmd, "--version").redirectErrorStream(true).start().also { it.inputStream.readBytes() }.waitFor() == 0
+    // `openssl --version` is not a command (it is `openssl version`): the old check made these tests skip everywhere.
+    private fun have(cmd: String, versionArg: String = "--version") = try {
+        ProcessBuilder(cmd, versionArg).redirectErrorStream(true).start().also { it.inputStream.readBytes() }.waitFor() == 0
     } catch (_: Exception) { false }
 
     private fun startDesktop(vararg extra: String): JSONObject {
         assumeTrue("node not available", have("node"))
-        assumeTrue("openssl not available", have("openssl"))
+        assumeTrue("openssl not available", have("openssl", "version"))
         val script = ReferenceFiles.file("android/tools/dev-desktop.mjs").absolutePath
         proc = ProcessBuilder(listOf("node", script, "--host", "127.0.0.1", "--port", "0", "--quiet", "--step", "300") + extra)
             .redirectErrorStream(true).start()
@@ -52,7 +54,32 @@ class DevDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val caps = LinkedBlockingQueue<Set<String>>()
+        val chat = LinkedBlockingQueue<String>()
+        override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
+        override fun onChatModels(models: List<ChatModel>) { chat.add("models:" + models.joinToString(",") { it.id }) }
+        override fun onChatDelta(id: String, text: String) { chat.add("delta:$id:$text") }
+        override fun onChatDone(id: String, text: String?) { chat.add("done:$id:${text ?: "-"}") }
+        override fun onChatError(id: String, reason: String, message: String) { chat.add("error:$id:$reason") }
+
+        /** Everything of one answer until its end. */
+        fun answer(id: String, seconds: Long = 10): Pair<String, String> {
+            val text = StringBuilder()
+            val deadline = System.currentTimeMillis() + seconds * 1000
+            while (System.currentTimeMillis() < deadline) {
+                val e = chat.poll(200, TimeUnit.MILLISECONDS) ?: continue
+                when {
+                    e.startsWith("delta:$id:") -> text.append(e.removePrefix("delta:$id:"))
+                    e.startsWith("done:$id:") -> return text.toString() to ("done:" + e.removePrefix("done:$id:"))
+                    e.startsWith("error:$id:") -> return text.toString() to e
+                }
+            }
+            error("no end of answer for $id")
+        }
     }
+
+    private fun chatClient(info: JSONObject, rec: Rec, caps: List<String> = Protocol.CAPABILITIES): LinkClient =
+        LinkClient(PairingPayload.parse(info.getString("link"))!!, "Interop Pixel", rec, readTimeoutMs = 5_000, caps = caps)
 
     @Test fun pairsReceivesSessionsAndApprovalAndDecides() {
         val info = startDesktop("--once")
@@ -91,6 +118,93 @@ class DevDesktopInteropTest {
             client.start()
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
             assertTrue(rec.welcome.isEmpty())
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── chat, against the fake provider of the Node desktop ─────────────────────────
+
+    @Test fun chatWorksAgainstTheFakeProvider() {
+        val info = startDesktop("--fake-chat")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("chat"), rec.caps.poll(10, TimeUnit.SECONDS))
+            assertEquals("models:fake/echo,fake/other", rec.chat.poll(10, TimeUnit.SECONDS))
+            assertTrue(client.chatSend("c1", "fake/echo", "hello there"))
+            val (text, end) = rec.answer("c1")
+            assertEquals("Fake answer to: hello there", text)
+            assertEquals("done:-", end)
+
+            // the desktop's own refusals arrive as codes
+            client.chatSend("c2", "fake/echo", "/error")
+            assertEquals("error:c2:provider", rec.answer("c2").second)
+            client.chatSend("c3", "fake/echo", "/auth")
+            assertEquals("error:c3:auth", rec.answer("c3").second)
+            client.chatSend("c4", "not/allowed", "hi")
+            assertEquals("error:c4:not_allowed", rec.answer("c4").second)
+            client.chatSend("c5", "fake/echo", "x".repeat(Protocol.CHAT_MAX_TEXT + 1))
+            assertEquals("error:c5:too_long", rec.answer("c5").second)
+
+            // a long answer arrives in pieces that add up
+            client.chatSend("c6", "fake/echo", "/long")
+            val (long, longEnd) = rec.answer("c6")
+            assertEquals("done:-", longEnd)
+            assertEquals(750 * "Lorem ipsum dolor sit amet. ".length, long.length)
+
+            // a rewritten answer is replaced by the final one
+            client.chatSend("c7", "fake/echo", "/rewrite")
+            assertEquals("done:Answer", rec.answer("c7").second)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun oneAnswerAtATimeAndCancelStopsIt() {
+        val info = startDesktop("--fake-chat")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertNotNull(rec.caps.poll(10, TimeUnit.SECONDS))
+            client.chatSend("s1", "fake/echo", "/slow")
+            assertTrue("never started", generateSequence { rec.chat.poll(5, TimeUnit.SECONDS) }.take(20).any { it.startsWith("delta:s1:") })
+            client.chatSend("s2", "fake/echo", "second")
+            assertEquals("error:s2:busy", rec.answer("s2").second)
+            client.chatCancel("s1")
+            assertEquals("error:s1:canceled", rec.answer("s1").second)
+            client.chatSend("s3", "fake/echo", "after")
+            assertEquals("Fake answer to: after", rec.answer("s3").first)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun anOlderAppOrAnOlderComputerSeesNoChat() {
+        // The desktop has chat but the app asks for nothing (an older app): not offered, nothing sent.
+        val info = startDesktop("--fake-chat")
+        val rec = Rec()
+        val client = chatClient(info, rec, caps = emptyList())
+        try {
+            client.start()
+            assertEquals(emptySet<String>(), rec.caps.poll(10, TimeUnit.SECONDS))
+            client.chatSend("o1", "fake/echo", "hi")
+            assertNull(rec.chat.poll(1, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun aDesktopWithoutTheFakeProviderOffersNoChat() {
+        val info = startDesktop()
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(emptySet<String>(), rec.caps.poll(10, TimeUnit.SECONDS))
+            assertNull(rec.chat.poll(1, TimeUnit.SECONDS))
         } finally {
             client.stop()
         }

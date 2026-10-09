@@ -94,6 +94,33 @@ class RustDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val caps = LinkedBlockingQueue<Set<String>>()
+        val chat = LinkedBlockingQueue<String>()
+        override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
+        override fun onChatModels(models: List<ChatModel>) { chat.add("models:" + models.joinToString(",") { it.id }) }
+        override fun onChatDelta(id: String, text: String) { chat.add("delta:$id:$text") }
+        override fun onChatDone(id: String, text: String?) { chat.add("done:$id:${text ?: "-"}") }
+        override fun onChatError(id: String, reason: String, message: String) { chat.add("error:$id:$reason") }
+
+        fun answer(id: String, seconds: Long = 15): Pair<String, String> {
+            val text = StringBuilder()
+            val deadline = System.currentTimeMillis() + seconds * 1000
+            while (System.currentTimeMillis() < deadline) {
+                val e = chat.poll(200, TimeUnit.MILLISECONDS) ?: continue
+                when {
+                    e.startsWith("delta:$id:") -> text.append(e.removePrefix("delta:$id:"))
+                    e.startsWith("done:$id:") -> return text.toString() to ("done:" + e.removePrefix("done:$id:"))
+                    e.startsWith("error:$id:") -> return text.toString() to e
+                }
+            }
+            error("no end of answer for $id")
+        }
+    }
+
+    private fun chatClient(info: JSONObject, rec: Rec, caps: List<String> = Protocol.CAPABILITIES): LinkClient {
+        val client = LinkClient(PairingPayload.parse(info.getString("link"))!!, "Interop Pixel", rec, readTimeoutMs = 5_000, caps = caps)
+        client.start()
+        return client
     }
 
     private fun connect(info: JSONObject, rec: Rec, token: String? = null): LinkClient {
@@ -187,6 +214,72 @@ class RustDesktopInteropTest {
             assertNotNull(rec.welcome.poll(15, TimeUnit.SECONDS))
             command("repair brand-new-token-0123456789")
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── chat, against the real server with a fake provider ───────────────────────────
+
+    @Test fun chatWorksAgainstTheRealServerWhenItsSwitchIsOn() {
+        val info = startDesktop()
+        command("chat on")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(setOf("chat"), rec.caps.poll(15, TimeUnit.SECONDS))
+            assertEquals("models:anthropic/fake-claude,openai/fake-gpt", rec.chat.poll(10, TimeUnit.SECONDS))
+            assertTrue(client.chatSend("c1", "openai/fake-gpt", "hello"))
+            val (text, end) = rec.answer("c1")
+            assertEquals("echo from openai/fake-gpt: hello", text)
+            assertEquals("done:-", end)
+
+            client.chatSend("c2", "openai/fake-gpt", "/error")
+            assertEquals("error:c2:provider", rec.answer("c2").second)
+            client.chatSend("c3", "openai/fake-gpt", "/auth")
+            assertEquals("error:c3:auth", rec.answer("c3").second)
+            client.chatSend("c4", "ollama/not-allowed", "hi")
+            assertEquals("error:c4:not_allowed", rec.answer("c4").second)
+            client.chatSend("c5", "openai/fake-gpt", "x".repeat(Protocol.CHAT_MAX_TEXT + 1))
+            assertEquals("error:c5:too_long", rec.answer("c5").second)
+
+            client.chatSend("s1", "openai/fake-gpt", "/slow")
+            assertTrue("never started", generateSequence { rec.chat.poll(5, TimeUnit.SECONDS) }.take(20).any { it.startsWith("delta:s1:") })
+            client.chatSend("s2", "openai/fake-gpt", "second")
+            assertEquals("error:s2:busy", rec.answer("s2").second)
+            client.chatCancel("s1")
+            assertEquals("error:s1:canceled", rec.answer("s1").second)
+
+            // New chat: the computer forgets its side
+            client.chatReset()
+            assertTrue(sawLine("CHAT reset", 10))
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withTheSwitchOffTheServerOffersNoChat() {
+        val info = startDesktop()
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            client.chatSend("o1", "openai/fake-gpt", "hi")
+            assertNull(rec.chat.poll(1, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun anOlderAppIsNeverOfferedChatEvenWhenItIsOn() {
+        val info = startDesktop()
+        command("chat on")
+        val rec = Rec()
+        val client = chatClient(info, rec, caps = emptyList())
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            client.chatSend("o1", "openai/fake-gpt", "hi")
+            assertNull(rec.chat.poll(1, TimeUnit.SECONDS))
         } finally {
             client.stop()
         }

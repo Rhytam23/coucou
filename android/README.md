@@ -102,3 +102,14 @@ adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind fi
 - `.../app` model, notifications, service, biometric gate, secure storage
 - `i18n/` Android-only strings; the rest come from the desktop catalog
 - Tests compare pill IDs, colours, tints, eyes and sounds with the desktop sources, so a drift fails the build
+
+## Chat through the computer (in progress, see CHAT_PLAN.md)
+
+The app can chat with the AI providers the computer is set up for; the computer's API keys never leave it. It is
+offered only when the user turns on "Let the phone chat with my AI providers" in the computer's Settings, and only the
+models they tick. Done so far: the protocol client, the conversation logic (`core/ChatSession.kt`), the private history
+file with Clear (`core/ChatHistory.kt`) and `AppModel` state. The Chat screen comes next. To try the link without a key:
+
+```bash
+node android/tools/dev-desktop.mjs --fake-chat --host <LAN IP>   # offers chat with a fake provider (free)
+```

@@ -21,6 +21,11 @@ import com.coucou.android.core.WishStore
 import com.coucou.android.core.Pills
 import com.coucou.android.ui.IslandOverlay
 import com.coucou.android.link.Protocol
+import com.coucou.android.link.ChatModel
+import com.coucou.android.core.ChatHistory
+import com.coucou.android.core.ChatMessage
+import com.coucou.android.core.ChatModels
+import com.coucou.android.core.ChatSession
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.DemoLink
 import com.coucou.android.link.DesktopLink
@@ -95,6 +100,83 @@ class AppModel(private val context: Context) : LinkListener {
     fun recordDecision(d: Decision) {
         decisionLog.add(d)
         decisions = decisionLog.all()
+    }
+
+    // ── Chat through the computer (docs/ANDROID_LINK.md). The UI comes in the next step. ──────────
+
+    private val chatHistory = ChatHistory(ChatFile(java.io.File(context.filesDir, "chat-history.json")))
+    private val chatSession = ChatSession(chatHistory.load())
+
+    /** What the user reads: this phone's own copy, kept in a private file. */
+    var chatMessages by mutableStateOf(chatSession.messages); private set
+
+    /** An answer is being waited for. */
+    var chatBusy by mutableStateOf(false); private set
+
+    /** The computer offers chat to this phone right now (its switch is on and we are connected). */
+    var chatOffered by mutableStateOf(false); private set
+
+    /** The models the user allowed on the computer; the keys never leave it. */
+    var chatModels by mutableStateOf<List<ChatModel>>(emptyList()); private set
+
+    var chatModel by mutableStateOf<String?>(prefs.getString("chat_model", null)); private set
+
+    /** Chat is usable: offered, at least one model allowed, connected. */
+    val chatAvailable: Boolean get() = chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED
+
+    private fun chatChanged(save: Boolean) {
+        chatMessages = chatSession.messages
+        chatBusy = chatSession.running != null
+        if (save) chatHistory.save(chatSession.messages)
+    }
+
+    fun chatSelect(id: String) {
+        if (chatModels.any { it.id == id }) {
+            chatModel = id
+            prefs.edit().putString("chat_model", id).apply()
+        }
+    }
+
+    /** Asks the computer again which models are allowed (when the Chat screen opens). */
+    fun chatRefreshModels() { link?.chatModels() }
+
+    /** Null when sent, else why not (for a message under the box). */
+    fun chatSend(text: String): ChatSession.Refusal? {
+        val sent = chatSession.send(text, chatModel, connected = chatAvailable)
+        return when (sent) {
+            is ChatSession.Sent.No -> sent.why
+            is ChatSession.Sent.Ok -> {
+                chatChanged(save = true)
+                if (link?.chatSend(sent.msg.id, sent.msg.model, sent.msg.text) != true) {
+                    chatSession.onDisconnected()
+                    chatChanged(save = true)
+                }
+                null
+            }
+        }
+    }
+
+    fun chatCancel() {
+        chatSession.cancel()?.let { link?.chatCancel(it) }
+        chatChanged(save = true)
+    }
+
+    /** Clear: forgets the history here and on the computer. */
+    fun chatClear() {
+        chatSession.cancel()?.let { link?.chatCancel(it) }
+        chatSession.clear()
+        chatHistory.clear()
+        link?.chatReset()
+        chatChanged(save = false)
+    }
+
+    private fun chatLinkLost() {
+        chatOffered = false
+        chatModels = emptyList()
+        if (chatSession.running != null) {
+            chatSession.onDisconnected()
+            chatChanged(save = true)
+        }
     }
 
     private val choice = OverlayChoice(object : WishStore {
@@ -225,6 +307,7 @@ class AppModel(private val context: Context) : LinkListener {
         desktopName = null
         sessions = emptyList()
         dropApprovals()
+        chatLinkLost()
         wantAllow = null
         lastState.clear()
         notifier.cancelAllStatus()
@@ -268,6 +351,7 @@ class AppModel(private val context: Context) : LinkListener {
             linkState = state
             // A card for a request we can no longer answer would only produce "no longer pending".
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
+            if (state != LinkState.CONNECTED) chatLinkLost()
             refreshIsland()
             notifier.updateOngoing(this)
         }
@@ -275,6 +359,29 @@ class AppModel(private val context: Context) : LinkListener {
 
     override fun onWelcome(desktopName: String, os: String) {
         main.post { if (mode != Mode.DEMO && desktopName.isNotBlank()) this.desktopName = desktopName }
+    }
+
+    override fun onCaps(caps: Set<String>) {
+        main.post { chatOffered = Protocol.CAP_CHAT in caps }
+    }
+
+    override fun onChatModels(models: List<ChatModel>) {
+        main.post {
+            chatModels = models
+            chatModel = ChatModels.pick(models, chatModel)
+        }
+    }
+
+    override fun onChatDelta(id: String, text: String) {
+        main.post { chatSession.onDelta(id, text); chatChanged(save = false) }
+    }
+
+    override fun onChatDone(id: String, text: String?) {
+        main.post { chatSession.onDone(id, text); chatChanged(save = true) }
+    }
+
+    override fun onChatError(id: String, reason: String, message: String) {
+        main.post { chatSession.onError(id, reason); chatChanged(save = true) }
     }
 
     override fun onSessions(sessions: List<SessionInfo>) {
