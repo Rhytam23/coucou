@@ -50,10 +50,14 @@ impl Rig {
     }
 
     async fn start_with(chat: Option<Arc<super::chat::ChatLink>>) -> Rig {
+        Rig::start_full(chat, Arc::new(server::NoFeatures)).await
+    }
+
+    async fn start_full(chat: Option<Arc<super::chat::ChatLink>>, features: Arc<dyn server::Features>) -> Rig {
         let identity = pairing::load_or_create_identity(&MemStore::default()).unwrap();
         let host = Arc::new(Recorder::default());
         let hub = Hub::new(host.clone());
-        let shared = server::Shared::with_chat(hub.clone(), TOKEN.to_string(), "Test PC".to_string(), chat);
+        let shared = server::Shared::with_features(hub.clone(), TOKEN.to_string(), "Test PC".to_string(), chat, features);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let handle = server::serve(listener, server::tls_acceptor(&identity).unwrap(), shared.clone());
@@ -202,7 +206,7 @@ fn a_paired_phone_gets_sessions_and_answers_the_request() {
     block_on(async {
         let rig = Rig::start().await;
         rig.hub.publish(
-            vec![SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing".into(), step_index: 2, step_count: 6 }],
+            vec![SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing".into(), step_index: 2, step_count: 6, ..Default::default() }],
             None,
             server::now_ms(),
         );
@@ -918,5 +922,123 @@ mod chat_tests {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         false
+    }
+}
+
+
+// ── Session details (cap `details`) end to end ───────────────────────────────────────────────
+
+mod details_tests {
+    use super::*;
+    use crate::phone_link::server::Features;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Switch(AtomicBool);
+    impl Features for Switch {
+        fn details(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    fn rich() -> SessionIn {
+        SessionIn {
+            pill_id: "integration_claude".into(),
+            agent: "Claude Code".into(),
+            state: "finished".into(),
+            status_text: "Done".into(),
+            step_index: 2,
+            step_count: 3,
+            steps: vec!["Read · a.rs".into(), "Edit · a.rs".into()],
+            final_line: Some("Fixed the bug".into()),
+            project: Some("/home/me/secret-folder/coucou".into()),
+            color: Some("#2DD4BF".into()),
+        }
+    }
+
+    async fn rig(on: bool) -> Rig {
+        let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(on)))).await;
+        rig.hub.publish(vec![rich()], None, server::now_ms());
+        rig
+    }
+
+    async fn phone(rig: &Rig, caps: Option<Value>) -> (Client, Value, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        let sessions = c.expect("sessions").await;
+        (c, welcome, sessions)
+    }
+
+    #[test]
+    fn a_phone_that_asks_gets_the_details_when_the_switch_is_on() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (_c, welcome, sessions) = phone(&rig, Some(json!(["details"]))).await;
+            assert_eq!(welcome["caps"], json!(["details"]));
+            let s = &sessions["sessions"][0];
+            assert_eq!(s["steps"], json!(["Read · a.rs", "Edit · a.rs"]));
+            assert_eq!(s["finalLine"], "Fixed the bug");
+            assert_eq!(s["project"], "coucou", "the folder name, never the path");
+            assert_eq!(s["color"], "#2DD4BF");
+            assert!(!sessions.to_string().contains("secret-folder"));
+        });
+    }
+
+    #[test]
+    fn an_older_phone_gets_the_v1_sessions_and_no_caps() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (_c, welcome, sessions) = phone(&rig, None).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+            let s = sessions["sessions"][0].as_object().unwrap();
+            let mut keys: Vec<&str> = s.keys().map(String::as_str).collect();
+            keys.sort_unstable();
+            assert_eq!(keys, ["agent", "pillId", "state", "statusText", "stepCount", "stepIndex", "updatedAt"]);
+            assert!(!sessions.to_string().contains("coucou") && !sessions.to_string().contains("Fixed the bug"));
+        });
+    }
+
+    #[test]
+    fn with_the_switch_off_nothing_extra_is_offered_even_to_a_phone_that_asks() {
+        block_on(async {
+            let rig = rig(false).await;
+            let (_c, welcome, sessions) = phone(&rig, Some(json!(["details", "chat"]))).await;
+            assert!(welcome.get("caps").is_none());
+            assert!(sessions["sessions"][0].get("steps").is_none());
+            assert!(sessions["sessions"][0].get("project").is_none());
+        });
+    }
+
+    #[test]
+    fn a_phone_gets_a_live_update_with_details_and_another_phone_without() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut with, _, _) = phone(&rig, Some(json!(["details"]))).await;
+            let (mut without, _, _) = phone(&rig, None).await;
+            let mut next = rich();
+            next.final_line = Some("A second line".into());
+            rig.hub.publish(vec![next], None, server::now_ms());
+            let a = with.expect("sessions").await;
+            let b = without.expect("sessions").await;
+            assert_eq!(a["sessions"][0]["finalLine"], "A second line");
+            assert!(b["sessions"][0].get("finalLine").is_none());
+        });
+    }
+
+    #[test]
+    fn a_full_load_of_details_still_arrives_under_the_line_limit() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let sessions: Vec<SessionIn> = (0..16)
+                .map(|i| SessionIn { pill_id: format!("agent_{i}"), steps: (0..20).map(|n| format!("{n} {}", "x".repeat(250))).collect(), ..rich() })
+                .collect();
+            rig.hub.publish(sessions, None, server::now_ms());
+            let (_c, _, line) = phone(&rig, Some(json!(["details"]))).await;
+            assert_eq!(line["sessions"].as_array().unwrap().len(), 16);
+        });
     }
 }

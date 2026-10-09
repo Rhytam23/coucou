@@ -28,6 +28,12 @@ pub const APPROVAL_TTL_MS: u64 = 115_000;
 const MAX_SESSIONS: usize = 16;
 const MAX_COMMAND_CHARS: usize = 500;
 const MAX_TEXT_CHARS: usize = 200;
+/// Details (cap `details`): at most this many steps per session, each cut at MAX_TEXT_CHARS.
+pub const MAX_STEPS: usize = 20;
+const MAX_PROJECT_CHARS: usize = 64;
+/// A `sessions` line with details stays under this, so it never reaches the 64 KiB limit of a line
+/// (16 sessions of 20 steps of 200 characters would be 64 KB of text alone).
+pub const DETAILS_LINE_BUDGET: usize = 56 * 1024;
 
 /// The states the phone draws; anything else is sent as `idle`.
 const STATES: &[&str] = &[
@@ -51,6 +57,12 @@ pub struct SessionIn {
     pub status_text: String,
     pub step_index: u32,
     pub step_count: u32,
+    /// Details, sent only to phones that asked for and were offered `details`.
+    pub steps: Vec<String>,
+    pub final_line: Option<String>,
+    /// The folder the session runs in; only its last segment is ever kept.
+    pub project: Option<String>,
+    pub color: Option<String>,
 }
 
 impl Default for SessionIn {
@@ -62,6 +74,10 @@ impl Default for SessionIn {
             status_text: String::new(),
             step_index: 0,
             step_count: 0,
+            steps: Vec::new(),
+            final_line: None,
+            project: None,
+            color: None,
         }
     }
 }
@@ -87,6 +103,15 @@ struct Session {
     step_index: u32,
     step_count: u32,
     updated_at: u64,
+    // Not part of the v1 session: added by `detailed_line` for phones that have `details`.
+    #[serde(skip)]
+    steps: Vec<String>,
+    #[serde(skip)]
+    final_line: Option<String>,
+    #[serde(skip)]
+    project: Option<String>,
+    #[serde(skip)]
+    color: Option<String>,
 }
 
 impl Session {
@@ -119,6 +144,8 @@ struct Sub {
     /// connection can be closed (and the phone reconnect to a fresh picture)
     /// instead of staying open and silently going stale.
     evicted: Arc<AtomicBool>,
+    /// The phone asked for `details` and the user's switch was on when it connected.
+    details: bool,
 }
 
 #[derive(Default)]
@@ -169,6 +196,10 @@ impl Hub {
                     step_index: s.step_index,
                     step_count: s.step_count,
                     updated_at: now,
+                    steps: clean_steps(&s.steps),
+                    final_line: s.final_line.as_deref().map(|l| clip(l, MAX_TEXT_CHARS)).filter(|l| !l.trim().is_empty()),
+                    project: s.project.as_deref().and_then(project_name),
+                    color: s.color.filter(|c| is_color(c)),
                 };
                 if let Some(old) = inner.sessions.iter().find(|o| o.pill_id == fresh.pill_id) {
                     if old.same_content(&fresh) {
@@ -181,8 +212,7 @@ impl Hub {
         let sessions_changed = next != inner.sessions;
         inner.sessions = next;
         if sessions_changed {
-            let line = sessions_line(&inner.sessions);
-            broadcast(&mut inner, &line);
+            broadcast_sessions(&mut inner);
         }
 
         // The pending request: a new one replaces the old, none retracts it.
@@ -217,17 +247,18 @@ impl Hub {
 
     /// Registers a connection that has authenticated. The returned lines bring it
     /// up to date: the sessions, then the request still waiting, if any.
-    pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64) -> (u64, Arc<AtomicBool>) {
+    pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64, details: bool) -> (u64, Arc<AtomicBool>) {
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
         inner.next_sub += 1;
-        let _ = tx.try_send(Out::Line(sessions_line(&inner.sessions).into()));
+        let first = if details { detailed_line(&inner.sessions) } else { sessions_line(&inner.sessions) };
+        let _ = tx.try_send(Out::Line(first.into()));
         if let Some(a) = &inner.approval {
             let _ = tx.try_send(Out::Line(approval_line(a).into()));
         }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone() });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details });
         (id, evicted)
     }
 
@@ -300,6 +331,77 @@ fn broadcast(inner: &mut Inner, line: &str) {
 
 fn sessions_line(sessions: &[Session]) -> String {
     json!({ "type": "sessions", "sessions": sessions }).to_string()
+}
+
+/// The sessions with their details, for a phone that has the capability. Same fields as the v1 line plus
+/// `steps`, `finalLine`, `project` and `color` where there is something to say. Steps are dropped from the
+/// oldest first (and then from all sessions) until the line fits.
+fn detailed_line(sessions: &[Session]) -> String {
+    let mut keep = MAX_STEPS;
+    loop {
+        let list: Vec<serde_json::Value> = sessions
+            .iter()
+            .map(|s| {
+                let mut v = serde_json::to_value(s).unwrap_or_default();
+                let steps = &s.steps[s.steps.len().saturating_sub(keep)..];
+                if !steps.is_empty() {
+                    v["steps"] = json!(steps);
+                }
+                if let Some(l) = &s.final_line {
+                    v["finalLine"] = json!(l);
+                }
+                if let Some(p) = &s.project {
+                    v["project"] = json!(p);
+                }
+                if let Some(c) = &s.color {
+                    v["color"] = json!(c);
+                }
+                v
+            })
+            .collect();
+        let line = json!({ "type": "sessions", "sessions": list }).to_string();
+        if line.len() <= DETAILS_LINE_BUDGET || keep == 0 {
+            return line;
+        }
+        keep /= 2;
+    }
+}
+
+/// Every phone gets the picture it asked for: the v1 line, or the one with details.
+fn broadcast_sessions(inner: &mut Inner) {
+    let basic: Arc<str> = sessions_line(&inner.sessions).into();
+    let detailed: Option<Arc<str>> = inner.subs.iter().any(|s| s.details).then(|| detailed_line(&inner.sessions).into());
+    inner.subs.retain(|s| {
+        let line = match (&detailed, s.details) {
+            (Some(d), true) => d.clone(),
+            _ => basic.clone(),
+        };
+        let kept = s.tx.try_send(Out::Line(line)).is_ok();
+        if !kept {
+            s.evicted.store(true, Ordering::SeqCst);
+        }
+        kept
+    });
+}
+
+/// The last MAX_STEPS non-empty steps, each cut to MAX_TEXT_CHARS.
+fn clean_steps(steps: &[String]) -> Vec<String> {
+    let kept: Vec<String> = steps.iter().filter(|s| !s.trim().is_empty()).map(|s| clip(s, MAX_TEXT_CHARS)).collect();
+    kept[kept.len().saturating_sub(MAX_STEPS)..].to_vec()
+}
+
+/// Only the last segment of a folder path: never a path, never anything that could hold a user name or
+/// a drive. None when nothing usable is left.
+pub fn project_name(path: &str) -> Option<String> {
+    let last = path.trim_end_matches(['/', '\\']).rsplit(['/', '\\']).next().unwrap_or("");
+    let clean: String = last.chars().filter(|c| !c.is_control()).collect();
+    let clean = clip(clean.trim(), MAX_PROJECT_CHARS);
+    (!clean.is_empty() && clean != "." && clean != "..").then_some(clean)
+}
+
+/// "#RRGGBB" only.
+fn is_color(c: &str) -> bool {
+    c.len() == 7 && c.starts_with('#') && c[1..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn approval_line(a: &Approval) -> String {
@@ -385,6 +487,159 @@ mod tests {
 
     fn fp_of(hub: &Hub) -> String {
         hub.inner.lock().unwrap().approval.as_ref().unwrap().fingerprint.clone()
+    }
+
+    // ── session details (cap `details`) ─────────────────────────────────────────────
+
+    fn rich(pill: &str) -> SessionIn {
+        SessionIn {
+            pill_id: pill.into(),
+            agent: "Claude Code".into(),
+            state: "working".into(),
+            status_text: "Editing".into(),
+            step_index: 1,
+            step_count: 3,
+            steps: vec!["Read · a.rs".into(), "Edit · a.rs".into()],
+            final_line: Some("All done".into()),
+            project: Some("/home/me/work/coucou".into()),
+            color: Some("#2DD4BF".into()),
+        }
+    }
+
+    fn first_sessions(rx: &mut mpsc::Receiver<Out>) -> Vec<serde_json::Value> {
+        let lines = drain(rx);
+        lines[0]["sessions"].as_array().unwrap().clone()
+    }
+
+    #[test]
+    fn a_phone_without_details_gets_exactly_the_v1_fields() {
+        let (hub, _) = hub();
+        hub.publish(vec![rich("integration_claude")], None, 1_000);
+        let (tx, mut rx) = mpsc::channel(8);
+        hub.subscribe(tx, 1_001, false);
+        let s = &first_sessions(&mut rx)[0];
+        let mut keys: Vec<&str> = s.as_object().unwrap().keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["agent", "pillId", "state", "statusText", "stepCount", "stepIndex", "updatedAt"]);
+    }
+
+    #[test]
+    fn a_phone_with_details_gets_them_and_the_other_phone_does_not() {
+        let (hub, _) = hub();
+        let (tx1, mut plain) = mpsc::channel(8);
+        let (tx2, mut rich_rx) = mpsc::channel(8);
+        hub.subscribe(tx1, 0, false);
+        hub.subscribe(tx2, 0, true);
+        drain(&mut plain);
+        drain(&mut rich_rx);
+        hub.publish(vec![rich("integration_claude")], None, 1_000);
+        let p = &first_sessions(&mut plain)[0];
+        let r = &first_sessions(&mut rich_rx)[0];
+        assert!(p.get("steps").is_none() && p.get("finalLine").is_none() && p.get("project").is_none() && p.get("color").is_none());
+        assert_eq!(r["steps"], json!(["Read · a.rs", "Edit · a.rs"]));
+        assert_eq!(r["finalLine"], "All done");
+        assert_eq!(r["project"], "coucou");
+        assert_eq!(r["color"], "#2DD4BF");
+        // and the shared fields are the same for both
+        assert_eq!(p["statusText"], r["statusText"]);
+    }
+
+    #[test]
+    fn a_new_phone_with_details_is_brought_up_to_date_with_them() {
+        let (hub, _) = hub();
+        hub.publish(vec![rich("integration_claude")], None, 1_000);
+        let (tx, mut rx) = mpsc::channel(8);
+        hub.subscribe(tx, 1_001, true);
+        assert_eq!(first_sessions(&mut rx)[0]["project"], "coucou");
+    }
+
+    #[test]
+    fn a_change_in_details_alone_is_sent() {
+        let (hub, _) = hub();
+        let (tx, mut rx) = mpsc::channel(8);
+        hub.subscribe(tx, 0, true);
+        drain(&mut rx);
+        hub.publish(vec![rich("a")], None, 1_000);
+        assert_eq!(drain(&mut rx).len(), 1);
+        hub.publish(vec![rich("a")], None, 2_000);
+        assert!(drain(&mut rx).is_empty(), "same picture: nothing sent");
+        let mut changed = rich("a");
+        changed.final_line = Some("Another".into());
+        hub.publish(vec![changed], None, 3_000);
+        assert_eq!(drain(&mut rx).len(), 1);
+    }
+
+    #[test]
+    fn only_the_last_twenty_steps_are_kept_each_cut_short_and_empties_dropped() {
+        let mut s = rich("a");
+        s.steps = (0..30).map(|i| format!("step {i}")).chain([String::new(), "   ".into(), "x".repeat(500)]).collect();
+        let steps = clean_steps(&s.steps);
+        assert_eq!(steps.len(), MAX_STEPS);
+        assert_eq!(steps.last().unwrap().chars().count(), MAX_TEXT_CHARS);
+        assert_eq!(steps[0], "step 11");
+        assert!(clean_steps(&[]).is_empty());
+    }
+
+    #[test]
+    fn the_project_is_a_folder_name_never_a_path() {
+        assert_eq!(project_name("/home/me/work/coucou").as_deref(), Some("coucou"));
+        assert_eq!(project_name("/home/me/work/coucou/").as_deref(), Some("coucou"));
+        assert_eq!(project_name("C:\\Users\\me\\proj").as_deref(), Some("proj"));
+        assert_eq!(project_name("C:\\Users\\me\\proj\\").as_deref(), Some("proj"));
+        assert_eq!(project_name("proj").as_deref(), Some("proj"));
+        assert_eq!(project_name("/a/b\tc\n").as_deref(), Some("bc"));
+        for none in ["", "/", "\\", "..", "/a/..", ".", "   "] {
+            assert_eq!(project_name(none), None, "{none:?}");
+        }
+        let long = project_name(&format!("/x/{}", "é".repeat(200))).unwrap();
+        assert_eq!(long.chars().count(), MAX_PROJECT_CHARS);
+        for p in ["/home/me/secret/app", "C:\\Users\\me\\app", "relative/dir/app"] {
+            let name = project_name(p).unwrap();
+            assert!(!name.contains('/') && !name.contains('\\') && name == "app");
+        }
+    }
+
+    #[test]
+    fn only_a_six_digit_hex_colour_is_passed_on() {
+        for ok in ["#8AB4F8", "#000000", "#abcdef"] {
+            assert!(is_color(ok), "{ok}");
+        }
+        for bad in ["", "red", "8AB4F8", "#12", "#GGGGGG", "#12345678", "#8AB4F8;", "url(x)"] {
+            assert!(!is_color(bad), "{bad}");
+        }
+        let (hub, _) = hub();
+        let mut s = rich("a");
+        s.color = Some("red".into());
+        hub.publish(vec![s], None, 1_000);
+        let (tx, mut rx) = mpsc::channel(8);
+        hub.subscribe(tx, 1_001, true);
+        assert!(first_sessions(&mut rx)[0].get("color").is_none());
+    }
+
+    #[test]
+    fn sixteen_sessions_of_full_steps_still_fit_in_one_line() {
+        let big = |i: usize| SessionIn {
+            steps: (0..30).map(|n| format!("{n}: {}", "é".repeat(300))).collect(),
+            final_line: Some("f".repeat(400)),
+            ..rich(&format!("agent_{i}"))
+        };
+        let sessions: Vec<SessionIn> = (0..20).map(big).collect();
+        let (hub, _) = hub();
+        hub.publish(sessions, None, 1_000);
+        let (tx, mut rx) = mpsc::channel(8);
+        hub.subscribe(tx, 1_001, true);
+        let Out::Line(line) = rx.try_recv().unwrap() else { panic!() };
+        assert!(line.len() <= DETAILS_LINE_BUDGET, "{} bytes", line.len());
+        assert!(line.len() < 64 * 1024);
+        let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+        let list = v["sessions"].as_array().unwrap();
+        assert_eq!(list.len(), MAX_SESSIONS);
+        // the newest steps are the ones kept
+        let steps = list[0]["steps"].as_array().unwrap();
+        assert!(!steps.is_empty() && steps.len() < MAX_STEPS);
+        assert!(steps.last().unwrap().as_str().unwrap().starts_with("29: "));
+        // and the short fields are all still there
+        assert_eq!(list[15]["project"], "coucou");
     }
 
     #[test]
@@ -481,7 +736,7 @@ mod tests {
         let (hub, _) = hub();
         let (tx, mut rx) = mpsc::channel(16);
         hub.publish(vec![session("working")], None, 1_000);
-        hub.subscribe(tx, 1_001);
+        hub.subscribe(tx, 1_001, false);
         let first = drain(&mut rx);
         assert_eq!(first.len(), 1);
         assert_eq!(first[0]["type"], "sessions");
@@ -515,12 +770,12 @@ mod tests {
         let (hub, _) = hub();
         hub.publish(vec![session("approval")], Some(approval("r1", "ls")), 1_000);
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe(tx, 2_000);
+        hub.subscribe(tx, 2_000, false);
         let lines = drain(&mut rx);
         assert_eq!(lines.iter().map(|l| l["type"].as_str().unwrap()).collect::<Vec<_>>(), ["sessions", "approval"]);
         // A request already past its time is not offered.
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe(tx, 1_000 + APPROVAL_TTL_MS + 1);
+        hub.subscribe(tx, 1_000 + APPROVAL_TTL_MS + 1, false);
         assert_eq!(drain(&mut rx).iter().filter(|l| l["type"] == "approval").count(), 0);
     }
 
@@ -528,7 +783,7 @@ mod tests {
     fn what_the_island_sends_is_bounded_and_cleaned() {
         let (hub, _) = hub();
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe(tx, 0);
+        hub.subscribe(tx, 0, false);
         drain(&mut rx);
         let many: Vec<SessionIn> = (0..40)
             .map(|i| SessionIn { pill_id: format!("agent_{i}"), state: "not-a-state".into(), ..Default::default() })
@@ -545,7 +800,7 @@ mod tests {
     fn a_phone_that_cannot_keep_up_is_dropped_not_waited_for() {
         let (hub, _) = hub();
         let (tx, _rx) = mpsc::channel(2); // never read
-        hub.subscribe(tx, 0);
+        hub.subscribe(tx, 0, false);
         assert_eq!(hub.clients(), 1);
         for i in 0..5 {
             hub.publish(vec![session("working")], None, 1_000);
@@ -558,7 +813,7 @@ mod tests {
     fn a_phone_that_was_dropped_is_marked_so_its_connection_can_close() {
         let (hub, _) = hub();
         let (tx, _rx) = mpsc::channel(1); // never read
-        let (_, evicted) = hub.subscribe(tx, 0);
+        let (_, evicted) = hub.subscribe(tx, 0, false);
         assert!(!evicted.load(Ordering::SeqCst));
         for i in 0..4 {
             hub.publish(vec![SessionIn { status_text: format!("{i}"), ..session("working") }], None, 1_000);
@@ -566,7 +821,7 @@ mod tests {
         assert!(evicted.load(Ordering::SeqCst), "a dropped phone must be told apart from a healthy one");
         // A healthy phone is never marked.
         let (tx, mut rx) = mpsc::channel(16);
-        let (_, ok) = hub.subscribe(tx, 0);
+        let (_, ok) = hub.subscribe(tx, 0, false);
         hub.publish(vec![session("finished")], None, 2_000);
         drain(&mut rx);
         assert!(!ok.load(Ordering::SeqCst));
@@ -576,7 +831,7 @@ mod tests {
     fn kicking_tells_every_phone_why() {
         let (hub, _) = hub();
         let (tx, mut rx) = mpsc::channel(4);
-        hub.subscribe(tx, 0);
+        hub.subscribe(tx, 0, false);
         hub.kick_all("auth", "unpaired");
         assert_eq!(hub.clients(), 0);
         let mut saw = false;

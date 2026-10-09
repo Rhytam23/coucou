@@ -116,7 +116,7 @@ fn interop_server() {
             match (words.next(), words.next(), words.next()) {
                 (Some("sessions"), _, _) => hub.publish(
                     vec![
-                        SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing files".into(), step_index: 2, step_count: 6 },
+                        SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing files".into(), step_index: 2, step_count: 6, ..Default::default() },
                         SessionIn { pill_id: "agent_gemini".into(), agent: "Gemini CLI".into(), state: "sleeping".into(), ..Default::default() },
                     ],
                     None,

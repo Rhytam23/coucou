@@ -42,6 +42,20 @@ const MAX_CONNECTIONS: usize = 8;
 /// Pause before answering a wrong token.
 const AUTH_PENALTY: Duration = Duration::from_millis(400);
 
+/// Which optional features the user has switched on, read again for every connection.
+pub trait Features: Send + Sync {
+    /// Session details: the steps, the last line, the project's folder name and the colour.
+    fn details(&self) -> bool;
+}
+
+/// Nothing extra: how the link behaved before capabilities existed.
+pub struct NoFeatures;
+impl Features for NoFeatures {
+    fn details(&self) -> bool {
+        false
+    }
+}
+
 /// What a connection needs to know about the desktop.
 pub struct Shared {
     pub hub: Arc<Hub>,
@@ -52,12 +66,17 @@ pub struct Shared {
     pub clock: fn() -> u64,
     /// Chat from the phone; None where the feature is not wired in. Offered only to a phone that asks for it.
     pub chat: Option<Arc<ChatLink>>,
+    pub features: Arc<dyn Features>,
     connections: AtomicUsize,
 }
 
 impl Shared {
     pub fn with_chat(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>) -> Arc<Shared> {
-        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, connections: AtomicUsize::new(0) })
+        Self::with_features(hub, token, name, chat, Arc::new(NoFeatures))
+    }
+
+    pub fn with_features(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>, features: Arc<dyn Features>) -> Arc<Shared> {
+        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, features, connections: AtomicUsize::new(0) })
     }
 }
 
@@ -201,12 +220,21 @@ where
     // that sends none (an older app) is never sent, and never answered, anything about chat.
     let asked_chat = hello["caps"].as_array().is_some_and(|c| c.iter().any(|x| x == "chat"));
     let chat = shared.chat.clone().filter(|c| asked_chat && c.enabled());
-    let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
+    let asked = |cap: &str| hello["caps"].as_array().is_some_and(|c| c.iter().any(|x| x == cap));
+    let details = asked("details") && shared.features.details();
+    let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
-        welcome["caps"] = json!(["chat"]);
+        offered.push("chat");
+    }
+    if details {
+        offered.push("details");
+    }
+    let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
+    if !offered.is_empty() {
+        welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe(tx.clone(), (shared.clock)());
+    let (id, evicted) = shared.hub.subscribe(tx.clone(), (shared.clock)(), details);
 
     // 2. the conversation
     loop {
