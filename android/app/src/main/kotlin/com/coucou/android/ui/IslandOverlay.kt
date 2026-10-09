@@ -7,28 +7,24 @@ import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
+import android.view.WindowInsets
 import android.view.WindowManager
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -36,19 +32,25 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -63,155 +65,184 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.coucou.android.R
+import com.coucou.android.core.IslandBox
+import com.coucou.android.core.IslandGeometry
+import com.coucou.android.core.IslandSpec
+import com.coucou.android.core.IslandTimeline
 import com.coucou.android.core.OverlayPolicy
-import com.coucou.android.link.ApprovalRequest
+import com.coucou.android.core.PxRect
+import com.coucou.android.core.Tracked
 import com.coucou.android.mochi.BotState
 import com.coucou.android.mochi.MochiEngine
 import com.coucou.android.mochi.MochiView
-import kotlin.math.min
 
 /**
- * The notch of the desktop, for the phone: a small black pill that drops from the top of the screen
- * over whatever app is open when an agent needs you or finishes, then slides away. A permission
- * request stays, expanded, until it is answered.
+ * The notch of the desktop, for the phone: a black island hanging from the top of the screen,
+ * centred on the camera cut-out, over whatever app is open. It drops while an agent works, shows
+ * how it ended for 10 s, then goes back up with the PC's motion (spring when it grows, a 340 ms
+ * curve when it shrinks). A permission request or a question keeps it open.
  *
- * Needs the user to allow "display over other apps" once. Nothing exists while it is hidden: the
- * window is added when something happens and removed after the pill has slid away, so it costs no
- * CPU the rest of the time. Allow opens the app for the fingerprint check; Deny acts right here.
+ * When it opens and closes is decided by [IslandTimeline] (pure, tested); this class only draws it
+ * and keeps one timer, for the next deadline. Nothing exists while it is hidden: the window is added
+ * when it opens and removed when it has gone up, so there is no timer and no frame loop.
+ * Needs the user's one-time "display over other apps" permission.
  */
 class IslandOverlay(
     private val context: Context,
     private val clock: () -> Double,
-    private val onAllow: (ApprovalRequest) -> Unit,
-    private val onDeny: (ApprovalRequest) -> Unit,
+    private val onAllow: (fingerprint: String) -> Unit,
+    private val onDeny: (fingerprint: String) -> Unit,
     private val onOpen: () -> Unit,
 ) {
-    private sealed interface Content {
-        data class Status(val agent: String, val state: BotState, val text: String) : Content
-        data class Approval(val request: ApprovalRequest, val agent: String) : Content
-    }
-
     private val wm = context.getSystemService(WindowManager::class.java)
     private val main = Handler(Looper.getMainLooper())
-    private var content by mutableStateOf<Content?>(null)
-    private var transition = MutableTransitionState(false)
-    private var view: ComposeView? = null
-    private var shownAt = 0.0
-    private var owner: Owner? = null
-    private val slideAwayLater = Runnable { slideAway() }
-    private val removeLater = Runnable { removeView() }
+    private val timeline = IslandTimeline(clock)
 
-    /** Every tap on the pill goes through here: one made in the first moments is ignored (see OverlayPolicy). */
-    private fun tap(what: String, action: () -> Unit) {
-        if (!OverlayPolicy.tapAccepted(shownAt, clock())) {
-            Log.d("CoucouOverlay", "ignored an early tap on $what")
-            return
-        }
-        action()
-    }
+    private var view: ComposeView? = null
+    private var owner: Owner? = null
+    private var box: IslandBox? = null
+    private var shownAt = 0.0
+
+    private var spec by mutableStateOf<IslandSpec?>(null)
+    private val width = Tracked(0.0)
+    private val height = Tracked(0.0)
+    private val radius = Tracked(0.0)
+    /** Bumped whenever a new target is set, to (re)start the frame loop that only runs while moving. */
+    private var motionKey by mutableIntStateOf(0)
+
+    private val deadline = Runnable { safely { timeline.tick(); sync() } }
 
     fun permitted(): Boolean = Settings.canDrawOverlays(context)
 
-    /** A short notice (finished, failed, asking…). Never replaces a request waiting for an answer. */
-    fun showStatus(agent: String, state: BotState, text: String) = safely {
-        if (content is Content.Approval) return@safely
-        if (!present(Content.Status(agent, state, text))) return@safely
-        main.removeCallbacks(slideAwayLater)
-        main.postDelayed(slideAwayLater, OverlayPolicy.STATUS_MS)
+    /** Something is going on right now: an agent works, a question waits, a request waits. Null: nothing. */
+    fun setActive(next: IslandSpec?) = safely {
+        timeline.setActive(next)
+        sync()
     }
 
-    /** A permission request: stays until it is answered, withdrawn or expired. */
-    fun showApproval(request: ApprovalRequest, agent: String): Boolean {
-        var shown = false
-        safely {
-            main.removeCallbacks(slideAwayLater)
-            shown = present(Content.Approval(request, agent)) && view != null
-        }
-        return shown
+    /** An agent finished, failed or hit a limit: shown for 10 s, then the island goes up. */
+    fun flash(next: IslandSpec) = safely {
+        timeline.flash(next)
+        sync()
     }
 
-    /** The request was answered elsewhere, withdrawn or expired. */
-    fun hideApproval(fingerprint: String) = safely {
-        if ((content as? Content.Approval)?.request?.fingerprint == fingerprint) slideAway()
+    /** Close at once, without animation (Coucou came to the front, the switch went off, the link dropped). */
+    fun hide() = safely {
+        timeline.dismiss()
+        removeView()
     }
 
-    fun hide() = safely { slideAway() }
+    /** True when the island is on screen showing a request: the notification can then stay quiet. */
+    fun isShowingRequest(): Boolean =
+        view != null && timeline.phase == IslandTimeline.Phase.OPEN && timeline.current?.kind == IslandSpec.Kind.APPROVAL
 
-    /**
-     * The pill is a nicety on top of the real app: whatever goes wrong with the window (permission
-     * taken away while it shows, a bad token, a SecurityException) must never reach the caller.
-     */
+    /** The island is a nicety on top of the app: nothing that goes wrong with the window may reach the caller. */
     private inline fun safely(block: () -> Unit) {
         try {
             block()
         } catch (e: Exception) {
-            Log.w("CoucouOverlay", "overlay failed: ${e.javaClass.simpleName}")
-            runCatching { removeView() }
+            Log.w(TAG, "island failed: ${e.javaClass.simpleName}")
+            runCatching { timeline.dismiss(); removeView() }
         }
     }
 
-    private fun present(c: Content): Boolean {
-        if (!permitted()) return false
-        main.removeCallbacks(removeLater)
-        content = c
-        shownAt = clock()
-        ensureView()
-        transition.targetState = true
-        return true
-    }
+    // ── From the timeline to the window ──────────────────────────────────────
 
-    private fun slideAway() {
-        main.removeCallbacks(slideAwayLater)
-        if (view == null) return
-        transition.targetState = false
-        main.removeCallbacks(removeLater)
-        main.postDelayed(removeLater, 450)
+    private fun sync() {
+        main.removeCallbacks(deadline)
+        val phase = timeline.phase
+        val current = timeline.current
+        Log.d(TAG, "phase=$phase content=${current?.kind}")
+        if (phase == IslandTimeline.Phase.HIDDEN || current == null) {
+            removeView()
+            return
+        }
+        val opening = view == null
+        if (!ensureView()) return
+        val b = box ?: return
+        if (spec?.kind != current.kind || spec?.fingerprint != current.fingerprint) shownAt = clock()
+        spec = current
+        val now = clock()
+        if (opening) {
+            width.jump(b.notchWidth.toDouble()); height.jump(0.0); radius.jump(b.cornerSmall.toDouble())
+        }
+        if (phase == IslandTimeline.Phase.OPEN) {
+            val (w, h) = IslandGeometry.sizeFor(b, current.kind)
+            width.goTo(w.toDouble(), now); height.goTo(h.toDouble(), now)
+            radius.goTo((if (current.kind == IslandSpec.Kind.WORKING) b.cornerSmall else b.cornerLarge).toDouble(), now)
+        } else {
+            // Back up into the notch: same curve as the PC.
+            width.curveTowards(b.notchWidth.toDouble(), now); height.curveTowards(0.0, now); radius.curveTowards(b.cornerSmall.toDouble(), now)
+        }
+        motionKey++
+        timeline.nextDeadline()?.let { main.postDelayed(deadline, (it - clock()).toLong().coerceAtLeast(0)) }
     }
 
     private fun removeView() {
-        if (transition.targetState) return // something new arrived meanwhile
+        main.removeCallbacks(deadline)
         view?.let { runCatching { wm.removeView(it) } }
         view = null
         owner?.destroy()
         owner = null
-        content = null
+        spec = null
     }
 
-    private fun ensureView() {
-        if (view != null) return
+    private fun measure(): IslandBox {
         val density = context.resources.displayMetrics.density
-        val width = min(context.resources.displayMetrics.widthPixels - (24 * density).toInt(), (380 * density).toInt())
-        val statusBar = context.resources.getIdentifier("status_bar_height", "dimen", "android")
-            .takeIf { it > 0 }?.let { context.resources.getDimensionPixelSize(it) } ?: (24 * density).toInt()
+        val metrics = wm.currentWindowMetrics
+        val insets = metrics.windowInsets
+        val cutout = insets.displayCutout?.boundingRectTop?.let { PxRect(it.left, it.top, it.right, it.bottom) }
+        val statusBar = insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
+            .takeIf { it > 0 } ?: (24 * density).toInt()
+        return IslandGeometry.place(metrics.bounds.width(), density, cutout, statusBar)
+    }
+
+    private fun ensureView(): Boolean {
+        if (view != null) return true
+        val b = measure()
+        box = b
         val params = WindowManager.LayoutParams(
-            width, WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            // Not focusable and not modal: touches outside the pill go to the app underneath.
+            // Not focusable and not modal: touches outside the island go to the app underneath. It may
+            // extend into the display cut-out so its black merges with the camera hole.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = statusBar + (2 * density).toInt()
+            x = b.centerOffsetX
+            y = 0
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
         val lifecycleOwner = Owner()
-        transition = MutableTransitionState(false) // enters from outside the screen
         val v = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
-            setContent { Pill() }
+            setContent { Island() }
         }
-        try {
+        return try {
             wm.addView(v, params)
+            owner = lifecycleOwner
+            view = v
+            true
         } catch (e: Exception) {
-            Log.w("CoucouOverlay", "cannot add the window: ${e.javaClass.simpleName}")
-            lifecycleOwner.destroy() // the permission was taken away meanwhile
+            Log.w(TAG, "cannot add the window: ${e.javaClass.simpleName}") // permission taken away meanwhile
+            lifecycleOwner.destroy()
+            false
+        }
+    }
+
+    /** Every tap goes through here: one made in the first moments is ignored (see OverlayPolicy). */
+    private fun tap(what: String, action: () -> Unit) {
+        if (!OverlayPolicy.tapAccepted(shownAt, clock())) {
+            Log.d(TAG, "ignored an early tap on $what")
             return
         }
-        owner = lifecycleOwner
-        view = v
+        action()
     }
 
     // ── What is drawn ────────────────────────────────────────────────────────
@@ -222,65 +253,123 @@ class IslandOverlay(
     private val accent = Color(0xFF8AB4FF)
 
     @Composable
-    private fun Pill() {
-        AnimatedVisibility(
-            visibleState = transition,
-            enter = slideInVertically(spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow)) { -it * 2 } + fadeIn(tween(150)),
-            exit = slideOutVertically(tween(260)) { -it * 2 } + fadeOut(tween(220)),
+    private fun Island() {
+        var frame by remember { mutableLongStateOf(0L) }
+        // Runs only while something is moving; when it stops, nothing redraws and nothing is scheduled.
+        LaunchedEffect(motionKey) {
+            var last = 0L
+            while (width.animating || height.animating || radius.animating) {
+                androidx.compose.runtime.withFrameNanos { ns ->
+                    val dt = if (last == 0L) 1.0 / 60 else ((ns - last) / 1e9).coerceIn(0.0, 0.1)
+                    last = ns
+                    val now = clock()
+                    width.step(dt, now); height.step(dt, now); radius.step(dt, now)
+                    frame = ns
+                }
+            }
+            if (timeline.phase == IslandTimeline.Phase.RETRACTING) {
+                timeline.retractFinished()
+                removeView()
+            }
+        }
+        frame // read, so the island redraws as it moves
+        val b = box ?: return
+        val s = spec ?: return
+        val density = LocalDensity.current
+        fun px(v: Double): Dp = with(density) { v.toFloat().toDp() }
+        val topInset = px(b.topInset.toDouble())
+        val (targetW, targetH) = IslandGeometry.sizeFor(b, s.kind)
+        // The content fades in as the island opens and out as it goes up.
+        val open = ((height.value / targetH.toDouble()) - 0.35) / 0.55
+        val corner = px(radius.value)
+        Box(
+            Modifier.width(px(width.value)).height(px(height.value))
+                .clip(RoundedCornerShape(bottomStart = corner, bottomEnd = corner)).background(ink),
         ) {
-            when (val c = content) {
-                is Content.Status -> StatusPill(c)
-                is Content.Approval -> ApprovalPill(c)
-                null -> {}
+            Box(
+                Modifier.fillMaxWidth().padding(top = topInset).alpha(open.coerceIn(0.0, 1.0).toFloat()),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(Modifier.requiredWidth(px(targetW.toDouble())).wrapContentHeight(Alignment.Top, unbounded = true)) {
+                    when (s.kind) {
+                        IslandSpec.Kind.WORKING -> WorkingStrip(s)
+                        IslandSpec.Kind.APPROVAL -> RequestCard(s)
+                        else -> ResultCard(s)
+                    }
+                }
             }
         }
     }
 
     @Composable
-    private fun StatusPill(c: Content.Status) {
-        val engine = remember(c.state) { MochiEngine(clock).apply { setState(c.state, force = true) } }
+    private fun WorkingStrip(s: IslandSpec) {
+        val engine = remember(s.state) { MochiEngine(clock).apply { setState(s.state, force = true) } }
         Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(ink)
-                .clickable { tap("the status pill") { onOpen() } }.padding(horizontal = 14.dp, vertical = 8.dp),
+            Modifier.fillMaxWidth().clickable { tap("the working strip") { onOpen() } }.padding(horizontal = 18.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MochiView(engine, Modifier.size(40.dp))
+            MochiView(engine, Modifier.size(34.dp))
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(c.agent, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (c.text.isNotBlank()) Text(c.text, color = dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(s.agent, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (s.text.isNotBlank()) Text(s.text, color = dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 
     @Composable
-    private fun ApprovalPill(c: Content.Approval) {
-        val engine = remember { MochiEngine(clock).apply { setState(BotState.APPROVAL, force = true) } }
-        Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(ink).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+    private fun ResultCard(s: IslandSpec) {
+        val engine = remember(s.state) { MochiEngine(clock).apply { setState(s.state, force = true) } }
+        val label = when (s.kind) {
+            IslandSpec.Kind.ERROR -> R.string.notif_error
+            IslandSpec.Kind.RATELIMIT -> R.string.notif_ratelimit
+            IslandSpec.Kind.QUESTION -> R.string.notif_question
+            else -> R.string.notif_finished
+        }
+        Row(
+            Modifier.fillMaxWidth().clickable { tap("the result card") { onOpen() } }.padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            MochiView(engine, Modifier.size(52.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(s.agent, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(label), color = dim, fontSize = 12.sp, maxLines = 1)
+                }
+                val text = if (s.kind == IslandSpec.Kind.QUESTION) stringResource(R.string.island_answer_on_pc) else s.text
+                if (text.isNotBlank()) Text(text, color = Color.White, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+
+    @Composable
+    private fun RequestCard(s: IslandSpec) {
+        val engine = remember { MochiEngine(clock).apply { setState(BotState.APPROVAL, force = true) } }
+        val fingerprint = s.fingerprint ?: return
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.clickable { tap("the request header") { onOpen() } }, verticalAlignment = Alignment.CenterVertically) {
                 MochiView(engine, Modifier.size(40.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(c.agent, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(c.request.tool, color = accent, fontSize = 12.sp, maxLines = 1)
+                    Text(s.agent, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(R.string.approval_title), color = accent, fontSize = 12.sp, maxLines = 1)
                 }
             }
             Text(
-                c.request.command,
+                s.text,
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF16171B)).padding(10.dp),
                 color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { tap("Deny") { onDeny(c.request) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
+                    onClick = { tap("Deny") { onDeny(fingerprint) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
                     border = BorderStroke(1.dp, line),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                 ) { Text(stringResource(R.string.action_deny)) }
                 Button(
-                    onClick = { tap("Allow") { onAllow(c.request) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
+                    onClick = { tap("Allow") { onAllow(fingerprint) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black),
                 ) { Text(stringResource(R.string.action_allow)) }
             }
@@ -306,4 +395,6 @@ class IslandOverlay(
             viewModelStore.clear()
         }
     }
+
+    private companion object { const val TAG = "CoucouIsland" }
 }

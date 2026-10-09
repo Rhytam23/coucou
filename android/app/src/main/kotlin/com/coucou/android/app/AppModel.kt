@@ -12,6 +12,7 @@ import com.coucou.android.R
 import com.coucou.android.core.Decision
 import com.coucou.android.core.DecisionLog
 import com.coucou.android.core.KeyValueStore
+import com.coucou.android.core.IslandPlan
 import com.coucou.android.core.OverlayChoice
 import com.coucou.android.core.StatusPolicy
 import com.coucou.android.core.UserSettings
@@ -115,13 +116,15 @@ class AppModel(private val context: Context) : LinkListener {
             if (value) {
                 overlay.hide()
                 notifier.cancelAllStatus()
+            } else {
+                refreshIsland() // the user left the app: an agent at work shows on the island at once
             }
         }
 
     private val overlay = IslandOverlay(
         context, { android.os.SystemClock.elapsedRealtimeNanos() / 1e6 },
-        onAllow = { notifier.openAllow(it.fingerprint) },
-        onDeny = { decide(it.fingerprint, allow = false) },
+        onAllow = { notifier.openAllow(it) },
+        onDeny = { decide(it, allow = false) },
         onOpen = { notifier.openApp() },
     )
 
@@ -137,13 +140,27 @@ class AppModel(private val context: Context) : LinkListener {
         choice.choose(on)
         overlayWished = on
         refreshOverlayPermission()
-        if (!on) overlay.hide()
+        refreshIsland()
     }
 
-    private fun overlayWanted(): Boolean {
+    private fun islandAllowed(): Boolean {
+        val connected = mode != Mode.PAIRED || linkState == LinkState.CONNECTED
         val why = OverlayPolicy.blocker(choice.wished, overlay.permitted(), inForeground)
-        if (why != null) Log.d("CoucouOverlay", "no pill: $why")
+            ?: if (!connected) "not connected to a computer" else null
+        if (why != null) Log.d("CoucouOverlay", "no island: $why")
         return why == null
+    }
+
+    /**
+     * What the island shows right now (an agent at work, a question, a request), from the current
+     * sessions and requests. When it may not show at all it is removed completely.
+     */
+    private fun refreshIsland() {
+        if (!islandAllowed()) {
+            overlay.hide()
+            return
+        }
+        overlay.setActive(IslandPlan.active(sessions, approvals, allowed = true, this::agentName))
     }
 
     /**
@@ -234,13 +251,14 @@ class AppModel(private val context: Context) : LinkListener {
         expiry.clear()
         approvals.forEach { notifier.cancelApproval(it.fingerprint) }
         approvals = emptyList()
+        refreshIsland()
     }
 
     private fun removeApproval(fingerprint: String) {
         expiry.remove(fingerprint)?.let { main.removeCallbacks(it) }
         approvals = approvals.filter { it.fingerprint != fingerprint }
         notifier.cancelApproval(fingerprint)
-        overlay.hideApproval(fingerprint)
+        refreshIsland()
     }
 
     // ── LinkListener (link thread) ───────────────────────────────────────────
@@ -250,6 +268,7 @@ class AppModel(private val context: Context) : LinkListener {
             linkState = state
             // A card for a request we can no longer answer would only produce "no longer pending".
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
+            refreshIsland()
             notifier.updateOngoing(this)
         }
     }
@@ -270,11 +289,12 @@ class AppModel(private val context: Context) : LinkListener {
                 val a = StatusPolicy.announce(prev, s.state, settings, minute, inForeground)
                 if (a.sound && sound != null) sounds.play(sound)
                 if (a.notify) notifier.showStatus(s.pillId, name, s.state, s.statusText)
-                if (a.pill && overlayWanted()) overlay.showStatus(name, s.state, s.statusText)
+                IslandPlan.flash(prev, s, settings, minute, islandAllowed(), this::agentName)?.let { overlay.flash(it) }
                 // The agent moved on: the notice about the last state is stale.
                 if (prev != s.state && s.state !in NEWSWORTHY) notifier.cancelStatus(s.pillId)
             }
             lastState.keys.retainAll(sessions.map { it.pillId }.toSet())
+            refreshIsland()
             notifier.updateOngoing(this)
         }
     }
@@ -282,9 +302,9 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onApproval(request: ApprovalRequest) {
         main.post {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
-            // One announcement only: the pill if it can show, else the heads-up notification.
-            val pill = overlayWanted() && overlay.showApproval(request, agentName(request.pillId))
-            notifier.showApproval(request, agentName(request.pillId), OverlayPolicy.approvalAlert(pill))
+            // One announcement only: the island if it can show, else the heads-up notification.
+            refreshIsland()
+            notifier.showApproval(request, agentName(request.pillId), OverlayPolicy.approvalAlert(overlay.isShowingRequest()))
             // Offered for 120 s from now, by this phone's clock (the notification times out then too).
             expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
             val gone = Runnable { removeApproval(request.fingerprint) }

@@ -38,7 +38,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,6 +49,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,17 +70,18 @@ import com.coucou.android.app.CoucouApp
 import com.coucou.android.app.Mode
 import com.coucou.android.app.Notifications
 import com.coucou.android.core.Pills
-import com.coucou.android.core.Summary
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.LinkState
 import com.coucou.android.link.PairingPayload
-import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotEmote
 import com.coucou.android.mochi.BotState
 import com.coucou.android.mochi.MochiEngine
 import com.coucou.android.mochi.MochiView
 import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
+import com.coucou.android.core.HomePanel
+import com.coucou.android.ui.AgentCard
+import com.coucou.android.ui.AgentChipRow
 import com.coucou.android.ui.MochiTouch
 import com.coucou.android.ui.HistoryScreen
 import com.coucou.android.ui.SettingsScreen
@@ -187,8 +191,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
+    val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     // Allow tapped on a notification before the link was back: open the prompt once the request is here.
     LaunchedEffect(model.approvals, model.wantAllow) {
@@ -199,11 +207,20 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
         }
     }
 
+    // The PC's Home panel: the agent that matters in a big card, the others as pills.
+    val focus = HomePanel.focus(model.sessions, selected)
+    val key = focus?.pillId ?: HOME_KEY
+    val engine = engines.getOrPut(key) { MochiEngine(clock, sound = model.sounds) }
+    val touch = touches.getOrPut(key) { MochiTouch(engine, model.sounds) { model.sessions.firstOrNull { it.pillId == key }?.state ?: BotState.IDLE } }
+    val state = focus?.state ?: BotState.IDLE
+    if (engine.state != state && !touch.dizzy) engine.setState(state)
+
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { Header(model, clock) }
+        item { Header(model) }
         model.message?.let { msg ->
             item {
                 CoucouCard {
@@ -214,30 +231,37 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
                 }
             }
         }
-        if (model.mode == Mode.NONE) item { PairCard(model) }
 
         // What is waiting for an answer comes first.
         items(model.approvals, key = { it.fingerprint }) { r -> ApprovalCard(model, r, onApprove) }
 
-        if (model.mode != Mode.NONE) {
+        val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO)
+        // Header, [message], approvals, the agent card, then the pairing card.
+        val pairIndex = 1 + (if (model.message != null) 1 else 0) + model.approvals.size + 1
+        item {
+            AgentCard(
+                focus, engine, touch.modifier, pair,
+                onLink = { if (pair == HomePanel.Link.PAIR) scope.launch { listState.animateScrollToItem(pairIndex) } else onSettings() },
+            )
+        }
+        if (model.mode == Mode.NONE) item { PairCard(model) }
+
+        val rows = HomePanel.rows(HomePanel.others(model.sessions, focus))
+        if (rows.isNotEmpty()) {
             item { SectionTitle(stringResource(R.string.sessions_title)) }
-            if (model.sessions.isEmpty()) {
-                item {
-                    CoucouCard {
-                        Text(
-                            stringResource(R.string.sessions_empty),
-                            Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            items(model.sessions, key = { it.pillId }) { s ->
-                val engine = engines.getOrPut(s.pillId) { MochiEngine(clock, sound = model.sounds) }
-                val touch = touches.getOrPut(s.pillId) { MochiTouch(engine, model.sounds) { model.sessions.firstOrNull { it.pillId == s.pillId }?.state ?: BotState.IDLE } }
-                if (engine.state != s.state && !touch.dizzy) engine.setState(s.state)
-                SessionRow(s, engine, touch)
+            items(rows, key = { row -> row.first().pillId }) { row ->
+                AgentChipRow(
+                    row,
+                    engineFor = { s ->
+                        miniEngines.getOrPut(s.pillId) {
+                            MochiEngine(clock).apply {
+                                isMini = true
+                                bodyColor = Pills.byId(s.pillId)?.colorHex?.let { HomePanel.rgb(it) }
+                            }
+                        }.also { if (it.state != s.state) it.setState(s.state) }
+                    },
+                    selected = focus?.pillId, onPick = { selected = it.pillId },
+                )
             }
         }
 
@@ -246,28 +270,22 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
     }
 }
 
+private const val HOME_KEY = "home"
+
 @Composable
-private fun Header(model: AppModel, clock: () -> Double) {
-    val engine = remember { MochiEngine(clock, sound = model.sounds) }
-    val state = Summary.headerState(model.sessions, model.approvals.isNotEmpty())
-    val touch = remember(engine) { MochiTouch(engine, model.sounds) { Summary.headerState(model.sessions, model.approvals.isNotEmpty()) } }
-    if (engine.state != state && !touch.dizzy) engine.setState(state)
+private fun Header(model: AppModel) {
     val dot = when {
         model.mode == Mode.DEMO -> StatusColors.busy
         model.mode == Mode.PAIRED && model.linkState == LinkState.CONNECTED -> StatusColors.online
         model.mode == Mode.PAIRED && model.linkState == LinkState.CONNECTING -> StatusColors.busy
         else -> StatusColors.offline
     }
-    Row(Modifier.padding(top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        MochiView(engine, Modifier.size(64.dp).then(touch.modifier))
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-                Spacer(Modifier.width(8.dp))
-                Text(statusLine(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+    Column(Modifier.padding(top = 20.dp, bottom = 4.dp)) {
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+            Spacer(Modifier.width(8.dp))
+            Text(statusLine(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -363,35 +381,6 @@ private fun ApprovalCard(model: AppModel, r: ApprovalRequest, onApprove: (Approv
                 ) { Text(stringResource(R.string.action_deny)) }
             }
             Text(stringResource(R.string.approval_hint), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun SessionRow(s: SessionInfo, engine: MochiEngine, touch: MochiTouch) {
-    CoucouCard {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MochiView(engine, Modifier.size(80.dp).then(touch.modifier))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    s.agent.ifBlank { Pills.byId(s.pillId)?.name.orEmpty() },
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                )
-                if (s.statusText.isNotBlank()) {
-                    Text(
-                        s.statusText, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (s.stepCount > 0) {
-                    LinearProgressIndicator(
-                        progress = { Summary.progress(s.stepIndex, s.stepCount) },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline,
-                    )
-                }
-            }
         }
     }
 }

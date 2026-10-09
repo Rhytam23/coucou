@@ -16,7 +16,15 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = finished | error | question | ratelimit | approval | history
+ * kind = working | finished | error | question | ratelimit | approval | clear | history
+ *
+ * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
+ * apps" switch must be on, the app in the background):
+ *   working   opens it and keeps it open (no timer while an agent works)
+ *   finished  shows the result, waits 10 s, then it goes back up (error and ratelimit: same 10 s)
+ *   question / approval  stay until answered, expired or cleared
+ *   clear     no sessions and no requests: the island goes up
+ * `adb logcat -s CoucouIsland` prints every phase change.
  *
  * `history` adds three sample decisions to Settings > History (no agent needed).
  * With the app in the background, finished / error / question / ratelimit also post a quiet notice
@@ -39,6 +47,11 @@ class DebugPillReceiver : BroadcastReceiver() {
         fun session(state: BotState, text: String) =
             SessionInfo("agent_gemini", "Gemini CLI", state, text, 1, 3, now)
         when (kind) {
+            "working" -> model.onSessions(listOf(session(BotState.WORKING, "Running npm test")))
+            "clear" -> {
+                model.onSessions(emptyList())
+                model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
+            }
             "history" -> {
                 val names = listOf("Gemini CLI" to "npm test", "Claude Code" to "git push origin main", "Codex" to "rm -rf build")
                 names.forEachIndexed { i, (agent, cmd) ->

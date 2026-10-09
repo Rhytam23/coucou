@@ -57,7 +57,22 @@
     "notif_finished": "Finished",
     "notif_error": "Stopped on an error",
     "notif_question": "Has a question",
-    "notif_ratelimit": "Hit a usage limit"
+    "notif_ratelimit": "Hit a usage limit",
+    "island_answer_on_pc": "Answer it on your computer",
+    "state_ready": "Ready",
+    "state_working": "Working",
+    "state_thinking": "Thinking",
+    "state_searching": "Searching",
+    "state_approval": "Waiting for your OK",
+    "state_question": "Has a question",
+    "state_error": "Error",
+    "state_finished": "Finished",
+    "state_ratelimit": "Limit reached",
+    "state_sleeping": "Sleeping",
+    "state_dizzy": "Dizzy",
+    "agent_kind": "Agent",
+    "link_settings": "Open Settings",
+    "link_pair": "Pair with your computer"
   },
   "_untranslatable": [
     "app_name",

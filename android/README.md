@@ -37,30 +37,38 @@ Try it without a desktop: open the app and tap *Try demo mode*. Or run the stand
 node tools/dev-desktop.mjs        # prints a pairing link to paste in the app
 ```
 
-## The pill over other apps (optional)
+## The island over other apps (optional)
 
-Like the notch on the computer: a small black pill drops from the top of the screen when an agent
-finishes, fails, asks something or is rate limited, then slides away; a permission request stays as a
-card with Deny / Allow until answered (Allow opens the app for the fingerprint check).
+Like the notch on the computer: a black island hangs from the top of the screen, centred on the camera
+cut-out, over whatever app is open. It drops while an agent works (small strip: Mochi, agent, status), shows
+how it ended (finished, error, rate limit) for **10 seconds**, then goes back up into the notch with the PC's
+motion (a spring when it grows, a 340 ms curve when it shrinks: `windows/src/core/anim.ts`). A permission
+request stays, expanded, until it is answered (Deny works there; Allow opens the app for the fingerprint
+check); a question stays until the agent moves on. A new session starting while it goes up opens it again.
+Tapping it opens Coucou.
 
 - Off by default. The switch saves the user's choice **at the tap**, then opens Android's "Display over
   other apps" screen. The permission is read live, so granting it later from Android's settings is enough.
-- It shows only on a *change* into those states (not for sessions already finished when the phone
-  reconnects) and only while Coucou is not on screen. The window exists only while something is shown.
-- Try it without an agent (**debug builds only**, not in release). With the switch on and the app in the
-  background (press Home first):
+- Never while Coucou itself is on screen. "When an agent finishes or fails" and quiet hours govern the
+  finished / error / rate-limit part; working, questions and requests need only the switch.
+- The window and everything with it (frame loop, timer) exist only while the island is shown: one timer for
+  the next deadline at most, none while it is hidden. Rules live in `core/IslandTimeline.kt`,
+  `IslandPlan.kt`, `IslandGeometry.kt`, `IslandMotion.kt` (pure Kotlin, unit-tested); `ui/IslandOverlay.kt` draws.
+- Taps in the first 600 ms are ignored (they were meant for the app underneath).
+- Try it without an agent (**debug builds only**). Switch on, press Home first:
 
 ```bash
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
-# kind = finished | error | question | ratelimit | approval
-adb logcat -s CoucouOverlay CoucouLaunch   # why the pill stayed away / which announcement was chosen / every start of the app and why
-# add --ez foreground true to an approval to see the heads-up notification instead of the pill
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind working    # opens and stays
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished   # result, then up after 10 s
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind clear      # goes up now
+# kind = working | finished | error | question | ratelimit | approval | clear | history
+adb logcat -s CoucouIsland CoucouOverlay CoucouLaunch
+# add --ez foreground true to an approval to see the heads-up notification instead of the island
 ```
 
-One announcement at a time: while the pill shows a request, its notification is posted quietly (channel
-"Approvals (quiet)", shade only); when the pill cannot show, the heads-up notification is used. Taps in the
-first 600 ms on the pill are ignored (they were meant for the app underneath). Deny acts without opening the
-app; only Allow (biometric) and a tap on the pill's header open it.
+One announcement at a time: while the island shows a request, its notification is posted quietly (channel
+"Approvals (quiet)", shade only); when the island cannot show, the heads-up notification is used.
+Deny acts without opening the app; only Allow (biometric) and a tap on the island open it.
 
 ## Settings, notices and history
 
@@ -68,6 +76,10 @@ Home > Settings: Mochi's sounds (switch, volume 0..0.2 as on the computer), "whe
 (a quiet notice in the shade, plus the pill if it is on), quiet hours (no sound and no pill for finished or
 failed agents; requests and questions always come through), and History (your Allow/Deny decisions, only on the phone).
 A tap on Mochi slaps him (three quick ones make him dizzy), a long press pets him.
+
+Home looks like the PC's Home panel: a card for the agent that matters most (big Mochi, name and kind, a status
+line with a coloured dot, a small link) and the other agents as pills with their own little Mochi; tap a pill to
+put it in the card.
 
 ```bash
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind history     # sample decisions (debug builds)

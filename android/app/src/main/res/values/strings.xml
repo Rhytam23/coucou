@@ -56,4 +56,19 @@
     <string name="notif_error">Stopped on an error</string>
     <string name="notif_question">Has a question</string>
     <string name="notif_ratelimit">Hit a usage limit</string>
+    <string name="island_answer_on_pc">Answer it on your computer</string>
+    <string name="state_ready">Ready</string>
+    <string name="state_working">Working</string>
+    <string name="state_thinking">Thinking</string>
+    <string name="state_searching">Searching</string>
+    <string name="state_approval">Waiting for your OK</string>
+    <string name="state_question">Has a question</string>
+    <string name="state_error">Error</string>
+    <string name="state_finished">Finished</string>
+    <string name="state_ratelimit">Limit reached</string>
+    <string name="state_sleeping">Sleeping</string>
+    <string name="state_dizzy">Dizzy</string>
+    <string name="agent_kind">Agent</string>
+    <string name="link_settings">Open Settings</string>
+    <string name="link_pair">Pair with your computer</string>
 </resources>
