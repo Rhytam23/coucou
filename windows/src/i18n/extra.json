@@ -3503,6 +3503,72 @@
    "pt-BR": "O celular se conecta a {address}",
    "ru": "Телефон подключается к {address}",
    "id": "Ponsel terhubung ke {address}"
+  },
+  "Let the phone chat with my AI providers": {
+   "zh-Hans": "允许手机使用我的 AI 提供商聊天",
+   "hi": "फ़ोन को मेरे AI प्रदाताओं से चैट करने दें",
+   "es": "Permitir que el teléfono chatee con mis proveedores de IA",
+   "ar": "السماح للهاتف بالدردشة مع مزوّدي الذكاء الاصطناعي لديّ",
+   "fr": "Laisser le téléphone discuter avec mes fournisseurs d'IA",
+   "bn": "ফোনকে আমার AI প্রদানকারীদের সঙ্গে চ্যাট করতে দিন",
+   "pt-BR": "Permitir que o celular converse com meus provedores de IA",
+   "ru": "Разрешить телефону общаться с моими ИИ-провайдерами",
+   "id": "Izinkan ponsel mengobrol dengan penyedia AI saya"
+  },
+  "Chat uses the API keys saved on this computer. The phone never sees them, and each message may cost money.": {
+   "zh-Hans": "聊天使用保存在这台电脑上的 API 密钥。手机永远看不到密钥，每条消息都可能产生费用。",
+   "hi": "चैट इस कंप्यूटर पर सहेजी गई API कुंजियों का उपयोग करती है। फ़ोन उन्हें कभी नहीं देखता, और हर संदेश पर शुल्क लग सकता है।",
+   "es": "El chat usa las claves de API guardadas en este ordenador. El teléfono nunca las ve y cada mensaje puede costar dinero.",
+   "ar": "تستخدم الدردشة مفاتيح API المحفوظة على هذا الكمبيوتر. لا يراها الهاتف أبدًا، وقد تترتب تكلفة على كل رسالة.",
+   "fr": "Le chat utilise les clés d'API enregistrées sur cet ordinateur. Le téléphone ne les voit jamais, et chaque message peut coûter de l'argent.",
+   "bn": "চ্যাট এই কম্পিউটারে সংরক্ষিত API কী ব্যবহার করে। ফোন কখনও সেগুলো দেখে না, এবং প্রতিটি বার্তায় খরচ হতে পারে।",
+   "pt-BR": "O chat usa as chaves de API salvas neste computador. O celular nunca as vê, e cada mensagem pode custar dinheiro.",
+   "ru": "Чат использует ключи API, сохранённые на этом компьютере. Телефон их никогда не видит, а каждое сообщение может стоить денег.",
+   "id": "Obrolan memakai kunci API yang tersimpan di komputer ini. Ponsel tidak pernah melihatnya, dan setiap pesan dapat memakan biaya."
+  },
+  "Models the phone may use": {
+   "zh-Hans": "手机可使用的模型",
+   "hi": "फ़ोन जिन मॉडलों का उपयोग कर सकता है",
+   "es": "Modelos que puede usar el teléfono",
+   "ar": "النماذج التي يمكن للهاتف استخدامها",
+   "fr": "Modèles que le téléphone peut utiliser",
+   "bn": "ফোন যেসব মডেল ব্যবহার করতে পারে",
+   "pt-BR": "Modelos que o celular pode usar",
+   "ru": "Модели, доступные телефону",
+   "id": "Model yang boleh dipakai ponsel"
+  },
+  "Choose models": {
+   "zh-Hans": "选择模型",
+   "hi": "मॉडल चुनें",
+   "es": "Elegir modelos",
+   "ar": "اختيار النماذج",
+   "fr": "Choisir les modèles",
+   "bn": "মডেল বেছে নিন",
+   "pt-BR": "Escolher modelos",
+   "ru": "Выбрать модели",
+   "id": "Pilih model"
+  },
+  "Nothing is allowed yet: the phone cannot chat until you tick a model.": {
+   "zh-Hans": "尚未允许任何模型：勾选一个模型后，手机才能聊天。",
+   "hi": "अभी कुछ भी अनुमत नहीं है: जब तक आप कोई मॉडल नहीं चुनते, फ़ोन चैट नहीं कर सकता।",
+   "es": "Aún no hay nada permitido: el teléfono no podrá chatear hasta que marques un modelo.",
+   "ar": "لا يوجد شيء مسموح به بعد: لا يمكن للهاتف الدردشة حتى تحدّد نموذجًا.",
+   "fr": "Rien n'est autorisé pour l'instant : le téléphone ne peut pas discuter tant que vous n'avez pas coché un modèle.",
+   "bn": "এখনও কিছু অনুমোদিত নয়: আপনি একটি মডেল না বাছা পর্যন্ত ফোন চ্যাট করতে পারবে না।",
+   "pt-BR": "Nada foi permitido ainda: o celular não poderá conversar até você marcar um modelo.",
+   "ru": "Пока ничего не разрешено: телефон не сможет общаться, пока вы не отметите модель.",
+   "id": "Belum ada yang diizinkan: ponsel tidak bisa mengobrol sampai Anda mencentang sebuah model."
+  },
+  "No provider is ready: add an API key or connect a local model first.": {
+   "zh-Hans": "没有可用的提供商：请先添加 API 密钥或连接本地模型。",
+   "hi": "कोई प्रदाता तैयार नहीं है: पहले API कुंजी जोड़ें या स्थानीय मॉडल कनेक्ट करें।",
+   "es": "Ningún proveedor está listo: añade primero una clave de API o conecta un modelo local.",
+   "ar": "لا يوجد مزوّد جاهز: أضف مفتاح API أو اتصل بنموذج محلي أولاً.",
+   "fr": "Aucun fournisseur n'est prêt : ajoutez d'abord une clé d'API ou connectez un modèle local.",
+   "bn": "কোনো প্রদানকারী প্রস্তুত নয়: আগে একটি API কী যোগ করুন বা স্থানীয় মডেল সংযুক্ত করুন।",
+   "pt-BR": "Nenhum provedor está pronto: adicione primeiro uma chave de API ou conecte um modelo local.",
+   "ru": "Нет готовых провайдеров: сначала добавьте ключ API или подключите локальную модель.",
+   "id": "Belum ada penyedia yang siap: tambahkan kunci API atau hubungkan model lokal terlebih dahulu."
   }
  }
 }

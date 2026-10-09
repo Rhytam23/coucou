@@ -1,13 +1,16 @@
 // Settings → Android phone: the switch for the phone link and the code that
 // pairs a phone with this computer. Off until the user turns it on.
 
-import { Bridge, type PhoneLinkPairing, type PhoneLinkStatus } from "../core/bridge";
+import { Bridge, type PhoneChatStatus, type PhoneLinkPairing, type PhoneLinkStatus } from "../core/bridge";
+import { modelId, modelsOf, toggleModel, usableProviders } from "../core/phone-chat";
+import { PROVIDERS, type ProviderDef } from "../core/providers";
+import type { Settings } from "../core/state";
 import { h } from "../views/dom";
 import { t } from "../i18n/i18n";
 
 type Toggle = (on: boolean, onChange: (v: boolean) => void) => HTMLElement;
 
-export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
+export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings): HTMLElement {
   const detail = h("div", {});
   const note = h("div", { class: "hint" });
 
@@ -40,6 +43,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
       clients,
       h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
       h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
+      chatBlock(makeToggle, settings),
     );
   };
 
@@ -80,6 +84,100 @@ export function phoneSection(on: boolean, makeToggle: Toggle): HTMLElement {
     detail,
   );
   return section;
+}
+
+/**
+ * Chat from the phone: off until the user turns it on, and then only the models ticked here.
+ * The phone gets text; the keys stay on this computer (src-tauri/src/phone_link/chat.rs).
+ */
+function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
+  let allowed: string[] = [];
+  const body = h("div", {});
+  const note = h("div", { class: "hint" });
+
+  const save = async (next: string[]) => {
+    try {
+      allowed = (await Bridge.phoneChatSetModels(next)).models;
+    } catch (err) {
+      note.textContent = String(err);
+    }
+    emptyNote.hidden = allowed.length > 0;
+  };
+  const emptyNote = h("div", { class: "hint", text: t("Nothing is allowed yet: the phone cannot chat until you tick a model.") });
+
+  /** One provider: a button that asks it for its models (only now), then a tick box per model. */
+  const providerRow = (p: ProviderDef): HTMLElement => {
+    const list = h("div", {});
+    const button = h("button", { text: t("Choose models") });
+    const head = h("div", { class: "row" }, h("label", { text: p.name }), button);
+    const show = (models: string[]) => {
+      list.replaceChildren(
+        ...[...new Set([...models, ...modelsOf(allowed, p.id)])].map((model) => {
+          const id = modelId(p.id, model);
+          const box = h("input", { type: "checkbox" }) as HTMLInputElement;
+          box.checked = allowed.includes(id);
+          box.addEventListener("change", () => void save(toggleModel(allowed, id, box.checked)));
+          return h("div", { class: "row" }, h("label", {}, box, h("span", { text: ` ${model}` })));
+        }),
+      );
+    };
+    button.addEventListener("click", () => {
+      list.replaceChildren(h("div", { class: "hint", text: t("Loading models…") }));
+      Bridge.chatModels(p.id).then(
+        (models) => show(models.map((m) => m.id)),
+        (err) => list.replaceChildren(h("div", { class: "hint", text: String(err).replace(/^Error:\s*/, "") })),
+      );
+    });
+    return h("div", {}, head, list);
+  };
+
+  const draw = async (status: PhoneChatStatus) => {
+    allowed = status.models;
+    body.replaceChildren();
+    if (!status.enabled) return;
+    const hasKey: Record<string, boolean> = {};
+    for (const p of usableProvidersCandidates()) hasKey[p.id] = (await Bridge.secretPresent(p.key!)) ?? false;
+    const providers = usableProviders(settings, hasKey);
+    body.append(h("div", { class: "hint", text: t("Models the phone may use") }));
+    if (providers.length === 0) body.append(h("div", { class: "hint", text: t("No provider is ready: add an API key or connect a local model first.") }));
+    for (const p of providers) body.append(providerRow(p));
+    emptyNote.hidden = allowed.length > 0;
+    body.append(emptyNote);
+  };
+
+  const switchEl = makeToggle(false, (next) => {
+    void (async () => {
+      note.textContent = "";
+      try {
+        await draw(await Bridge.phoneChatSetEnabled(next));
+      } catch (err) {
+        switchEl.classList.remove("on");
+        switchEl.setAttribute("aria-pressed", "false");
+        body.replaceChildren();
+        note.textContent = String(err);
+      }
+    })();
+  });
+  // The switch shows what Rust says, not what the page remembers.
+  void Bridge.phoneChatStatus().then((status) => {
+    if (!status) return;
+    switchEl.classList.toggle("on", status.enabled);
+    switchEl.setAttribute("aria-pressed", String(status.enabled));
+    void draw(status);
+  });
+
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Let the phone chat with my AI providers") }), switchEl),
+    h("div", { class: "hint", text: t("Chat uses the API keys saved on this computer. The phone never sees them, and each message may cost money.") }),
+    note,
+    body,
+  );
+}
+
+function usableProvidersCandidates(): ProviderDef[] {
+  return PROVIDERS.filter((p) => p.key !== null);
 }
 
 function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[] {

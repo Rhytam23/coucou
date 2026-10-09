@@ -1,6 +1,6 @@
 # Stage C-chat: chat on the phone through the PC
 
-Status: plan approved with the defaults below. **C1 done** (PC protocol core, tested with a fake provider; not wired to a real provider yet, so the feature is dark in the app). C2 to C4 pending.
+Status: plan approved with the defaults below. **C1 done** (PC protocol core, fake provider tests). **C2 done** (real providers behind it, Settings switch and model checklist on the PC). C3 (Android client, `dev-desktop.mjs --fake-chat`, Kotlin interop) and C4 (Chat screen) pending.
 
 Decision by the user: the earlier "no chat on the phone" is reversed. The phone chats with the LLM
 providers the PC is set up for. **The API key never leaves the PC**: the phone sends text, the PC calls

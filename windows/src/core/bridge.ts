@@ -43,6 +43,12 @@ export interface PhoneLinkStatus {
   error: string | null;
 }
 
+/** Chat from the phone: the switch and the models the phone may use ("provider/model"). */
+export interface PhoneChatStatus {
+  enabled: boolean;
+  models: string[];
+}
+
 /** What the settings window shows to pair a phone. Only the settings window may ask. */
 export interface PhoneLinkPairing {
   link: string;
@@ -183,6 +189,10 @@ export const Bridge = {
   phoneLinkPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_pairing"),
   /** A new code: the phone that had the old one is disconnected. */
   phoneLinkNewPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_new_pairing"),
+  phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
+  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
+  phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),
+  phoneChatSetModels: (models: string[]) => callOrThrow<PhoneChatStatus>("phone_chat_set_models", { models }),
   phoneLinkPublish: (sessions: PhoneLinkSession[], approval: PhoneLinkApproval | null) =>
     call<void>("phone_link_publish", { sessions, approval }),
 

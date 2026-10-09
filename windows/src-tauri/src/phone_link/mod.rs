@@ -14,6 +14,7 @@
 // that is still pending (hub.rs). The desktop's own card keeps working all along.
 
 mod chat;
+mod chat_backend;
 mod hub;
 #[cfg(test)]
 mod interop;
@@ -72,6 +73,8 @@ struct Running {
 
 pub struct PhoneLink {
     hub: Arc<Hub>,
+    /// Chat from the phone; offered to phones only while the user's switch is on (chat.rs).
+    chat: Arc<chat::ChatLink>,
     store: Arc<dyn SecretStore>,
     running: Mutex<Option<Running>>,
     error: Mutex<Option<String>>,
@@ -80,6 +83,7 @@ pub struct PhoneLink {
 impl PhoneLink {
     pub fn new(app: AppHandle) -> Self {
         Self {
+            chat: chat::ChatLink::new(Arc::new(chat_backend::AppChat::new(app.clone()))),
             hub: Hub::new(Arc::new(TauriHost { app })),
             store: Arc::new(Keystore),
             running: Mutex::new(None),
@@ -120,7 +124,7 @@ impl PhoneLink {
         std_listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         let port = std_listener.local_addr().map_err(|e| e.to_string())?.port();
         let acceptor = server::tls_acceptor(&identity)?;
-        let shared = server::Shared::new(self.hub.clone(), token, pairing::computer_name());
+        let shared = server::Shared::with_chat(self.hub.clone(), token, pairing::computer_name(), Some(self.chat.clone()));
         let handle = {
             let shared = shared.clone();
             tauri::async_runtime::block_on(async move {
@@ -243,6 +247,82 @@ pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> 
     link.hub.kick_all("auth", "unpaired");
     log::line("phone link: new pairing code, phones disconnected");
     pairing_of(r)
+}
+
+// ── Chat from the phone: the switch and the list of models (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatStatus {
+    pub enabled: bool,
+    /// Allowed models as "provider/model".
+    pub models: Vec<String>,
+}
+
+fn only_settings(window: &WebviewWindow) -> Result<(), String> {
+    if window.label() == "settings" {
+        Ok(())
+    } else {
+        Err("only the settings window may change what the phone can use".into())
+    }
+}
+
+#[tauri::command]
+pub fn phone_chat_status(shared: State<Shared>) -> ChatStatus {
+    let s = shared.settings.lock().unwrap();
+    ChatStatus { enabled: s.phone_chat, models: chat_backend::clean_models(&s.phone_chat_models) }
+}
+
+/// The switch "Let the phone chat with my AI providers". Off by default. A change disconnects the
+/// phones so they reconnect and are told (or not) about the capability; turning it off also stops a
+/// running answer and forgets the phone's conversation.
+#[tauri::command]
+pub fn phone_chat_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<ChatStatus, String> {
+    only_settings(&window)?;
+    let (updated, status) = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_chat = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        let status = ChatStatus { enabled, models: chat_backend::clean_models(&current.phone_chat_models) };
+        (current.clone(), status)
+    };
+    if !enabled {
+        link.chat.shutdown();
+    }
+    link.hub.kick_all("closed", "chat setting changed");
+    log::line(format!("phone link: chat {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(status)
+}
+
+/// Which models the phone may use. Anything that is not a known provider's model is dropped.
+#[tauri::command]
+pub fn phone_chat_set_models(
+    app: AppHandle,
+    window: WebviewWindow,
+    shared: State<Shared>,
+    models: Vec<String>,
+) -> Result<ChatStatus, String> {
+    only_settings(&window)?;
+    let cleaned = chat_backend::clean_models(&models);
+    let (updated, status) = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_chat_models = cleaned.clone();
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        (current.clone(), ChatStatus { enabled: current.phone_chat, models: cleaned })
+    };
+    let _ = app.emit("settings-changed", updated);
+    Ok(status)
 }
 
 /// The island's picture of its sessions and of the request waiting for an answer.

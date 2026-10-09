@@ -56,6 +56,7 @@ pub struct Shared {
 }
 
 impl Shared {
+    #[cfg(test)]
     pub fn new(hub: Arc<Hub>, token: String, name: String) -> Arc<Shared> {
         Self::with_chat(hub, token, name, None)
     }

@@ -124,6 +124,13 @@ and re-reads that switch for every message. The user also chooses which provider
   does not start.
 - One token at a time: "Pair again" replaces it and disconnects the phone that had the old one. The
   pairing code is shown only after a click, and only to the settings window.
+- Chat (Settings → Android phone → "Let the phone chat with my AI providers"): off by default, owned by Rust like
+  `phoneLink` (`phoneChat`, `phoneChatModels` in settings.json; the webview cannot change them). The user ticks the
+  provider/model pairs the phone may use (a provider's model list is asked for only when its "Choose models" button is
+  pressed). Turning the switch on or off disconnects the phones once so they reconnect and learn about the capability;
+  turning it off also stops a running answer and forgets the phone's conversation. The phone's conversation is a
+  separate in-memory `Chat`, not the island's. The provider code is the island's (`chat::send_for_phone`); a provider's
+  error text is never forwarded or logged, only a kind (no key, unreachable, auth, provider).
 - Only permission requests (Allow/Deny) go to the phone; a question from Claude Code needs its options
   picked on the island.
 - New crates: `rcgen` (+ `yasna`) makes the certificate once, `qrcode` draws the pairing QR; `rustls`,

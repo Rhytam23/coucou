@@ -1368,7 +1368,7 @@ async function render() {
     localSection(customKey),
     activePillsSection(connected),
     integrationsSection(present),
-    phoneSection(settings.phoneLink ?? false, toggle),
+    phoneSection(settings.phoneLink ?? false, toggle, settings),
     generalSection(),
     shortcutsSection(shortcutReport),
     h("div", {

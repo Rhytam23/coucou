@@ -95,6 +95,8 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         settings.desktop_mochi = current.desktop_mochi.clone();
         // Same for the phone link: only its own commands turn it on or off.
         settings.phone_link = current.phone_link;
+        settings.phone_chat = current.phone_chat;
+        settings.phone_chat_models = current.phone_chat_models.clone();
         *current = settings;
         (screen_changed, autostart_changed, shortcuts_changed)
     };
@@ -721,6 +723,9 @@ pub fn run() {
             phone_link::phone_link_pairing,
             phone_link::phone_link_new_pairing,
             phone_link::phone_link_publish,
+            phone_link::phone_chat_status,
+            phone_link::phone_chat_set_enabled,
+            phone_link::phone_chat_set_models,
             recap::recap_history,
             recap::recap_prefs,
             recap::recap_set_enabled,

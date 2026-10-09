@@ -151,6 +151,10 @@ export interface Settings {
    * Settings → Android phone turns it on): whatever the page sends back is ignored.
    */
   phoneLink?: boolean;
+  /** The phone may chat through this computer's API keys. Rust owns it too. */
+  phoneChat?: boolean;
+  /** Which models the phone may use, "provider/model". Rust owns it too. */
+  phoneChatModels?: string[];
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;

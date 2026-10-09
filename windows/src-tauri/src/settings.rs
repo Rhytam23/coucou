@@ -73,6 +73,13 @@ pub struct Settings {
     /// the local network. Off until the user turns it on in Settings → Phone;
     /// owned by the Rust side, so what a webview sends back is ignored.
     pub phone_link: bool,
+    /// The phone may chat through this computer's API keys (phone_link/chat.rs).
+    /// Off until the user turns it on in Settings → Android phone; owned by the
+    /// Rust side like `phone_link`, so what a webview sends back is ignored.
+    pub phone_chat: bool,
+    /// Which models the phone may use, as "provider/model". Empty allows none.
+    /// Also owned by the Rust side (phone_link::set_chat_models cleans it).
+    pub phone_chat_models: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -129,6 +136,8 @@ impl Default for Settings {
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
             phone_link: false,
+            phone_chat: false,
+            phone_chat_models: Vec::new(),
         }
     }
 }
@@ -406,7 +415,9 @@ mod tests {
   "pillColors": { "integration_claude": "#2DD4BF" },
   "language": "pt-BR",
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
-  "phoneLink": true
+  "phoneLink": true,
+  "phoneChat": true,
+  "phoneChatModels": ["openai/gpt-x"]
 }"##;
 
     fn custom() -> Value {
@@ -529,6 +540,24 @@ mod tests {
         assert!(!odd.phone_link);
         assert_eq!(odd.mochi_outfit, "witchHat");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_from_before_phone_chat_keeps_it_off_and_empty() {
+        // Chat spends the user's API credit: never on by default, and an older file is not consent.
+        let d = Settings::default();
+        assert!(!d.phone_chat);
+        assert!(d.phone_chat_models.is_empty());
+        let loaded = parse(&custom_with("phoneChat", None)).unwrap();
+        assert!(!loaded.phone_chat);
+        assert!(parse(&custom_with("phoneChat", Some(serde_json::json!(true)))).unwrap().phone_chat);
+        let odd = parse(&custom_with("phoneChat", Some(serde_json::json!("yes")))).unwrap();
+        assert!(!odd.phone_chat, "a wrong type does not switch it on");
+        assert_eq!(odd.mochi_outfit, "witchHat");
+        let models = parse(&custom_with("phoneChatModels", Some(serde_json::json!(["openai/gpt-x"])))).unwrap();
+        assert_eq!(models.phone_chat_models, vec!["openai/gpt-x".to_string()]);
+        let bad = parse(&custom_with("phoneChatModels", Some(serde_json::json!("openai/gpt-x")))).unwrap();
+        assert!(bad.phone_chat_models.is_empty());
     }
 
     #[test]
@@ -830,6 +859,8 @@ mod tests {
                 "language",
                 "desktopMochi",
                 "phoneLink",
+                "phoneChat",
+                "phoneChatModels",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
