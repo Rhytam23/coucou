@@ -1,8 +1,5 @@
 package com.coucou.android.ui
 
-import android.app.LocaleManager
-import android.os.Build
-import android.os.LocaleList
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,19 +12,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.coucou.android.R
 import com.coucou.android.app.AppModel
 import com.coucou.android.core.HistoryDays
-import com.coucou.android.core.Languages
 import com.coucou.android.core.QuietHours
 import com.coucou.android.sound.SoundVolume
 import java.time.ZoneId
@@ -112,8 +104,6 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit, onHistory: () -> Unit) {
             }
         }
 
-        item { LanguageCard() }
-
         item {
             CoucouCard(Modifier.clickable { onHistory() }) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -123,38 +113,6 @@ fun SettingsScreen(model: AppModel, onBack: () -> Unit, onHistory: () -> Unit) {
             }
         }
         item { Spacer(Modifier.padding(bottom = 16.dp)) }
-    }
-}
-
-/** App language: Android 13+ has a per-app language; older versions follow the system. */
-@Composable
-private fun LanguageCard() {
-    val context = LocalContext.current
-    CoucouCard {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(stringResource(R.string.settings_language), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (Build.VERSION.SDK_INT < 33) {
-                Text(stringResource(R.string.language_old_android), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                return@Column
-            }
-            val manager = remember { context.getSystemService(LocaleManager::class.java) }
-            var chosen by remember { mutableStateOf(manager.applicationLocales.takeIf { !it.isEmpty }?.get(0)?.toLanguageTag().orEmpty()) }
-            fun choose(tag: String) {
-                chosen = tag
-                // The activity is recreated by Android with the new language.
-                manager.applicationLocales = if (tag.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
-            }
-            Row(Modifier.fillMaxWidth().clickable { choose("") }, verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = chosen.isEmpty(), onClick = { choose("") })
-                Text(stringResource(R.string.language_system))
-            }
-            for ((tag, name) in Languages.all) {
-                Row(Modifier.fillMaxWidth().clickable { choose(tag) }, verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = chosen.equals(tag, ignoreCase = true), onClick = { choose(tag) })
-                    Text(name)
-                }
-            }
-        }
     }
 }
 

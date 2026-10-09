@@ -25,7 +25,7 @@ Compatibility facts (checked in `Protocol.kt` and `server.rs`): the phone ignore
 | 7 | Mochi touch (slap, dizzy, love, hover) and their sounds | yes | no | n/a | wire engine methods that exist but have no callers | yes |
 | 8 | Sounds beyond 4 state sounds, sound on/off, volume | 29 sounds, mute, 0..0.2 | 4 notification sounds | n/a | play approve/blip/send/pop on phone actions; add switch + volume | yes |
 | 9 | Settings screen | full | About + notification prefs | n/a | sound, volume, language, notify on finish/fail, quiet hours, pill switch, outfit | yes |
-| 10 | Language choice | 10 languages | English only | n/a | Android already has the same 10; add an in-app picker (per-app locale, Android 13+) | yes |
+| 10 | Language choice | 10 languages | English only | n/a | **decided: the Android app is English only for now** (no picker); translations kept in the repo | no |
 | 11 | Notifications for finished / failed / question | sounds + cards | local notifications, quiet hours, reply | no data gap | local notifications from state changes (not first picture), quiet hours | yes |
 | 12 | Decision history, search | recap (counts) | decisions + turn archive + Spotlight | no data gap | decision history kept on the phone only; search later | yes, local |
 | 13 | Per-pill colours | colour pickers | `color` per session | no | optional `color` hex in `sessions` | yes |
@@ -35,7 +35,7 @@ Compatibility facts (checked in `Protocol.kt` and `server.rs`): the phone ignore
 | 17 | Widgets, Control Center-like entry | no | widgets, Live Activity, Control | no data gap | home-screen widget (RemoteViews, no new dependency), quick-settings tile, richer ongoing notification | yes, late |
 | 18 | Send the next instruction | no | yes (GitHub build, own toggle) | no | would make the PC run `claude -p --resume` itself | **not planned** (decided) |
 
-Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with biometrics, quiet/heads-up routing, pill overlay, 10 languages.
+Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with biometrics, quiet/heads-up routing, pill overlay.
 
 ## Not on the phone (privacy or safety)
 - Chat with LLM providers, API keys, model lists: spends money and holds secrets.
@@ -66,4 +66,4 @@ Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with b
 5. Order: A, B, C, D, E, F, G, H (outfits stay after the protocol work).
 
 ## Verification (applies to every stage)
-`cd android && ./gradlew test assembleDebug lint`, `node android/scripts/gen-strings.mjs --check`, `cargo test -p coucou phone_link` and the interop test for desktop changes, Phone link CI green. Locally, kotlinc + JUnit for pure logic (Gradle is unavailable here). A debug-only receiver case per stage so the user can trigger it with adb without a real agent. Every new string translated in the 10 languages. Honest note per stage of what was not seen on a device. Nothing published; no PR to upstream.
+`cd android && ./gradlew test assembleDebug lint`, `node android/scripts/gen-strings.mjs --check`, `cargo test -p coucou phone_link` and the interop test for desktop changes, Phone link CI green. Locally, kotlinc + JUnit for pure logic (Gradle is unavailable here). A debug-only receiver case per stage so the user can trigger it with adb without a real agent. New strings are English only for now (decision of stage A2). Honest note per stage of what was not seen on a device. Nothing published; no PR to upstream.

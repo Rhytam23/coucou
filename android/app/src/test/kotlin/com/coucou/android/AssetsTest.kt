@@ -24,23 +24,10 @@ class AssetsTest {
         raw.listFiles()!!.forEach { assertTrue(it.name, Regex("""[a-z][a-z0-9_]*\.wav""").matches(it.name)) }
     }
 
-    @Test fun translationsOnlyUseKnownKeys() {
-        fun keys(f: File) = Regex("name=\"([a-z_]+)\"").findAll(f.readText()).map { it.groupValues[1] }.toSet()
-        val base = keys(File(res, "values/strings.xml"))
-        val dirs = res.listFiles { f -> f.name.startsWith("values-") }!!
-        assertEquals("10 languages besides English minus none missing", 9, dirs.size)
-        dirs.forEach { assertTrue(it.name, base.containsAll(keys(File(it, "strings.xml")))) }
-    }
-
     @Test fun soundTableCoversEveryBundledSound() {
         val src = File("src/main/kotlin/com/coucou/android/sound/SoundPlayer.kt").readText()
         val mapped = Regex("\"(\\w+)\" to R\\.raw\\.(\\w+)").findAll(src).map { assertEquals(it.groupValues[1], it.groupValues[2]); it.groupValues[1] }.toSet()
         assertEquals(raw.listFiles()!!.map { it.nameWithoutExtension }.toSet(), mapped)
-    }
-
-    @Test fun indonesianUsesTheLegacyFolderCode() {
-        assertTrue(File(res, "values-in/strings.xml").exists())
-        assertTrue(!File(res, "values-id").exists())
     }
 
     @Test fun notificationIconIsMonochromeVector() {

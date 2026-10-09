@@ -1,5 +1,7 @@
 {
   "_about": "English source for the Android app. Strings whose English text also exists in windows/src/i18n/strings.json (the desktop catalog, 10 languages) are translated from it by scripts/gen-strings.mjs; the others fall back to English until someone translates them in i18n/extra.json. Edit this file, then run: node android/scripts/gen-strings.mjs",
+  "_englishOnly": true,
+  "_englishOnlyNote": "The app is English only for now (build: resourceConfigurations = en). While this is true gen-strings writes and checks only values/strings.xml. The other values-xx folders and i18n/extra.json are kept untouched so the languages can come back: set this to false and run gen-strings.",
   "strings": {
     "app_name": "Coucou for Android",
     "about_unofficial": "Unofficial Android port based on Coucou by Louis Raillé.",
@@ -37,9 +39,6 @@
     "settings_title": "Settings",
     "settings_sound": "Mochi's sounds",
     "settings_volume": "Volume",
-    "settings_language": "Language",
-    "language_system": "System",
-    "language_old_android": "On this version of Android, the app follows the language of your phone. Change it in Android's settings.",
     "notify_done": "When an agent finishes or fails",
     "notify_done_hint": "A quiet notice in the notification shade, and the pill if it is on. Permission requests and questions always notify you.",
     "quiet_hours": "Quiet hours",

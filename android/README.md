@@ -13,7 +13,7 @@ no billing, no analytics.
 | Part | State |
 |---|---|
 | Mochi (Compose Canvas port of `windows/src/mochi/engine.ts`) | states, emotes, hands, particles, badges, mailbox morph. **Outfits not ported yet** |
-| Sounds, icon, 10 languages | done |
+| Sounds, icon, English only for now (the other languages are kept in the repo, off in the build) | done |
 | Demo mode (no desktop needed) | done |
 | Pairing (QR via the camera app, or paste), TLS pinning, secure storage | done |
 | Sessions list, approvals, biometric gate, notifications, background service | done, tested with unit tests; **not yet tried on a real phone** |
@@ -66,8 +66,7 @@ app; only Allow (biometric) and a tap on the pill's header open it.
 
 Home > Settings: Mochi's sounds (switch, volume 0..0.2 as on the computer), "when an agent finishes or fails"
 (a quiet notice in the shade, plus the pill if it is on), quiet hours (no sound and no pill for finished or
-failed agents; requests and questions always come through), language (Android 13+ per-app language; older
-versions follow the phone), and History (your Allow/Deny decisions, only on the phone).
+failed agents; requests and questions always come through), and History (your Allow/Deny decisions, only on the phone).
 A tap on Mochi slaps him (three quick ones make him dizzy), a long press pets him.
 
 ```bash

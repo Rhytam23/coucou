@@ -44,9 +44,9 @@ do not restyle existing shipped views; one topic per PR/commit.
   Protocol spec: `docs/ANDROID_LINK.md`.
 - `app/.../app`: `AppModel`, notifications (Deny from the notification, Allow opens the app for the
   biometric prompt), foreground `LinkService`, `SecureStore` (Android Keystore), `BiometricGate`.
-- Settings screen (sound on/off + volume, notices when an agent finishes or fails, quiet hours, language on Android 13+), a History of the phone's own decisions (kept only on the phone, command cut to 120 characters, 50 entries), quiet "Updates" notifications, and tap/long-press on Mochi (slap, dizzy, love). Plan: `android/PARITY_PLAN.md` (stage A done; B..H wait for the user's test of each stage).
+- Settings screen (sound on/off + volume, notices when an agent finishes or fails, quiet hours), a History of the phone's own decisions (kept only on the phone, command cut to 120 characters, 50 entries), quiet "Updates" notifications, and tap/long-press on Mochi (slap, dizzy, love). Plan: `android/PARITY_PLAN.md` (stage A done; B..H wait for the user's test of each stage).
 - Optional pill over other apps (`ui/IslandOverlay.kt`, `core/OverlayPolicy.kt`): see `android/README.md`. The wish is saved at the tap; a debug-only broadcast (`src/debug`) shows fake pills. Never seen rendered by the author's tools: check it on the phone.
-- Sounds (res/raw), launcher icon, 10 languages (generated from the desktop catalog by
+- Sounds (res/raw), launcher icon, English only for now (`resourceConfigurations = en`; the other `values-xx` folders and `i18n/extra.json` are kept so the languages can come back: set `_englishOnly` to false in `i18n/app-strings.json` and run `gen-strings.mjs`). Strings come from the desktop catalog by
   `scripts/gen-strings.mjs`, Android-only strings in `i18n/`), dark/light theme.
 - `tools/dev-desktop.mjs`: a pretend desktop (Node + openssl) that sends **fake scripted sessions and a
   fake approval**. It is a test tool only; the fake "Claude Code / Codex" data it shows is not real.

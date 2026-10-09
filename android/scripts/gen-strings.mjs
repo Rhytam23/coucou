@@ -14,6 +14,9 @@ const read = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 const appFile = read(path.join(root, "i18n/app-strings.json"));
 const app = appFile.strings;
 const untranslatable = new Set(appFile._untranslatable ?? []);
+// English only for now: only values/strings.xml is written and checked, the other values-xx folders
+// are left as they are (and are not in the build). Set "_englishOnly" to false to bring them back.
+const englishOnly = appFile._englishOnly === true;
 const extra = read(path.join(root, "i18n/extra.json")).strings ?? {};
 const desktop = read(path.resolve(root, "../windows/src/i18n/strings.json"));
 const langs = desktop.languages.filter((l) => l !== "en");
@@ -43,7 +46,7 @@ const outputs = new Map();
 outputs.set(path.join(resDir, "values/strings.xml"), xml(Object.entries(app)));
 
 const missing = {};
-for (const l of langs) {
+for (const l of englishOnly ? [] : langs) {
   const entries = [];
   for (const [k, en] of Object.entries(app)) {
     if (untranslatable.has(k)) continue;
@@ -70,4 +73,5 @@ for (const [file, content] of outputs) {
   fs.writeFileSync(file, content);
 }
 const total = Object.keys(app).length;
-for (const l of langs) console.log(`${l}: ${total - (missing[l]?.length ?? 0)}/${total} translated`);
+if (englishOnly) console.log(`English only: ${total} strings (other languages untouched)`);
+else for (const l of langs) console.log(`${l}: ${total - (missing[l]?.length ?? 0)}/${total} translated`);

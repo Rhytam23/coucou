@@ -37,9 +37,6 @@
     <string name="settings_title">Settings</string>
     <string name="settings_sound">Mochi\'s sounds</string>
     <string name="settings_volume">Volume</string>
-    <string name="settings_language">Language</string>
-    <string name="language_system">System</string>
-    <string name="language_old_android">On this version of Android, the app follows the language of your phone. Change it in Android\'s settings.</string>
     <string name="notify_done">When an agent finishes or fails</string>
     <string name="notify_done_hint">A quiet notice in the notification shade, and the pill if it is on. Permission requests and questions always notify you.</string>
     <string name="quiet_hours">Quiet hours</string>
