@@ -41,7 +41,7 @@ import com.coucou.android.mochi.MochiEngine
 import com.coucou.android.mochi.MochiView
 import com.coucou.android.mochi.Rgb
 
-private fun stateLabel(state: BotState): Int = when (state) {
+internal fun stateLabel(state: BotState): Int = when (state) {
     BotState.IDLE -> R.string.state_ready
     BotState.WORKING -> R.string.state_working
     BotState.THINKING -> R.string.state_thinking
@@ -55,7 +55,7 @@ private fun stateLabel(state: BotState): Int = when (state) {
     BotState.DIZZY -> R.string.state_dizzy
 }
 
-private fun rgbColor(c: Rgb) = Color(c.r.toFloat(), c.g.toFloat(), c.b.toFloat())
+internal fun rgbColor(c: Rgb) = Color(c.r.toFloat(), c.g.toFloat(), c.b.toFloat())
 
 /** Idle is "Ready" with a green dot, as on the PC; every other state wears its own colour. */
 private fun dotColor(state: BotState): Color =
@@ -69,9 +69,11 @@ private fun dotColor(state: BotState): Color =
 @Composable
 fun AgentCard(
     focus: SessionInfo?, engine: MochiEngine, touch: Modifier, link: HomePanel.Link, onLink: () -> Unit,
+    /** Opens the session's detail screen; null when the computer sent no details for it. */
+    onDetails: (() -> Unit)? = null,
 ) {
     val state = focus?.state ?: BotState.IDLE
-    CoucouCard {
+    CoucouCard(if (onDetails != null) Modifier.clickable(onClick = onDetails) else Modifier) {
         Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically) {
             MochiView(engine, Modifier.size(112.dp).then(touch))
             Spacer(Modifier.width(Gutter))
@@ -118,6 +120,12 @@ fun AgentCard(
                         )
                     }
                 }
+                if (onDetails != null) {
+                    Text(
+                        stringResource(R.string.session_details) + "  ›", style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary, maxLines = 1,
+                    )
+                }
                 if (link != HomePanel.Link.NONE) {
                     TextButton(onClick = onLink, contentPadding = PaddingValues(0.dp)) {
                         Text(stringResource(if (link == HomePanel.Link.PAIR) R.string.link_pair else R.string.link_approval))
@@ -135,7 +143,7 @@ fun AgentCard(
 @Composable
 fun AgentChip(s: SessionInfo, engine: MochiEngine, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val def = Pills.byId(s.pillId)
-    val tint = def?.colorHex?.let { HomePanel.rgb(it) }?.let(::rgbColor) ?: MaterialTheme.colorScheme.primary
+    val tint = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }?.let(::rgbColor) ?: MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(14.dp)
     Row(
         modifier.height(CHIP_HEIGHT).clip(shape)

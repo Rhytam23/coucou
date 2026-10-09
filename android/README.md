@@ -121,3 +121,11 @@ node android/tools/dev-desktop.mjs --fake-chat --host <LAN IP>   # pair the app 
 # in the chat: any text is echoed; /error /auth /slow (never ends: press Stop) /long /rewrite try the odd cases
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind chat   # debug builds: the screen with sample messages, no computer
 ```
+
+## Session details (opt-in on the computer)
+
+With "Show session details on the phone" turned on in the computer's Settings > Android phone (off by default), the agent
+card on Home opens a detail screen: the project's **folder name** (never a path), how far the agent got, its last message
+and the steps it took, newest first and in plain words. Pills use the colour chosen for them on the computer. Without the
+switch the screen says where to turn it on. Try it free: `node android/tools/dev-desktop.mjs --details --host <LAN IP>`,
+or in a debug build `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind details`.

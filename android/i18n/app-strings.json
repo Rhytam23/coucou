@@ -115,7 +115,14 @@
     "chat_err_canceled": "Stopped.",
     "chat_err_internal": "Something went wrong.",
     "chat_err_connection": "The connection to your computer was lost.",
-    "chat_err_interrupted": "Stopped when the app closed."
+    "chat_err_interrupted": "Stopped when the app closed.",
+    "session_details": "Details",
+    "session_last": "Last message",
+    "session_steps": "Steps",
+    "session_no_steps": "No steps yet.",
+    "session_hint": "Turn on “Show session details on the phone” in your computer's Settings to see the steps and the last message here.",
+    "session_ended": "This session is no longer running.",
+    "session_project": "Project: %1$s"
   },
   "_untranslatable": [
     "app_name",

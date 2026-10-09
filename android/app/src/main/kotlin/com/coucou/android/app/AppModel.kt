@@ -121,6 +121,9 @@ class AppModel(private val context: Context) : LinkListener {
 
     var chatModel by mutableStateOf<String?>(prefs.getString("chat_model", null)); private set
 
+    /** The computer offers session details (steps, last message, project folder, colour) to this phone. */
+    var detailsOffered by mutableStateOf(false); private set
+
     /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
     private var chatForced = false
 
@@ -184,6 +187,7 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private fun chatLinkLost() {
+        detailsOffered = false
         chatForced = false
         chatOffered = false
         chatModels = emptyList()
@@ -376,7 +380,10 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     override fun onCaps(caps: Set<String>) {
-        main.post { chatOffered = Protocol.CAP_CHAT in caps }
+        main.post {
+            chatOffered = Protocol.CAP_CHAT in caps
+            detailsOffered = Protocol.CAP_DETAILS in caps
+        }
     }
 
     override fun onChatModels(models: List<ChatModel>) {

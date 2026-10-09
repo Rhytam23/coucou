@@ -5,6 +5,7 @@ import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomePanelTest {
@@ -67,5 +68,23 @@ class HomePanelTest {
         assertNull(HomePanel.rgb("blue"))
         assertNull(HomePanel.rgb("#12"))
         assertNull(HomePanel.rgb("#GGGGGG"))
+    }
+
+    @Test fun theCardOpensOnlyWhenThereIsSomethingToShow() {
+        assertTrue(!HomePanel.hasDetails(s("a", BotState.IDLE)))
+        assertTrue(HomePanel.hasDetails(s("a", BotState.IDLE).copy(steps = listOf("x"))))
+        assertTrue(HomePanel.hasDetails(s("a", BotState.IDLE).copy(finalLine = "done")))
+        assertTrue(HomePanel.hasDetails(s("a", BotState.IDLE).copy(project = "app")))
+        assertTrue(!HomePanel.hasDetails(s("a", BotState.IDLE).copy(finalLine = "  ", color = "#112233")))
+    }
+
+    @Test fun theUsersColourBeatsTheCatalogsAndTheCatalogIsTheFallback() {
+        assertEquals("#2DD4BF", HomePanel.colorHex(s("agent_gemini", BotState.IDLE).copy(color = "#2DD4BF")))
+        assertEquals("#8AB4F8", HomePanel.colorHex(s("agent_gemini", BotState.IDLE)))
+        assertNull(HomePanel.colorHex(s("not_a_pill", BotState.IDLE)))
+    }
+
+    @Test fun stepsAreListedNewestFirst() {
+        assertEquals(listOf("c", "b", "a"), HomePanel.stepsNewestFirst(s("a", BotState.IDLE).copy(steps = listOf("a", "b", "c"))))
     }
 }

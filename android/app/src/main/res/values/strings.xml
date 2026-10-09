@@ -114,4 +114,11 @@
     <string name="chat_err_internal">Something went wrong.</string>
     <string name="chat_err_connection">The connection to your computer was lost.</string>
     <string name="chat_err_interrupted">Stopped when the app closed.</string>
+    <string name="session_details">Details</string>
+    <string name="session_last">Last message</string>
+    <string name="session_steps">Steps</string>
+    <string name="session_no_steps">No steps yet.</string>
+    <string name="session_hint">Turn on “Show session details on the phone” in your computer\'s Settings to see the steps and the last message here.</string>
+    <string name="session_ended">This session is no longer running.</string>
+    <string name="session_project">Project: %1$s</string>
 </resources>

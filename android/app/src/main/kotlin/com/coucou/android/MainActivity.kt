@@ -82,6 +82,7 @@ import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentCard
 import com.coucou.android.ui.ChatEntry
+import com.coucou.android.ui.SessionScreen
 import com.coucou.android.ui.ChatScreen
 import com.coucou.android.ui.AgentChipRow
 import com.coucou.android.ui.MochiTouch
@@ -96,11 +97,13 @@ import com.coucou.android.ui.SectionTitle
 import com.coucou.android.ui.linkDotColor
 import com.coucou.android.ui.linkStatusText
 
-private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT }
+private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
     private var screen by mutableStateOf(Screen.HOME)
+    /** The session whose details are open. */
+    private var detailPill by mutableStateOf<String?>(null)
     private var confirming = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,6 +121,7 @@ class MainActivity : ComponentActivity() {
                         }
                         when (screen) {
                             Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })
+                            Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
                             Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY },
@@ -128,6 +132,7 @@ class MainActivity : ComponentActivity() {
                                 model, onApprove = ::approve,
                                 onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
                                 onChat = { screen = Screen.CHAT },
+                                onSession = { detailPill = it; screen = Screen.SESSION },
                             )
                         }
                     }
@@ -203,7 +208,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit, onSession: (String) -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -256,6 +261,7 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
         item {
             AgentCard(
                 focus, engine, touch.modifier, pair,
+                onDetails = if (focus != null && HomePanel.hasDetails(focus)) ({ onSession(focus.pillId) }) else null,
                 onLink = {
                     when (pair) {
                         HomePanel.Link.PAIR -> scope.launch { listState.animateScrollToItem(pairIndex) }
@@ -277,9 +283,12 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
                         miniEngines.getOrPut(s.pillId) {
                             MochiEngine(clock).apply {
                                 isMini = true
-                                bodyColor = Pills.byId(s.pillId)?.colorHex?.let { HomePanel.rgb(it) }
+                                bodyColor = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }
                             }
-                        }.also { if (it.state != s.state) it.setState(s.state) }
+                        }.also {
+                            it.bodyColor = HomePanel.colorHex(s)?.let { hex -> HomePanel.rgb(hex) }
+                            if (it.state != s.state) it.setState(s.state)
+                        }
                     },
                     selected = focus?.pillId, onPick = { selected = it.pillId },
                 )

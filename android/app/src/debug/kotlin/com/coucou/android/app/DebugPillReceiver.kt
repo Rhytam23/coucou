@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -80,6 +80,22 @@ class DebugPillReceiver : BroadcastReceiver() {
                     com.coucou.android.core.ChatMessage("a-3", com.coucou.android.core.ChatRole.ASSISTANT, "", com.coucou.android.core.ChatStatus.STREAMING),
                 ),
             )
+            // Session details (steps, last message, project folder, colour), as with the computer's switch on.
+            "details" -> {
+                model.onCaps(setOf("details"))
+                model.onSessions(
+                    listOf(
+                        SessionInfo(
+                            "integration_claude", "Claude Code", BotState.FINISHED, "Done", 4, 5, now,
+                            steps = listOf("Read · README.md", "Grep · TODO", "Edit · src/app.ts", "Bash · npm test", "ask_question"),
+                            finalLine = "I fixed the failing test and everything passes now.",
+                            project = "coucou", color = "#2DD4BF",
+                        ),
+                        SessionInfo("agent_codex", "Codex", BotState.WORKING, "Reading files", 1, 3, now, steps = listOf("Search · the code"), project = "api-server", color = "#E879F9"),
+                        SessionInfo("agent_gemini", "Gemini CLI", BotState.SLEEPING, "", 0, 0, now),
+                    ),
+                )
+            }
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }

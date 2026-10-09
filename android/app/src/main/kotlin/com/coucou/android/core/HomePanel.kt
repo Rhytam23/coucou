@@ -47,6 +47,15 @@ object HomePanel {
         else -> Link.NONE
     }
 
+    /** There is something to open: steps, a last message or a project name (only with the "details" capability). */
+    fun hasDetails(s: SessionInfo): Boolean = s.steps.isNotEmpty() || !s.finalLine.isNullOrBlank() || s.project != null
+
+    /** The colour of an agent: the one the user gave its pill on the computer, else the catalog's. */
+    fun colorHex(s: SessionInfo): String? = s.color ?: Pills.byId(s.pillId)?.colorHex
+
+    /** Newest first, as the detail screen lists them. */
+    fun stepsNewestFirst(s: SessionInfo): List<String> = s.steps.asReversed()
+
     /** "#8AB4F8" to a colour for a mini Mochi's body; a malformed value gives null (the default body). */
     fun rgb(hex: String): Rgb? {
         val h = hex.trim().removePrefix("#")
