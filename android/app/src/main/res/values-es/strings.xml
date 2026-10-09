@@ -29,4 +29,7 @@
     <string name="msg_link_error">Error de enlace</string>
     <string name="msg_need_lock">Configura un bloqueo de pantalla para aprobar desde el teléfono.</string>
     <string name="approval_hint">Permitir en el teléfono pide la huella o el bloqueo de pantalla. Denegar no.</string>
+    <string name="overlay_title">Mostrar a Mochi sobre otras apps</string>
+    <string name="overlay_hint">Una pequeña píldora baja desde la parte superior de la pantalla cuando un agente te necesita o termina, y luego se desliza fuera.</string>
+    <string name="msg_overlay_permission">Permite «mostrar sobre otras apps» para Coucou y vuelve.</string>
 </resources>

@@ -30,7 +30,10 @@
     "msg_rejected": "The desktop rejected this phone. Pair again.",
     "msg_link_error": "Link error",
     "msg_need_lock": "Set a screen lock to approve from your phone.",
-    "approval_hint": "Allow on the phone asks for the fingerprint or the screen lock. Deny does not."
+    "approval_hint": "Allow on the phone asks for the fingerprint or the screen lock. Deny does not.",
+    "overlay_title": "Show Mochi over other apps",
+    "overlay_hint": "A small pill drops from the top of the screen when an agent needs you or finishes, then slides away.",
+    "msg_overlay_permission": "Allow “display over other apps” for Coucou, then come back."
   },
   "_untranslatable": [
     "app_name",

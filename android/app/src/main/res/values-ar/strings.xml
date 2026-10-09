@@ -29,4 +29,7 @@
     <string name="msg_link_error">خطأ في الاتصال</string>
     <string name="msg_need_lock">اضبط قفل الشاشة للموافقة من هاتفك.</string>
     <string name="approval_hint">السماح على الهاتف يتطلب بصمة الإصبع أو قفل الشاشة. أما الرفض فلا يتطلبها.</string>
+    <string name="overlay_title">إظهار Mochi فوق التطبيقات الأخرى</string>
+    <string name="overlay_hint">تنزل كبسولة صغيرة من أعلى الشاشة عندما يحتاجك وكيل أو ينتهي، ثم تنزلق بعيدًا.</string>
+    <string name="msg_overlay_permission">اسمح لـ Coucou بـ«العرض فوق التطبيقات الأخرى» ثم عد.</string>
 </resources>

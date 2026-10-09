@@ -99,6 +99,11 @@ class Notifications(private val context: Context) {
 
     fun cancelApproval(fp: String) = nm.cancel(idFor(fp))
 
+    /** Opens the app on the biometric prompt for this request (the same as tapping Allow in the notification). */
+    fun openAllow(fp: String) { runCatching { open(fp, true, idFor(fp) + 1).send() } }
+
+    fun openApp() { runCatching { open(null, false, 0).send() } }
+
     companion object {
         const val CH_LINK = "link"
         const val CH_APPROVAL = "approvals"

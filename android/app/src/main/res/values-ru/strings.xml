@@ -29,4 +29,7 @@
     <string name="msg_link_error">Ошибка связи</string>
     <string name="msg_need_lock">Настройте блокировку экрана, чтобы разрешать с телефона.</string>
     <string name="approval_hint">Чтобы разрешить на телефоне, нужен отпечаток пальца или блокировка экрана. Для отказа — не нужен.</string>
+    <string name="overlay_title">Показывать Mochi поверх других приложений</string>
+    <string name="overlay_hint">Маленькая капсула опускается с верха экрана, когда агенту нужны вы или он закончил, а затем уезжает.</string>
+    <string name="msg_overlay_permission">Разрешите Coucou «показ поверх других приложений» и вернитесь.</string>
 </resources>

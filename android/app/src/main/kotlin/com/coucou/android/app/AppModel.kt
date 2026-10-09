@@ -8,7 +8,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.coucou.android.R
+import com.coucou.android.core.OverlayPolicy
 import com.coucou.android.core.Pills
+import com.coucou.android.ui.IslandOverlay
 import com.coucou.android.link.Protocol
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.DemoLink
@@ -36,6 +38,31 @@ class AppModel(private val context: Context) : LinkListener {
     var sessions by mutableStateOf<List<SessionInfo>>(emptyList()); private set
     var approvals by mutableStateOf<List<ApprovalRequest>>(emptyList()); private set
     var message by mutableStateOf<String?>(null)
+
+    private val prefs = context.getSharedPreferences("coucou_ui", Context.MODE_PRIVATE)
+
+    /** The pill that drops from the top of the screen over other apps (off until the user turns it on). */
+    var overlayEnabled by mutableStateOf(prefs.getBoolean("overlay", false)); private set
+
+    /** The app is on screen: it shows everything itself, so the pill stays away. */
+    var inForeground = false
+
+    private val overlay = IslandOverlay(
+        context, { android.os.SystemClock.elapsedRealtimeNanos() / 1e6 },
+        onAllow = { notifier.openAllow(it.fingerprint) },
+        onDeny = { decide(it.fingerprint, allow = false) },
+        onOpen = { notifier.openApp() },
+    )
+
+    fun overlayPermitted() = overlay.permitted()
+
+    fun setOverlayEnabled(on: Boolean) {
+        overlayEnabled = on
+        prefs.edit().putBoolean("overlay", on).apply()
+        if (!on) overlay.hide()
+    }
+
+    private fun overlayWanted() = OverlayPolicy.shouldShow(overlayEnabled, overlay.permitted(), inForeground)
 
     /**
      * Allow was tapped on a notification before the link was back (the app had been closed): the
@@ -112,6 +139,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     /** Every card goes: the desktop offers a request again if it is still pending once we reconnect. */
     private fun dropApprovals() {
+        overlay.hide()
         expiry.values.forEach { main.removeCallbacks(it) }
         expiry.clear()
         approvals.forEach { notifier.cancelApproval(it.fingerprint) }
@@ -122,6 +150,7 @@ class AppModel(private val context: Context) : LinkListener {
         expiry.remove(fingerprint)?.let { main.removeCallbacks(it) }
         approvals = approvals.filter { it.fingerprint != fingerprint }
         notifier.cancelApproval(fingerprint)
+        overlay.hideApproval(fingerprint)
     }
 
     // ── LinkListener (link thread) ───────────────────────────────────────────
@@ -145,6 +174,7 @@ class AppModel(private val context: Context) : LinkListener {
             for (s in sessions) {
                 val prev = lastState.put(s.pillId, s.state)
                 if (prev != s.state && s.state in LOUD) sounds.play(com.coucou.android.mochi.MochiConst.STATE_SOUND[s.state] ?: continue)
+                if (OverlayPolicy.shouldFlash(prev, s.state) && overlayWanted()) overlay.showStatus(agentName(s.pillId), s.state, s.statusText)
             }
             lastState.keys.retainAll(sessions.map { it.pillId }.toSet())
             notifier.updateOngoing(this)
@@ -155,6 +185,7 @@ class AppModel(private val context: Context) : LinkListener {
         main.post {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
             notifier.showApproval(request, agentName(request.pillId))
+            if (overlayWanted()) overlay.showApproval(request, agentName(request.pillId))
             // Offered for 120 s from now, by this phone's clock (the notification times out then too).
             expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
             val gone = Runnable { removeApproval(request.fingerprint) }

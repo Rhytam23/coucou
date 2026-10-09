@@ -29,4 +29,7 @@
     <string name="msg_link_error">Kesalahan tautan</string>
     <string name="msg_need_lock">Setel kunci layar untuk menyetujui dari ponsel.</string>
     <string name="approval_hint">Mengizinkan di ponsel meminta sidik jari atau kunci layar. Menolak tidak.</string>
+    <string name="overlay_title">Tampilkan Mochi di atas aplikasi lain</string>
+    <string name="overlay_hint">Pil kecil turun dari atas layar saat agen membutuhkanmu atau selesai, lalu bergeser pergi.</string>
+    <string name="msg_overlay_permission">Izinkan “tampilkan di atas aplikasi lain” untuk Coucou, lalu kembali.</string>
 </resources>

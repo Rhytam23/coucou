@@ -29,4 +29,7 @@
     <string name="msg_link_error">Erreur de liaison</string>
     <string name="msg_need_lock">Configure un verrouillage d\'écran pour autoriser depuis le téléphone.</string>
     <string name="approval_hint">Autoriser sur le téléphone demande l\'empreinte ou le verrouillage d\'écran. Refuser, non.</string>
+    <string name="overlay_title">Afficher Mochi par-dessus les autres apps</string>
+    <string name="overlay_hint">Une petite pilule descend du haut de l\'écran quand un agent a besoin de toi ou termine, puis repart.</string>
+    <string name="msg_overlay_permission">Autorise « afficher par-dessus les autres apps » pour Coucou, puis reviens.</string>
 </resources>

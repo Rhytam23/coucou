@@ -3,6 +3,8 @@ package com.coucou.android
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -39,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,6 +82,7 @@ class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
     private var gallery by mutableStateOf(false)
     private var confirming = false
+    private var waitingForOverlayPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,12 +96,40 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
                         if (gallery) Gallery(onBack = { gallery = false })
-                        else Home(model, onApprove = ::approve, onGallery = { gallery = true })
+                        else Home(model, onApprove = ::approve, onGallery = { gallery = true }, onOverlay = ::setOverlay)
                     }
                 }
             }
         }
         handle(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        model.inForeground = true
+    }
+
+    override fun onStop() {
+        model.inForeground = false
+        super.onStop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Back from the system screen where "display over other apps" is granted.
+        if (waitingForOverlayPermission) {
+            waitingForOverlayPermission = false
+            if (model.overlayPermitted()) model.setOverlayEnabled(true)
+        }
+    }
+
+    /** The pill over other apps needs a one-time permission from the system settings. */
+    private fun setOverlay(on: Boolean) {
+        if (!on) { model.setOverlayEnabled(false); return }
+        if (model.overlayPermitted()) { model.setOverlayEnabled(true); return }
+        model.message = getString(R.string.msg_overlay_permission)
+        waitingForOverlayPermission = true
+        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -141,7 +173,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit, onOverlay: (Boolean) -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
 
@@ -195,6 +227,7 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
             }
         }
 
+        item { OverlayCard(model, onOverlay) }
         item { Footer(model, onGallery) }
     }
 }
@@ -344,6 +377,20 @@ private fun SessionRow(s: SessionInfo, engine: MochiEngine) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun OverlayCard(model: AppModel, onOverlay: (Boolean) -> Unit) {
+    CoucouCard {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.overlay_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.overlay_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = model.overlayEnabled && model.overlayPermitted(), onCheckedChange = onOverlay)
         }
     }
 }

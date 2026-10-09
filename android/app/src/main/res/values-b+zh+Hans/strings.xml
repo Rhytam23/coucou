@@ -29,4 +29,7 @@
     <string name="msg_link_error">连接错误</string>
     <string name="msg_need_lock">请先设置锁屏，才能在手机上批准。</string>
     <string name="approval_hint">在手机上点“允许”需要指纹或锁屏验证；“拒绝”则不需要。</string>
+    <string name="overlay_title">在其他应用上方显示 Mochi</string>
+    <string name="overlay_hint">当智能体需要你或完成时，屏幕顶部会落下一个小胶囊，然后滑走。</string>
+    <string name="msg_overlay_permission">请为 Coucou 允许“显示在其他应用上方”，然后返回。</string>
 </resources>

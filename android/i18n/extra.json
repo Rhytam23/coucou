@@ -209,6 +209,39 @@
       "pt-BR": "Permitir no celular pede a digital ou o bloqueio de tela. Negar não pede.",
       "ru": "Чтобы разрешить на телефоне, нужен отпечаток пальца или блокировка экрана. Для отказа — не нужен.",
       "id": "Mengizinkan di ponsel meminta sidik jari atau kunci layar. Menolak tidak."
+    },
+    "Show Mochi over other apps": {
+      "zh-Hans": "在其他应用上方显示 Mochi",
+      "hi": "दूसरे ऐप्स के ऊपर Mochi दिखाएँ",
+      "es": "Mostrar a Mochi sobre otras apps",
+      "ar": "إظهار Mochi فوق التطبيقات الأخرى",
+      "fr": "Afficher Mochi par-dessus les autres apps",
+      "bn": "অন্য অ্যাপের উপরে Mochi দেখান",
+      "pt-BR": "Mostrar o Mochi sobre outros apps",
+      "ru": "Показывать Mochi поверх других приложений",
+      "id": "Tampilkan Mochi di atas aplikasi lain"
+    },
+    "A small pill drops from the top of the screen when an agent needs you or finishes, then slides away.": {
+      "zh-Hans": "当智能体需要你或完成时，屏幕顶部会落下一个小胶囊，然后滑走。",
+      "hi": "जब कोई एजेंट आपको बुलाता है या पूरा करता है, तो स्क्रीन के ऊपर से एक छोटी गोली उतरती है और फिर खिसक जाती है।",
+      "es": "Una pequeña píldora baja desde la parte superior de la pantalla cuando un agente te necesita o termina, y luego se desliza fuera.",
+      "ar": "تنزل كبسولة صغيرة من أعلى الشاشة عندما يحتاجك وكيل أو ينتهي، ثم تنزلق بعيدًا.",
+      "fr": "Une petite pilule descend du haut de l'écran quand un agent a besoin de toi ou termine, puis repart.",
+      "bn": "কোনো এজেন্টের আপনাকে দরকার হলে বা কাজ শেষ হলে স্ক্রিনের উপর থেকে একটি ছোট পিল নেমে আসে, তারপর সরে যায়।",
+      "pt-BR": "Uma pequena pílula desce do topo da tela quando um agente precisa de você ou termina, e depois desliza para fora.",
+      "ru": "Маленькая капсула опускается с верха экрана, когда агенту нужны вы или он закончил, а затем уезжает.",
+      "id": "Pil kecil turun dari atas layar saat agen membutuhkanmu atau selesai, lalu bergeser pergi."
+    },
+    "Allow “display over other apps” for Coucou, then come back.": {
+      "zh-Hans": "请为 Coucou 允许“显示在其他应用上方”，然后返回。",
+      "hi": "Coucou के लिए “दूसरे ऐप्स के ऊपर दिखाएँ” की अनुमति दें, फिर वापस आएँ।",
+      "es": "Permite «mostrar sobre otras apps» para Coucou y vuelve.",
+      "ar": "اسمح لـ Coucou بـ«العرض فوق التطبيقات الأخرى» ثم عد.",
+      "fr": "Autorise « afficher par-dessus les autres apps » pour Coucou, puis reviens.",
+      "bn": "Coucou-কে “অন্য অ্যাপের উপরে দেখানো”-র অনুমতি দিন, তারপর ফিরে আসুন।",
+      "pt-BR": "Permita “exibir sobre outros apps” para o Coucou e volte.",
+      "ru": "Разрешите Coucou «показ поверх других приложений» и вернитесь.",
+      "id": "Izinkan “tampilkan di atas aplikasi lain” untuk Coucou, lalu kembali."
     }
   }
 }

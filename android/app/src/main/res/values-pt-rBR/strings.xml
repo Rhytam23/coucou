@@ -29,4 +29,7 @@
     <string name="msg_link_error">Erro de conexão</string>
     <string name="msg_need_lock">Configure um bloqueio de tela para aprovar pelo celular.</string>
     <string name="approval_hint">Permitir no celular pede a digital ou o bloqueio de tela. Negar não pede.</string>
+    <string name="overlay_title">Mostrar o Mochi sobre outros apps</string>
+    <string name="overlay_hint">Uma pequena pílula desce do topo da tela quando um agente precisa de você ou termina, e depois desliza para fora.</string>
+    <string name="msg_overlay_permission">Permita “exibir sobre outros apps” para o Coucou e volte.</string>
 </resources>

@@ -29,4 +29,7 @@
     <string name="msg_link_error">लिंक त्रुटि</string>
     <string name="msg_need_lock">फ़ोन से मंज़ूरी देने के लिए स्क्रीन लॉक सेट करें।</string>
     <string name="approval_hint">फ़ोन पर अनुमति देने के लिए फ़िंगरप्रिंट या स्क्रीन लॉक माँगा जाता है। अस्वीकार के लिए नहीं।</string>
+    <string name="overlay_title">दूसरे ऐप्स के ऊपर Mochi दिखाएँ</string>
+    <string name="overlay_hint">जब कोई एजेंट आपको बुलाता है या पूरा करता है, तो स्क्रीन के ऊपर से एक छोटी गोली उतरती है और फिर खिसक जाती है।</string>
+    <string name="msg_overlay_permission">Coucou के लिए “दूसरे ऐप्स के ऊपर दिखाएँ” की अनुमति दें, फिर वापस आएँ।</string>
 </resources>
