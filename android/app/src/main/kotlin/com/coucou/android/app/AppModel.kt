@@ -56,7 +56,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     fun overlayPermitted() = overlay.permitted()
 
-    fun setOverlayEnabled(on: Boolean) {
+    fun useOverlay(on: Boolean) {
         overlayEnabled = on
         prefs.edit().putBoolean("overlay", on).apply()
         if (!on) overlay.hide()

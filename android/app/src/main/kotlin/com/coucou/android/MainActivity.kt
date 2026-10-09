@@ -119,14 +119,14 @@ class MainActivity : ComponentActivity() {
         // Back from the system screen where "display over other apps" is granted.
         if (waitingForOverlayPermission) {
             waitingForOverlayPermission = false
-            if (model.overlayPermitted()) model.setOverlayEnabled(true)
+            if (model.overlayPermitted()) model.useOverlay(true)
         }
     }
 
     /** The pill over other apps needs a one-time permission from the system settings. */
     private fun setOverlay(on: Boolean) {
-        if (!on) { model.setOverlayEnabled(false); return }
-        if (model.overlayPermitted()) { model.setOverlayEnabled(true); return }
+        if (!on) { model.useOverlay(false); return }
+        if (model.overlayPermitted()) { model.useOverlay(true); return }
         model.message = getString(R.string.msg_overlay_permission)
         waitingForOverlayPermission = true
         startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
