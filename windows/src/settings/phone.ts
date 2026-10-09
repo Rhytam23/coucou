@@ -13,6 +13,8 @@ type Toggle = (on: boolean, onChange: (v: boolean) => void) => HTMLElement;
 export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings): HTMLElement {
   const detail = h("div", {});
   const note = h("div", { class: "hint" });
+  /** Where the pairing code is drawn, so showing it never hides the switches below. */
+  const pairingBox = h("div", {});
 
   const showError = (message: string) => {
     note.textContent = t("Could not turn it on: {error}", { error: message });
@@ -22,7 +24,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
   const reveal = async (status: PhoneLinkStatus, newCode: boolean) => {
     try {
       const pairing = newCode ? await Bridge.phoneLinkNewPairing() : await Bridge.phoneLinkPairing();
-      detail.replaceChildren(...pairingRows(pairing, () => void reveal(status, true)));
+      pairingBox.replaceChildren(...pairingRows(pairing, () => void reveal(status, true)));
     } catch (err) {
       showError(String(err));
     }
@@ -31,6 +33,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
   /** Draws what is below the switch from the link's state. */
   const draw = (status: PhoneLinkStatus | null) => {
     detail.replaceChildren();
+    pairingBox.replaceChildren();
     note.textContent = "";
     if (status?.error) showError(status.error);
     if (!status?.running) return;
@@ -40,6 +43,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
     clients.textContent = t("Phones connected: {count}", { count: status.clients });
     detail.append(
       h("div", { class: "row" }, show),
+      pairingBox,
       clients,
       h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
       h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
