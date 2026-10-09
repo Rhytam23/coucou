@@ -62,6 +62,19 @@ One announcement at a time: while the pill shows a request, its notification is 
 first 600 ms on the pill are ignored (they were meant for the app underneath). Deny acts without opening the
 app; only Allow (biometric) and a tap on the pill's header open it.
 
+## Settings, notices and history
+
+Home > Settings: Mochi's sounds (switch, volume 0..0.2 as on the computer), "when an agent finishes or fails"
+(a quiet notice in the shade, plus the pill if it is on), quiet hours (no sound and no pill for finished or
+failed agents; requests and questions always come through), language (Android 13+ per-app language; older
+versions follow the phone), and History (your Allow/Deny decisions, only on the phone).
+A tap on Mochi slaps him (three quick ones make him dizzy), a long press pets him.
+
+```bash
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind history     # sample decisions (debug builds)
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished    # with the app in the background: a notice in the shade
+```
+
 ## Layout
 
 - `app/src/main/kotlin/.../mochi` the engine (pure Kotlin, unit-tested) and the Compose painter

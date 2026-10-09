@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages Android lists for this app in its per-app language settings (Android 13+). -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="zh-Hans" />
+    <locale android:name="hi" />
+    <locale android:name="es" />
+    <locale android:name="ar" />
+    <locale android:name="fr" />
+    <locale android:name="bn" />
+    <locale android:name="pt-BR" />
+    <locale android:name="ru" />
+    <locale android:name="id" />
+</locale-config>

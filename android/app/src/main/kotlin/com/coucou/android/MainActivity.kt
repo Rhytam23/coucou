@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.Log
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
@@ -77,11 +78,16 @@ import com.coucou.android.mochi.MochiEngine
 import com.coucou.android.mochi.MochiView
 import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
+import com.coucou.android.ui.MochiTouch
+import com.coucou.android.ui.HistoryScreen
+import com.coucou.android.ui.SettingsScreen
 import com.coucou.android.ui.StatusColors
+
+private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
-    private var gallery by mutableStateOf(false)
+    private var screen by mutableStateOf(Screen.HOME)
     private var confirming = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,8 +100,18 @@ class MainActivity : ComponentActivity() {
             CoucouTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
-                        if (gallery) Gallery(onBack = { gallery = false })
-                        else Home(model, onApprove = ::approve, onGallery = { gallery = true }, onOverlay = ::setOverlay)
+                        BackHandler(enabled = screen != Screen.HOME) {
+                            screen = if (screen == Screen.HISTORY) Screen.SETTINGS else Screen.HOME
+                        }
+                        when (screen) {
+                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.HOME })
+                            Screen.SETTINGS -> SettingsScreen(model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY })
+                            Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
+                            Screen.HOME -> Home(
+                                model, onApprove = ::approve, onGallery = { screen = Screen.GALLERY },
+                                onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
+                            )
+                        }
                     }
                 }
             }
@@ -169,8 +185,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit, onOverlay: (Boolean) -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
+    val touches = remember { HashMap<String, MochiTouch>() }
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
 
     // Allow tapped on a notification before the link was back: open the prompt once the request is here.
@@ -218,21 +235,23 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
             }
             items(model.sessions, key = { it.pillId }) { s ->
                 val engine = engines.getOrPut(s.pillId) { MochiEngine(clock, sound = model.sounds) }
-                if (engine.state != s.state) engine.setState(s.state)
-                SessionRow(s, engine)
+                val touch = touches.getOrPut(s.pillId) { MochiTouch(engine, model.sounds) { model.sessions.firstOrNull { it.pillId == s.pillId }?.state ?: BotState.IDLE } }
+                if (engine.state != s.state && !touch.dizzy) engine.setState(s.state)
+                SessionRow(s, engine, touch)
             }
         }
 
         item { OverlayCard(model, onOverlay) }
-        item { Footer(model, onGallery) }
+        item { Footer(model, onGallery, onSettings) }
     }
 }
 
 @Composable
 private fun Header(model: AppModel, clock: () -> Double) {
-    val engine = remember { MochiEngine(clock) }
+    val engine = remember { MochiEngine(clock, sound = model.sounds) }
     val state = Summary.headerState(model.sessions, model.approvals.isNotEmpty())
-    if (engine.state != state) engine.setState(state)
+    val touch = remember(engine) { MochiTouch(engine, model.sounds) { Summary.headerState(model.sessions, model.approvals.isNotEmpty()) } }
+    if (engine.state != state && !touch.dizzy) engine.setState(state)
     val dot = when {
         model.mode == Mode.DEMO -> StatusColors.busy
         model.mode == Mode.PAIRED && model.linkState == LinkState.CONNECTED -> StatusColors.online
@@ -240,7 +259,7 @@ private fun Header(model: AppModel, clock: () -> Double) {
         else -> StatusColors.offline
     }
     Row(Modifier.padding(top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        MochiView(engine, Modifier.size(64.dp))
+        MochiView(engine, Modifier.size(64.dp).then(touch.modifier))
         Spacer(Modifier.width(14.dp))
         Column {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -349,10 +368,10 @@ private fun ApprovalCard(model: AppModel, r: ApprovalRequest, onApprove: (Approv
 }
 
 @Composable
-private fun SessionRow(s: SessionInfo, engine: MochiEngine) {
+private fun SessionRow(s: SessionInfo, engine: MochiEngine, touch: MochiTouch) {
     CoucouCard {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MochiView(engine, Modifier.size(80.dp))
+            MochiView(engine, Modifier.size(80.dp).then(touch.modifier))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     s.agent.ifBlank { Pills.byId(s.pillId)?.name.orEmpty() },
@@ -392,7 +411,7 @@ private fun OverlayCard(model: AppModel, onOverlay: (Boolean) -> Unit) {
 }
 
 @Composable
-private fun Footer(model: AppModel, onGallery: () -> Unit) {
+private fun Footer(model: AppModel, onGallery: () -> Unit, onSettings: () -> Unit) {
     Column(Modifier.padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row {
             when (model.mode) {
@@ -402,6 +421,7 @@ private fun Footer(model: AppModel, onGallery: () -> Unit) {
                 }
                 Mode.NONE -> {}
             }
+            TextButton(onClick = onSettings) { Text(stringResource(R.string.settings_title)) }
             TextButton(onClick = onGallery) { Text(stringResource(R.string.gallery)) }
         }
         val dim = MaterialTheme.colorScheme.onSurfaceVariant

@@ -44,12 +44,13 @@ do not restyle existing shipped views; one topic per PR/commit.
   Protocol spec: `docs/ANDROID_LINK.md`.
 - `app/.../app`: `AppModel`, notifications (Deny from the notification, Allow opens the app for the
   biometric prompt), foreground `LinkService`, `SecureStore` (Android Keystore), `BiometricGate`.
+- Settings screen (sound on/off + volume, notices when an agent finishes or fails, quiet hours, language on Android 13+), a History of the phone's own decisions (kept only on the phone, command cut to 120 characters, 50 entries), quiet "Updates" notifications, and tap/long-press on Mochi (slap, dizzy, love). Plan: `android/PARITY_PLAN.md` (stage A done; B..H wait for the user's test of each stage).
 - Optional pill over other apps (`ui/IslandOverlay.kt`, `core/OverlayPolicy.kt`): see `android/README.md`. The wish is saved at the tap; a debug-only broadcast (`src/debug`) shows fake pills. Never seen rendered by the author's tools: check it on the phone.
 - Sounds (res/raw), launcher icon, 10 languages (generated from the desktop catalog by
   `scripts/gen-strings.mjs`, Android-only strings in `i18n/`), dark/light theme.
 - `tools/dev-desktop.mjs`: a pretend desktop (Node + openssl) that sends **fake scripted sessions and a
   fake approval**. It is a test tool only; the fake "Claude Code / Codex" data it shows is not real.
-- 69 JVM unit tests (`./gradlew test`), lint clean, CI in `.github/workflows/android.yml`.
+- 114 JVM unit tests (`./gradlew test`; some need cargo/node and skip without them), lint clean, CI in `.github/workflows/android.yml`.
 - Verified on a real phone (Samsung Galaxy A12s, Android 13): Mochi renders, demo mode, pairing over
   Wi-Fi, Allow reaches the desktop. Bugs found that way are fixed (e.g. network write on the main thread).
 
@@ -84,7 +85,7 @@ do not restyle existing shipped views; one topic per PR/commit.
 ## Useful commands
 
 ```
-cd android && ./gradlew test assembleDebug lint          # build + 69 tests + lint
+cd android && ./gradlew test assembleDebug lint          # build + 114 tests + lint
 node android/scripts/gen-strings.mjs --check              # translations in sync
 node android/tools/dev-desktop.mjs --host <LAN IP>        # fake desktop; prints a pairing link
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk   # local only

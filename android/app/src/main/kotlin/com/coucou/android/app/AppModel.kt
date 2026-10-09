@@ -9,7 +9,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.coucou.android.R
+import com.coucou.android.core.Decision
+import com.coucou.android.core.DecisionLog
+import com.coucou.android.core.KeyValueStore
 import com.coucou.android.core.OverlayChoice
+import com.coucou.android.core.StatusPolicy
+import com.coucou.android.core.UserSettings
 import com.coucou.android.core.OverlayPolicy
 import com.coucou.android.core.WishStore
 import com.coucou.android.core.Pills
@@ -43,6 +48,53 @@ class AppModel(private val context: Context) : LinkListener {
     var message by mutableStateOf<String?>(null)
 
     private val prefs = context.getSharedPreferences("coucou_ui", Context.MODE_PRIVATE)
+    private val kv = object : KeyValueStore {
+        override fun getBoolean(key: String, default: Boolean) = prefs.getBoolean(key, default)
+        override fun getInt(key: String, default: Int) = prefs.getInt(key, default)
+        override fun getFloat(key: String, default: Float) = prefs.getFloat(key, default)
+        override fun getString(key: String, default: String) = prefs.getString(key, default) ?: default
+        override fun put(key: String, value: Any) {
+            prefs.edit().apply {
+                when (value) {
+                    is Boolean -> putBoolean(key, value)
+                    is Int -> putInt(key, value)
+                    is Float -> putFloat(key, value)
+                    is String -> putString(key, value)
+                }
+            }.apply()
+        }
+    }
+
+    /** What the user chose in Settings (sound, notices, quiet hours). */
+    var settings by mutableStateOf(UserSettings.load(kv)); private set
+
+    fun updateSettings(next: UserSettings) {
+        settings = next
+        UserSettings.save(kv, next)
+        applySound()
+    }
+
+    private fun applySound() {
+        sounds.enabled = settings.soundOn
+        sounds.volume = settings.volume
+    }
+
+    init { applySound() }
+
+    /** The phone's own list of decisions. Never sent anywhere. */
+    private val decisionLog = DecisionLog(kv)
+    var decisions by mutableStateOf(decisionLog.all()); private set
+
+    fun clearDecisions() {
+        decisionLog.clear()
+        decisions = emptyList()
+    }
+
+    /** Also used by the debug receiver, to fill the history without a real decision. */
+    fun recordDecision(d: Decision) {
+        decisionLog.add(d)
+        decisions = decisionLog.all()
+    }
 
     private val choice = OverlayChoice(object : WishStore {
         override fun read() = prefs.getBoolean("overlay", false)
@@ -60,7 +112,10 @@ class AppModel(private val context: Context) : LinkListener {
     var inForeground = false
         set(value) {
             field = value
-            if (value) overlay.hide()
+            if (value) {
+                overlay.hide()
+                notifier.cancelAllStatus()
+            }
         }
 
     private val overlay = IslandOverlay(
@@ -155,11 +210,16 @@ class AppModel(private val context: Context) : LinkListener {
         dropApprovals()
         wantAllow = null
         lastState.clear()
+        notifier.cancelAllStatus()
     }
 
     /** True if the decision was sent (or applied to the demo). Allow is gated by the biometric prompt in the UI. */
     fun decide(fingerprint: String, allow: Boolean): Boolean {
+        val request = approvals.firstOrNull { it.fingerprint == fingerprint }
         val ok = link?.decide(fingerprint, allow) ?: false
+        if (ok && request != null) {
+            recordDecision(Decision(agentName(request.pillId), request.tool, request.command, allow, System.currentTimeMillis()))
+        }
         if (!ok) {
             message = context.getString(R.string.msg_not_pending)
             removeApproval(fingerprint) // it cannot be answered any more: no card or pill that lingers
@@ -201,10 +261,18 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onSessions(sessions: List<SessionInfo>) {
         main.post {
             this.sessions = sessions
+            val minute = java.time.LocalTime.now().let { it.hour * 60 + it.minute }
             for (s in sessions) {
                 val prev = lastState.put(s.pillId, s.state)
-                if (prev != s.state && s.state in LOUD) sounds.play(com.coucou.android.mochi.MochiConst.STATE_SOUND[s.state] ?: continue)
-                if (OverlayPolicy.shouldFlash(prev, s.state) && overlayWanted()) overlay.showStatus(agentName(s.pillId), s.state, s.statusText)
+                val name = agentName(s.pillId)
+                val sound = com.coucou.android.mochi.MochiConst.STATE_SOUND[s.state]
+                if (sound != null && StatusPolicy.stateSoundWanted(prev, s.state, settings)) sounds.play(sound)
+                val a = StatusPolicy.announce(prev, s.state, settings, minute, inForeground)
+                if (a.sound && sound != null) sounds.play(sound)
+                if (a.notify) notifier.showStatus(s.pillId, name, s.state, s.statusText)
+                if (a.pill && overlayWanted()) overlay.showStatus(name, s.state, s.statusText)
+                // The agent moved on: the notice about the last state is stale.
+                if (prev != s.state && s.state !in NEWSWORTHY) notifier.cancelStatus(s.pillId)
             }
             lastState.keys.retainAll(sessions.map { it.pillId }.toSet())
             notifier.updateOngoing(this)
@@ -240,6 +308,6 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private companion object {
-        val LOUD = setOf(BotState.APPROVAL, BotState.QUESTION, BotState.ERROR, BotState.FINISHED)
+        val NEWSWORTHY = setOf(BotState.QUESTION, BotState.ERROR, BotState.FINISHED, BotState.RATELIMIT)
     }
 }

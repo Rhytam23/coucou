@@ -242,6 +242,215 @@
       "pt-BR": "Permita “exibir sobre outros apps” para o Coucou e volte.",
       "ru": "Разрешите Coucou «показ поверх других приложений» и вернитесь.",
       "id": "Izinkan “tampilkan di atas aplikasi lain” untuk Coucou, lalu kembali."
+    },
+    "Settings": {
+      "zh-Hans": "设置",
+      "hi": "सेटिंग्स",
+      "es": "Ajustes",
+      "ar": "الإعدادات",
+      "fr": "Réglages",
+      "bn": "সেটিংস",
+      "pt-BR": "Ajustes",
+      "ru": "Настройки",
+      "id": "Pengaturan"
+    },
+    "Mochi's sounds": {
+      "zh-Hans": "Mochi 的声音",
+      "hi": "Mochi की आवाज़ें",
+      "es": "Sonidos de Mochi",
+      "ar": "أصوات Mochi",
+      "fr": "Sons de Mochi",
+      "bn": "Mochi-র শব্দ",
+      "pt-BR": "Sons do Mochi",
+      "ru": "Звуки Mochi",
+      "id": "Suara Mochi"
+    },
+    "On this version of Android, the app follows the language of your phone. Change it in Android's settings.": {
+      "zh-Hans": "在此 Android 版本上，应用使用手机的语言。请在 Android 设置中更改。",
+      "hi": "इस Android संस्करण पर ऐप आपके फ़ोन की भाषा का पालन करता है। इसे Android की सेटिंग्स में बदलें।",
+      "es": "En esta versión de Android, la app usa el idioma del teléfono. Cámbialo en los ajustes de Android.",
+      "ar": "في هذا الإصدار من Android يتبع التطبيق لغة هاتفك. غيّرها من إعدادات Android.",
+      "fr": "Sur cette version d'Android, l'app suit la langue du téléphone. Change-la dans les réglages d'Android.",
+      "bn": "এই Android সংস্করণে অ্যাপ আপনার ফোনের ভাষা অনুসরণ করে। Android-এর সেটিংসে এটি বদলান।",
+      "pt-BR": "Nesta versão do Android, o app segue o idioma do celular. Mude nos ajustes do Android.",
+      "ru": "В этой версии Android приложение использует язык телефона. Измените его в настройках Android.",
+      "id": "Di versi Android ini, aplikasi mengikuti bahasa ponsel. Ubah di pengaturan Android."
+    },
+    "When an agent finishes or fails": {
+      "zh-Hans": "当智能体完成或失败时",
+      "hi": "जब कोई एजेंट पूरा करे या विफल हो",
+      "es": "Cuando un agente termina o falla",
+      "ar": "عندما ينتهي وكيل أو يفشل",
+      "fr": "Quand un agent termine ou échoue",
+      "bn": "যখন কোনো এজেন্ট শেষ করে বা ব্যর্থ হয়",
+      "pt-BR": "Quando um agente termina ou falha",
+      "ru": "Когда агент завершил работу или произошла ошибка",
+      "id": "Saat agen selesai atau gagal"
+    },
+    "A quiet notice in the notification shade, and the pill if it is on. Permission requests and questions always notify you.": {
+      "zh-Hans": "在通知栏中显示静音通知，如果已开启还会显示药丸。权限请求和问题始终会通知你。",
+      "hi": "नोटिफ़िकेशन शेड में एक शांत सूचना, और चालू हो तो पिल भी। अनुमति के अनुरोध और प्रश्न हमेशा आपको सूचित करते हैं।",
+      "es": "Un aviso silencioso en el panel de notificaciones y la píldora, si está activada. Las solicitudes de permiso y las preguntas siempre te avisan.",
+      "ar": "إشعار هادئ في لوحة الإشعارات، والحبة إن كانت مفعّلة. طلبات الإذن والأسئلة تُنبّهك دائمًا.",
+      "fr": "Une notification discrète dans le volet, et la pastille si elle est activée. Les demandes d'autorisation et les questions te préviennent toujours.",
+      "bn": "বিজ্ঞপ্তি শেডে একটি শান্ত বিজ্ঞপ্তি, এবং চালু থাকলে পিলও। অনুমতির অনুরোধ ও প্রশ্ন সবসময় আপনাকে জানায়।",
+      "pt-BR": "Um aviso silencioso na central de notificações e a pílula, se estiver ativada. Pedidos de permissão e perguntas sempre avisam você.",
+      "ru": "Тихое уведомление в шторке и таблетка, если она включена. Запросы разрешений и вопросы уведомляют вас всегда.",
+      "id": "Pemberitahuan senyap di panel notifikasi, dan pil jika aktif. Permintaan izin dan pertanyaan selalu memberi tahu Anda."
+    },
+    "Quiet hours": {
+      "zh-Hans": "免打扰时段",
+      "hi": "शांत घंटे",
+      "es": "Horas de silencio",
+      "ar": "ساعات الهدوء",
+      "fr": "Heures calmes",
+      "bn": "শান্ত সময়",
+      "pt-BR": "Horário silencioso",
+      "ru": "Тихие часы",
+      "id": "Jam tenang"
+    },
+    "No sound and no pill for finished or failed agents. Requests and questions still come through.": {
+      "zh-Hans": "已完成或失败的智能体不发出声音，也不显示药丸。请求和问题仍会送达。",
+      "hi": "पूरे या विफल एजेंटों के लिए न आवाज़, न पिल। अनुरोध और प्रश्न फिर भी आएँगे।",
+      "es": "Sin sonido ni píldora para agentes terminados o con error. Las solicitudes y las preguntas siguen llegando.",
+      "ar": "بلا صوت ولا حبة للوكلاء المنتهين أو الفاشلين. الطلبات والأسئلة تصل كما هي.",
+      "fr": "Ni son ni pastille pour les agents terminés ou en échec. Les demandes et les questions passent quand même.",
+      "bn": "শেষ বা ব্যর্থ এজেন্টের জন্য শব্দ ও পিল থাকবে না। অনুরোধ ও প্রশ্ন তবুও আসবে।",
+      "pt-BR": "Sem som nem pílula para agentes que terminaram ou falharam. Pedidos e perguntas continuam chegando.",
+      "ru": "Без звука и таблетки для завершённых или завершившихся ошибкой агентов. Запросы и вопросы всё равно приходят.",
+      "id": "Tanpa suara dan pil untuk agen yang selesai atau gagal. Permintaan dan pertanyaan tetap masuk."
+    },
+    "From": {
+      "zh-Hans": "从",
+      "hi": "से",
+      "es": "Desde",
+      "ar": "من",
+      "fr": "De",
+      "bn": "থেকে",
+      "pt-BR": "De",
+      "ru": "С",
+      "id": "Dari"
+    },
+    "History": {
+      "zh-Hans": "历史记录",
+      "hi": "इतिहास",
+      "es": "Historial",
+      "ar": "السجل",
+      "fr": "Historique",
+      "bn": "ইতিহাস",
+      "pt-BR": "Histórico",
+      "ru": "История",
+      "id": "Riwayat"
+    },
+    "Your decisions will appear here. They stay on this phone.": {
+      "zh-Hans": "你的决定会显示在这里，只保存在这部手机上。",
+      "hi": "आपके फ़ैसले यहाँ दिखेंगे। वे इसी फ़ोन पर रहते हैं।",
+      "es": "Tus decisiones aparecerán aquí. Se quedan en este teléfono.",
+      "ar": "ستظهر قراراتك هنا. وتبقى على هذا الهاتف.",
+      "fr": "Tes décisions apparaîtront ici. Elles restent sur ce téléphone.",
+      "bn": "আপনার সিদ্ধান্তগুলো এখানে দেখা যাবে। সেগুলো এই ফোনেই থাকে।",
+      "pt-BR": "Suas decisões aparecerão aqui. Elas ficam neste celular.",
+      "ru": "Здесь появятся ваши решения. Они хранятся только на этом телефоне.",
+      "id": "Keputusan Anda akan muncul di sini. Tersimpan hanya di ponsel ini."
+    },
+    "Today": {
+      "zh-Hans": "今天",
+      "hi": "आज",
+      "es": "Hoy",
+      "ar": "اليوم",
+      "fr": "Aujourd'hui",
+      "bn": "আজ",
+      "pt-BR": "Hoje",
+      "ru": "Сегодня",
+      "id": "Hari ini"
+    },
+    "Yesterday": {
+      "zh-Hans": "昨天",
+      "hi": "कल",
+      "es": "Ayer",
+      "ar": "أمس",
+      "fr": "Hier",
+      "bn": "গতকাল",
+      "pt-BR": "Ontem",
+      "ru": "Вчера",
+      "id": "Kemarin"
+    },
+    "Allowed": {
+      "zh-Hans": "已允许",
+      "hi": "अनुमति दी",
+      "es": "Permitido",
+      "ar": "تم السماح",
+      "fr": "Autorisé",
+      "bn": "অনুমোদিত",
+      "pt-BR": "Permitido",
+      "ru": "Разрешено",
+      "id": "Diizinkan"
+    },
+    "Kept only on this phone, never sent anywhere.": {
+      "zh-Hans": "仅保存在这部手机上，不会发送到任何地方。",
+      "hi": "केवल इसी फ़ोन पर रखा जाता है, कहीं भेजा नहीं जाता।",
+      "es": "Solo se guarda en este teléfono y nunca se envía a ningún sitio.",
+      "ar": "يُحفظ على هذا الهاتف فقط ولا يُرسل إلى أي مكان.",
+      "fr": "Conservé uniquement sur ce téléphone, jamais envoyé ailleurs.",
+      "bn": "শুধু এই ফোনে রাখা হয়, কোথাও পাঠানো হয় না।",
+      "pt-BR": "Guardado só neste celular, nunca enviado a lugar nenhum.",
+      "ru": "Хранится только на этом телефоне и никуда не отправляется.",
+      "id": "Hanya disimpan di ponsel ini, tidak pernah dikirim ke mana pun."
+    },
+    "Back": {
+      "zh-Hans": "返回",
+      "hi": "वापस",
+      "es": "Atrás",
+      "ar": "رجوع",
+      "fr": "Retour",
+      "bn": "পেছনে",
+      "pt-BR": "Voltar",
+      "ru": "Назад",
+      "id": "Kembali"
+    },
+    "Finished": {
+      "zh-Hans": "已完成",
+      "hi": "पूरा हुआ",
+      "es": "Terminado",
+      "ar": "انتهى",
+      "fr": "Terminé",
+      "bn": "শেষ হয়েছে",
+      "pt-BR": "Concluído",
+      "ru": "Завершено",
+      "id": "Selesai"
+    },
+    "Stopped on an error": {
+      "zh-Hans": "因错误而停止",
+      "hi": "त्रुटि के कारण रुका",
+      "es": "Se detuvo por un error",
+      "ar": "توقف بسبب خطأ",
+      "fr": "Arrêté sur une erreur",
+      "bn": "একটি ত্রুটিতে থেমেছে",
+      "pt-BR": "Parou por um erro",
+      "ru": "Остановлено из-за ошибки",
+      "id": "Berhenti karena kesalahan"
+    },
+    "Has a question": {
+      "zh-Hans": "有一个问题",
+      "hi": "एक प्रश्न है",
+      "es": "Tiene una pregunta",
+      "ar": "لديه سؤال",
+      "fr": "A une question",
+      "bn": "একটি প্রশ্ন আছে",
+      "pt-BR": "Tem uma pergunta",
+      "ru": "Есть вопрос",
+      "id": "Punya pertanyaan"
+    },
+    "Hit a usage limit": {
+      "zh-Hans": "已达到使用上限",
+      "hi": "उपयोग की सीमा पूरी हुई",
+      "es": "Alcanzó un límite de uso",
+      "ar": "بلغ حد الاستخدام",
+      "fr": "A atteint une limite d'usage",
+      "bn": "ব্যবহারের সীমায় পৌঁছেছে",
+      "pt-BR": "Atingiu um limite de uso",
+      "ru": "Достигнут лимит использования",
+      "id": "Mencapai batas penggunaan"
     }
   }
 }

@@ -16,6 +16,7 @@ import com.coucou.android.R
 import com.coucou.android.core.OverlayPolicy
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.LinkState
+import com.coucou.android.mochi.BotState
 
 /**
  * Notifications: one quiet ongoing notification for the link, and a loud one per approval.
@@ -29,6 +30,12 @@ class Notifications(private val context: Context) {
         nm.createNotificationChannel(
             NotificationChannel(CH_LINK, "Connection", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows that Coucou is connected to your computer"
+                setShowBadge(false)
+            },
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_UPDATES, "Updates", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "An agent finished, failed or has a question"
                 setShowBadge(false)
             },
         )
@@ -111,6 +118,42 @@ class Notifications(private val context: Context) {
 
     fun cancelApproval(fp: String) = nm.cancel(idFor(fp))
 
+    /** An agent finished, failed, hit a limit or asks something. Quiet: Mochi's own sound and the pill are the alerts. */
+    fun showStatus(pillId: String, agentName: String, state: BotState, statusText: String) {
+        val what = context.getString(
+            when (state) {
+                BotState.ERROR -> R.string.notif_error
+                BotState.QUESTION -> R.string.notif_question
+                BotState.RATELIMIT -> R.string.notif_ratelimit
+                else -> R.string.notif_finished
+            },
+        )
+        val n = Notification.Builder(context, CH_UPDATES)
+            .setSmallIcon(R.drawable.ic_stat_mochi)
+            .setContentTitle(agentName)
+            .setContentText(what)
+            .setSubText(statusText.takeIf { it.isNotBlank() })
+            .setCategory(Notification.CATEGORY_STATUS)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                Notification.Builder(context, CH_UPDATES).setSmallIcon(R.drawable.ic_stat_mochi)
+                    .setContentTitle(context.getString(R.string.app_name)).setContentText(what).build(),
+            )
+            .setAutoCancel(true)
+            .setContentIntent(open(null, false, 0))
+            .build()
+        runCatching { nm.notify(STATUS_TAG, statusId(pillId), n) }
+    }
+
+    fun cancelStatus(pillId: String) = runCatching { nm.cancel(STATUS_TAG, statusId(pillId)) }
+
+    /** Coucou is on screen: the notices are redundant. */
+    fun cancelAllStatus() {
+        runCatching { nm.activeNotifications.filter { it.tag == STATUS_TAG }.forEach { nm.cancel(it.tag, it.id) } }
+    }
+
+    private fun statusId(pillId: String) = pillId.hashCode() and 0x3fffffff
+
     /** Opens the app on the biometric prompt for this request (the same as tapping Allow in the notification). */
     fun openAllow(fp: String) {
         Log.d("CoucouLaunch", "open the app on Allow (tap on the pill)")
@@ -126,6 +169,8 @@ class Notifications(private val context: Context) {
         const val CH_LINK = "link"
         const val CH_APPROVAL = "approvals"
         const val CH_APPROVAL_QUIET = "approvals_quiet"
+        const val CH_UPDATES = "updates"
+        private const val STATUS_TAG = "status"
         const val ONGOING_ID = 1
         const val ACTION_DENY = "com.coucou.android.DENY"
         const val EXTRA_FP = "fingerprint"

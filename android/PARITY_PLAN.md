@@ -48,7 +48,7 @@ Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with b
 - Spotify controls, weekly recap share, shortcuts, tray, window attach: PC concepts.
 
 ## Proposed order (small first; one stage = one commit series, each with tests, CI green, a debug trigger and adb steps)
-- **A. Phone-only polish, no protocol change.** Settings screen, sound switch/volume, language picker, tap-Mochi interactions and their sounds, finished/failed/question notifications with quiet hours, local decision history, update the stale HANDOFF numbers (docs say 69 tests, code has 94).
+- **A. Phone-only polish, no protocol change. (done, waiting for the user's test on the phone)** Settings screen, sound switch/volume, language picker, tap-Mochi interactions and their sounds, finished/failed/question notifications with quiet hours, local decision history, update the stale HANDOFF numbers (docs say 69 tests, code has 94).
 - **B. Capabilities + session details.** `caps` handshake, `steps[]`, `finalLine`, `project`, `color`; session detail screen; PC Settings > Android phone gets one toggle per feature, all off. Rust + Kotlin interop tests, backward-compat tests both directions.
 - **C. Answer questions from the phone.**
 - **D. Outfits and wardrobe** with `prefs{outfit}` from the PC and a phone-local override.

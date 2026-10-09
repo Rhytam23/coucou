@@ -16,7 +16,11 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = finished | error | question | ratelimit | approval
+ * kind = finished | error | question | ratelimit | approval | history
+ *
+ * `history` adds three sample decisions to Settings > History (no agent needed).
+ * With the app in the background, finished / error / question / ratelimit also post a quiet notice
+ * in the notification shade (channel "Updates") unless Settings turned it off or quiet hours apply.
  *
  * `--ez foreground true` pretends Coucou is on screen for a moment, so the pill must stay away and an
  * approval is announced by the heads-up notification instead (the case "pill not allowed").
@@ -35,6 +39,12 @@ class DebugPillReceiver : BroadcastReceiver() {
         fun session(state: BotState, text: String) =
             SessionInfo("agent_gemini", "Gemini CLI", state, text, 1, 3, now)
         when (kind) {
+            "history" -> {
+                val names = listOf("Gemini CLI" to "npm test", "Claude Code" to "git push origin main", "Codex" to "rm -rf build")
+                names.forEachIndexed { i, (agent, cmd) ->
+                    model.recordDecision(com.coucou.android.core.Decision(agent, "Bash", cmd, allowed = i != 2, atMs = now - i * 3_600_000L))
+                }
+            }
             "approval" -> model.onApproval(
                 ApprovalRequest("agent_gemini", "debug-$now", "Bash", "rm -rf node_modules && npm install", now),
             )
