@@ -32,7 +32,7 @@
     <string name="msg_need_lock">Set a screen lock to approve from your phone.</string>
     <string name="approval_hint">Allow on the phone asks for the fingerprint or the screen lock. Deny does not.</string>
     <string name="overlay_title">Show Mochi over other apps</string>
-    <string name="overlay_hint">A small pill drops from the top of the screen when an agent needs you or finishes, then slides away.</string>
+    <string name="overlay_hint">An island drops from the top of the screen while an agent works, then goes back up.</string>
     <string name="msg_overlay_permission">Allow “display over other apps” for Coucou, then come back.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_sound">Mochi\'s sounds</string>
@@ -69,6 +69,16 @@
     <string name="state_sleeping">Sleeping</string>
     <string name="state_dizzy">Dizzy</string>
     <string name="agent_kind">Agent</string>
-    <string name="link_settings">Open Settings</string>
     <string name="link_pair">Pair with your computer</string>
+    <string name="step_of">Step %1$d of %2$d</string>
+    <string name="link_approval">Allow / Deny</string>
+    <string name="overlay_missing">Allow “display over other apps” so the island can show.</string>
+    <string name="overlay_allow">Allow</string>
+    <string name="settings_section_computer">Computer</string>
+    <string name="settings_section_sound">Sound</string>
+    <string name="settings_section_notices">Notices</string>
+    <string name="settings_section_display">Display</string>
+    <string name="settings_section_more">More</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_computer_none">No computer connected yet. You can pair one from the Home screen.</string>
 </resources>

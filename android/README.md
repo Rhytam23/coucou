@@ -61,7 +61,7 @@ Tapping it opens Coucou.
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind working    # opens and stays
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished   # result, then up after 10 s
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind clear      # goes up now
-# kind = working | finished | error | question | ratelimit | approval | clear | history
+# kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi
 adb logcat -s CoucouIsland CoucouOverlay CoucouLaunch
 # add --ez foreground true to an approval to see the heads-up notification instead of the island
 ```
@@ -77,12 +77,21 @@ Home > Settings: Mochi's sounds (switch, volume 0..0.2 as on the computer), "whe
 failed agents; requests and questions always come through), and History (your Allow/Deny decisions, only on the phone).
 A tap on Mochi slaps him (three quick ones make him dizzy), a long press pets him.
 
-Home looks like the PC's Home panel: a card for the agent that matters most (big Mochi, name and kind, a status
-line with a coloured dot, a small link) and the other agents as pills with their own little Mochi; tap a pill to
-put it in the card.
+Home looks like the PC's Home panel and the agent card is the hero: big Mochi, name and kind, a status line with a
+coloured dot, what the agent is doing in plain words (a raw tool name such as `ask_question` or `Bash` becomes
+"Asking a question" / "Running a command", see `core/ToolLabels.kt`; the island says the same), "Step 3 of 8" with its
+bar, and at most one link ("Allow / Deny" when a request waits, "Pair with your computer" when not paired). The other
+agents are pills in two equal columns, full name on up to two lines; the chosen one has a clear frame; tap one to put
+it in the card. The gear at the top right opens Settings. Settings holds the rest: this computer (Disconnect), the
+island switch, sound, notices, History, Mochi gallery and About (the notice Louis Raillé's permission requires).
+Home shows a line about the island only when its switch is on but Android's permission is missing.
 
 ```bash
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind history     # sample decisions (debug builds)
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind multi       # 4 agents: pill grid, one lone pill
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind long        # very long agent name and tool name
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind tool        # raw tool name ask_question
+adb shell settings put system font_scale 1.3                                          # text 30 % bigger; put 1.0 back after
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished    # with the app in the background: a notice in the shade
 ```
 

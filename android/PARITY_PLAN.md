@@ -50,6 +50,7 @@ Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with b
 ## Proposed order (small first; one stage = one commit series, each with tests, CI green, a debug trigger and adb steps)
 - **A. Phone-only polish, no protocol change. (done, being tested on the phone)**
 - **A2. English only + the island at the top of the phone + Home like the PC Home panel. (done, to be tested)** Settings screen, sound switch/volume, language picker, tap-Mochi interactions and their sounds, finished/failed/question notifications with quiet hours, local decision history, update the stale HANDOFF numbers (docs say 69 tests, code has 94).
+- **A3. UI/UX polish. (done, to be tested)** Settings gear on Home, disconnect/gallery/overlay/About moved into Settings, human status text instead of raw tool names (Home card and island), "Step n of m", equal pill columns, narrower island that grows out of the camera hole, one gutter/gap rhythm, light theme contrast checked by test.
 - **B. Capabilities + session details.** `caps` handshake, `steps[]`, `finalLine`, `project`, `color`; session detail screen; PC Settings > Android phone gets one toggle per feature, all off. Rust + Kotlin interop tests, backward-compat tests both directions.
 - **C. Answer questions from the phone.**
 - **D. Outfits and wardrobe** with `prefs{outfit}` from the PC and a phone-local override.

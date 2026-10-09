@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +33,7 @@ import com.coucou.android.R
 import com.coucou.android.core.HomePanel
 import com.coucou.android.core.Pills
 import com.coucou.android.core.Summary
+import com.coucou.android.core.ToolLabels
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotState
 import com.coucou.android.mochi.MochiConst
@@ -60,9 +62,9 @@ private fun dotColor(state: BotState): Color =
     if (state == BotState.IDLE) StatusColors.online else MochiConst.STATES[state]?.color?.let(::rgbColor) ?: StatusColors.offline
 
 /**
- * The PC's Home panel, for a phone: the big Mochi of the agent that matters, its name and kind, a
- * status line with a coloured dot, one small link, then the other agents as pills with their own
- * little Mochi.
+ * The PC's Home panel, for a phone, and the hero of the screen: the big Mochi of the agent that
+ * matters, its name and kind, a status line with a coloured dot, what it is doing in plain words
+ * (never a raw tool name), "Step 3 of 8" with its bar, and at most one link.
  */
 @Composable
 fun AgentCard(
@@ -70,29 +72,29 @@ fun AgentCard(
 ) {
     val state = focus?.state ?: BotState.IDLE
     CoucouCard {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            MochiView(engine, Modifier.size(110.dp).then(touch))
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically) {
+            MochiView(engine, Modifier.size(112.dp).then(touch))
+            Spacer(Modifier.width(Gutter))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val pillName = focus?.let { Pills.byId(it.pillId)?.name }.orEmpty()
                 val name = focus?.agent?.ifBlank { pillName }.orEmpty().ifBlank { stringResource(R.string.app_name) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
                     Text(
                         name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.width(8.dp))
                     Text(
                         if (pillName.isNotBlank() && pillName != name) pillName else stringResource(R.string.agent_kind),
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(dotColor(state)))
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(dotColor(state)))
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(stateLabel(state)), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(stateLabel(state)), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                 }
-                val detail = focus?.statusText.orEmpty()
+                val detail = ToolLabels.label(focus?.statusText.orEmpty())
                 if (detail.isNotBlank()) {
                     Text(
                         detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -101,50 +103,68 @@ fun AgentCard(
                 } else if (focus == null) {
                     Text(stringResource(R.string.sessions_empty), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (focus != null && focus.stepCount > 0) {
-                    LinearProgressIndicator(
-                        progress = { Summary.progress(focus.stepIndex, focus.stepCount) },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline,
-                    )
+                val step = focus?.let { Summary.stepNumber(it.stepIndex, it.stepCount) }
+                if (focus != null && step != null) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            stringResource(R.string.step_of, step, focus.stepCount),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                        )
+                        LinearProgressIndicator(
+                            progress = { Summary.progress(focus.stepIndex, focus.stepCount) },
+                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.outline,
+                        )
+                    }
                 }
-                TextButton(onClick = onLink, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                    Text(stringResource(if (link == HomePanel.Link.PAIR) R.string.link_pair else R.string.link_settings))
+                if (link != HomePanel.Link.NONE) {
+                    TextButton(onClick = onLink, contentPadding = PaddingValues(0.dp)) {
+                        Text(stringResource(if (link == HomePanel.Link.PAIR) R.string.link_pair else R.string.link_approval))
+                    }
                 }
             }
         }
     }
 }
 
-/** One of the other agents: its little Mochi in the agent's colour and its name. Tap to focus it. */
+/**
+ * One of the other agents: its little Mochi in the agent's colour and its full name (two lines at
+ * most, smaller text rather than a cut-off one). Tap to focus it; the chosen one has a clear frame.
+ */
 @Composable
 fun AgentChip(s: SessionInfo, engine: MochiEngine, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val def = Pills.byId(s.pillId)
     val tint = def?.colorHex?.let { HomePanel.rgb(it) }?.let(::rgbColor) ?: MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(14.dp)
     Row(
-        modifier.clip(RoundedCornerShape(26.dp))
-            .background(tint.copy(alpha = 0.12f))
-            .border(1.dp, if (selected) tint else tint.copy(alpha = 0.35f), RoundedCornerShape(26.dp))
-            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier.height(CHIP_HEIGHT).clip(shape)
+            .background(if (selected) tint.copy(alpha = 0.20f) else MaterialTheme.colorScheme.surfaceVariant)
+            .border(if (selected) 2.dp else 1.dp, if (selected) tint else MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick).padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MochiView(engine, Modifier.size(32.dp))
+        MochiView(engine, Modifier.size(36.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-            s.agent.ifBlank { def?.name.orEmpty() }, color = tint, style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            s.agent.ifBlank { def?.name.orEmpty() }, Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-/** Two chips per row; a lone one keeps its half of the width. */
+private val CHIP_HEIGHT = 64.dp
+
+/** Two equal columns, the same height; a lone pill keeps the left column. */
 @Composable
 fun AgentChipRow(
     row: List<SessionInfo>, engineFor: (SessionInfo) -> MochiEngine, selected: String?, onPick: (SessionInfo) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (s in row) AgentChip(s, engineFor(s), s.pillId == selected, Modifier.weight(1f)) { onPick(s) }
-        if (row.size == 1) Spacer(Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Gap)) {
+        for (s in HomePanel.cells(row)) {
+            if (s == null) Spacer(Modifier.weight(1f).height(CHIP_HEIGHT))
+            else AgentChip(s, engineFor(s), s.pillId == selected, Modifier.weight(1f)) { onPick(s) }
+        }
     }
 }

@@ -29,9 +29,11 @@ data class IslandBox(
  * status bar, centred on the screen. Sizes follow the PC (working strip, card, request card).
  */
 object IslandGeometry {
-    const val NOTCH_DP = 184 // NOTCH_W on the PC
     const val MARGIN_DP = 12
-    const val MAX_W_DP = 360
+    const val MAX_W_DP = 340
+    const val WORKING_W_DP = 240 // narrow: it should look like it grows out of the camera hole
+    const val MIN_NOTCH_DP = 44
+    const val HOLE_PAD_DP = 10
 
     fun place(screenW: Int, density: Float, cutoutTop: PxRect?, statusBarH: Int): IslandBox {
         fun dp(v: Int) = (v * density).toInt()
@@ -42,10 +44,11 @@ object IslandGeometry {
         val rawOffset = cut?.let { it.centerX - screenW / 2 } ?: 0
         val room = max(screenW / 2 - maxW / 2, 0)
         val offset = rawOffset.coerceIn(-room, room)
-        val notch = min(max((cut?.width ?: 0) + dp(24), dp(NOTCH_DP)), maxW)
+        // Hidden, the island is just a little wider than the camera hole, so it appears to grow out of it.
+        val notch = min(max((cut?.width ?: 0) + dp(HOLE_PAD_DP), dp(MIN_NOTCH_DP)), maxW)
         return IslandBox(
             centerOffsetX = offset, topInset = top, notchWidth = notch,
-            workingW = min(dp(300), maxW), workingH = top + dp(52),
+            workingW = min(dp(WORKING_W_DP), maxW), workingH = top + dp(52),
             cardW = maxW, cardH = top + dp(96),
             approvalW = maxW, approvalH = top + dp(196),
             cornerSmall = dp(14), cornerLarge = dp(22),

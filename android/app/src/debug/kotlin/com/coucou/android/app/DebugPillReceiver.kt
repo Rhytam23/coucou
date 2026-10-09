@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -48,6 +48,20 @@ class DebugPillReceiver : BroadcastReceiver() {
             SessionInfo("agent_gemini", "Gemini CLI", state, text, 1, 3, now)
         when (kind) {
             "working" -> model.onSessions(listOf(session(BotState.WORKING, "Running npm test")))
+            // Looks, not behaviour: raw tool names, long names and several agents, to check the Home screen
+            // (try it with the font at 1.3x: adb shell settings put system font_scale 1.3).
+            "tool" -> model.onSessions(listOf(session(BotState.WORKING, "ask_question")))
+            "long" -> model.onSessions(
+                listOf(SessionInfo("agent_gemini", "A very long agent name that keeps going and going", BotState.WORKING, "mcp__github__list_pull_request_review_comments", 4, 8, now)),
+            )
+            "multi" -> model.onSessions(
+                listOf(
+                    SessionInfo("agent_gemini", "Gemini CLI", BotState.WORKING, "Bash", 2, 8, now),
+                    SessionInfo("integration_claude", "Claude Code", BotState.IDLE, "", 0, 0, now),
+                    SessionInfo("agent_codex", "Codex", BotState.THINKING, "Read", 0, 3, now),
+                    SessionInfo("agent_claude-desktop", "Claude Desktop with a long name", BotState.FINISHED, "All done", 3, 3, now),
+                ),
+            )
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }

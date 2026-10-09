@@ -18,7 +18,14 @@ object Summary {
         return PRIORITY.firstOrNull { it in states } ?: BotState.IDLE
     }
 
+    /**
+     * "Step 3 of 8": the desktop counts steps from 0, so the step being worked on is index + 1.
+     * Null when the agent does not report steps. Never above the count, never below 1.
+     */
+    fun stepNumber(stepIndex: Int, stepCount: Int): Int? =
+        if (stepCount <= 0) null else (stepIndex + 1).coerceIn(1, stepCount)
+
     /** 0..1 for the thin progress bar; no bar when the agent does not report steps. */
     fun progress(stepIndex: Int, stepCount: Int): Float =
-        if (stepCount <= 0) 0f else (stepIndex.toFloat() / stepCount).coerceIn(0f, 1f)
+        stepNumber(stepIndex, stepCount)?.let { it.toFloat() / stepCount } ?: 0f
 }

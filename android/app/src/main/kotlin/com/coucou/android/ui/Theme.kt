@@ -15,40 +15,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.coucou.android.core.Palette
 
 /**
  * The look of the Coucou website (docs/site.css): near-black page, slightly lighter cards with a thin
  * border, soft blue accent, rounded corners and pill-shaped buttons. Mochi itself is untouched.
  */
-private val Dark = darkColorScheme(
-    background = Color(0xFF0E0F12),
-    surface = Color(0xFF0E0F12),
-    surfaceVariant = Color(0xFF16171B),
-    surfaceContainer = Color(0xFF16171B),
-    onBackground = Color(0xFFF3F4F6),
-    onSurface = Color(0xFFF3F4F6),
-    onSurfaceVariant = Color(0xFFA1A6B0),
-    outline = Color(0xFF26282E),
-    outlineVariant = Color(0xFF26282E),
-    primary = Color(0xFF8AB4FF),
-    onPrimary = Color(0xFF0E0F12),
-    error = Color(0xFFFF8A80),
-)
+private fun scheme(p: Palette, dark: Boolean): ColorScheme {
+    val base = if (dark) darkColorScheme() else lightColorScheme()
+    return base.copy(
+        background = Color(p.background), surface = Color(p.background),
+        surfaceVariant = Color(p.card), surfaceContainer = Color(p.card),
+        onBackground = Color(p.text), onSurface = Color(p.text), onSurfaceVariant = Color(p.textDim),
+        outline = Color(p.line), outlineVariant = Color(p.line),
+        primary = Color(p.accent), onPrimary = Color(p.onAccent), error = Color(p.error),
+    )
+}
 
-private val Light = lightColorScheme(
-    background = Color(0xFFFAFAFA),
-    surface = Color(0xFFFAFAFA),
-    surfaceVariant = Color(0xFFFFFFFF),
-    surfaceContainer = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF16171B),
-    onSurface = Color(0xFF16171B),
-    onSurfaceVariant = Color(0xFF5F646D),
-    outline = Color(0xFFE6E7EA),
-    outlineVariant = Color(0xFFE6E7EA),
-    primary = Color(0xFF2F6FE0),
-    onPrimary = Color(0xFFFFFFFF),
-    error = Color(0xFFC62828),
-)
+private val Dark = scheme(Palette.DARK, dark = true)
+private val Light = scheme(Palette.LIGHT, dark = false)
 
 /** Link status colours (the dot next to "Connected"). */
 object StatusColors {
@@ -64,6 +49,10 @@ fun CoucouTheme(content: @Composable () -> Unit) {
 }
 
 val CardShape = RoundedCornerShape(14.dp)
+
+/** The gutter at the side of every screen, and the gap between cards (one rhythm everywhere). */
+val Gutter = 16.dp
+val Gap = 12.dp
 
 /** The website's `.card`: a flat surface with a one-pixel border; [emphasis] draws it in the accent colour. */
 @Composable

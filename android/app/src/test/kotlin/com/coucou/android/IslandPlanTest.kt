@@ -123,4 +123,11 @@ class IslandPlanTest {
         assertEquals(box.cardW to box.cardH, IslandGeometry.sizeFor(box, IslandSpec.Kind.FINISHED))
         assertEquals(box.cardW to box.cardH, IslandGeometry.sizeFor(box, IslandSpec.Kind.QUESTION))
     }
+
+    @Test fun theIslandSaysWhatTheAgentDoesNotTheRawToolName() {
+        val w = IslandPlan.active(listOf(s("a", BotState.WORKING, "ask_question")), emptyList(), true, name)!!
+        assertEquals("Asking a question", w.text)
+        val f = IslandPlan.flash(BotState.WORKING, s("a", BotState.FINISHED, "Bash"), settings, noon, true, name)!!
+        assertEquals("Running a command", f.text)
+    }
 }

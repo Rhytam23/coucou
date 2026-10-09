@@ -62,5 +62,5 @@ object IslandPlan {
     }
 
     private fun spec(kind: IslandSpec.Kind, s: SessionInfo, name: (String) -> String) =
-        IslandSpec(kind, s.pillId, name(s.pillId), s.state, s.statusText)
+        IslandSpec(kind, s.pillId, name(s.pillId), s.state, ToolLabels.label(s.statusText))
 }

@@ -41,10 +41,22 @@ class HomePanelTest {
         assertEquals(5, HomePanel.others(list, null).size)
     }
 
-    @Test fun theLinkPairsWhenThereIsNoComputerAndOpensSettingsOtherwise() {
-        assertEquals(HomePanel.Link.PAIR, HomePanel.link(paired = false, demo = false))
-        assertEquals(HomePanel.Link.SETTINGS, HomePanel.link(paired = true, demo = false))
-        assertEquals(HomePanel.Link.SETTINGS, HomePanel.link(paired = false, demo = true))
+    @Test fun theLinkAnswersARequestFirstThenPairsThenIsGone() {
+        assertEquals(HomePanel.Link.APPROVAL, HomePanel.link(paired = true, demo = false, hasApproval = true))
+        assertEquals(HomePanel.Link.APPROVAL, HomePanel.link(paired = false, demo = true, hasApproval = true))
+        assertEquals(HomePanel.Link.PAIR, HomePanel.link(paired = false, demo = false, hasApproval = false))
+        // Settings is no longer a link on the card (it has its own button): nothing to show.
+        assertEquals(HomePanel.Link.NONE, HomePanel.link(paired = true, demo = false, hasApproval = false))
+        assertEquals(HomePanel.Link.NONE, HomePanel.link(paired = false, demo = true, hasApproval = false))
+    }
+
+    @Test fun everyRowHasTwoCellsAndALonePillStaysOnTheLeft() {
+        val two = HomePanel.cells(listOf(s("a", BotState.IDLE), s("b", BotState.IDLE)))
+        assertEquals(listOf("a", "b"), two.map { it?.pillId })
+        val one = HomePanel.cells(listOf(s("a", BotState.IDLE)))
+        assertEquals(2, one.size)
+        assertEquals("a", one[0]!!.pillId)
+        assertNull(one[1])
     }
 
     @Test fun pillColoursBecomeMochiBodies() {

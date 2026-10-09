@@ -4,6 +4,7 @@ import com.coucou.android.core.Summary
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SummaryTest {
@@ -28,8 +29,17 @@ class SummaryTest {
 
     @Test fun progressIsClampedAndSafe() {
         assertEquals(0f, Summary.progress(3, 0), 0f)
-        assertEquals(0.5f, Summary.progress(3, 6), 0f)
+        assertEquals(4f / 6f, Summary.progress(3, 6), 1e-6f)
         assertEquals(1f, Summary.progress(9, 6), 0f)
-        assertEquals(0f, Summary.progress(-2, 6), 0f)
+        assertEquals(1f / 6f, Summary.progress(-2, 6), 1e-6f)
+    }
+
+    @Test fun theStepShownIsOneBasedAndNeverOutOfRange() {
+        assertEquals(1, Summary.stepNumber(0, 8))
+        assertEquals(3, Summary.stepNumber(2, 8))
+        assertEquals(8, Summary.stepNumber(40, 8))
+        assertEquals(1, Summary.stepNumber(-5, 8))
+        assertNull(Summary.stepNumber(2, 0))
+        assertNull(Summary.stepNumber(2, -1))
     }
 }

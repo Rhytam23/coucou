@@ -86,6 +86,13 @@ import com.coucou.android.ui.MochiTouch
 import com.coucou.android.ui.HistoryScreen
 import com.coucou.android.ui.SettingsScreen
 import com.coucou.android.ui.StatusColors
+import com.coucou.android.ui.Gap
+import com.coucou.android.ui.Gutter
+import com.coucou.android.ui.GearButton
+import com.coucou.android.ui.ScreenTitle
+import com.coucou.android.ui.SectionTitle
+import com.coucou.android.ui.linkDotColor
+import com.coucou.android.ui.linkStatusText
 
 private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY }
 
@@ -105,14 +112,17 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
                         BackHandler(enabled = screen != Screen.HOME) {
-                            screen = if (screen == Screen.HISTORY) Screen.SETTINGS else Screen.HOME
+                            screen = if (screen == Screen.HISTORY || screen == Screen.GALLERY) Screen.SETTINGS else Screen.HOME
                         }
                         when (screen) {
-                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.HOME })
-                            Screen.SETTINGS -> SettingsScreen(model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY })
+                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
+                            Screen.SETTINGS -> SettingsScreen(
+                                model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY },
+                                onGallery = { screen = Screen.GALLERY }, onOverlay = ::setOverlay,
+                            )
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HOME -> Home(
-                                model, onApprove = ::approve, onGallery = { screen = Screen.GALLERY },
+                                model, onApprove = ::approve,
                                 onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
                             )
                         }
@@ -189,7 +199,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGallery: () -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -217,10 +227,10 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
 
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Gutter),
+        verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        item { Header(model) }
+        item { Header(model, onSettings) }
         model.message?.let { msg ->
             item {
                 CoucouCard {
@@ -235,13 +245,20 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
         // What is waiting for an answer comes first.
         items(model.approvals, key = { it.fingerprint }) { r -> ApprovalCard(model, r, onApprove) }
 
-        val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO)
+        val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO, hasApproval = model.approvals.isNotEmpty())
         // Header, [message], approvals, the agent card, then the pairing card.
-        val pairIndex = 1 + (if (model.message != null) 1 else 0) + model.approvals.size + 1
+        val firstApproval = 1 + (if (model.message != null) 1 else 0)
+        val pairIndex = firstApproval + model.approvals.size + 1
         item {
             AgentCard(
                 focus, engine, touch.modifier, pair,
-                onLink = { if (pair == HomePanel.Link.PAIR) scope.launch { listState.animateScrollToItem(pairIndex) } else onSettings() },
+                onLink = {
+                    when (pair) {
+                        HomePanel.Link.PAIR -> scope.launch { listState.animateScrollToItem(pairIndex) }
+                        HomePanel.Link.APPROVAL -> scope.launch { listState.animateScrollToItem(firstApproval) }
+                        HomePanel.Link.NONE -> {}
+                    }
+                },
             )
         }
         if (model.mode == Mode.NONE) item { PairCard(model) }
@@ -265,50 +282,27 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onGaller
             }
         }
 
-        item { OverlayCard(model, onOverlay) }
-        item { Footer(model, onGallery, onSettings) }
+        // Only when the switch is on but Android still refuses: the one thing Home must say about it.
+        if (model.overlayWished && !model.overlayPermission) item { OverlayHint(onOverlay) }
+        item { Spacer(Modifier.height(Gutter)) }
     }
 }
 
 private const val HOME_KEY = "home"
 
 @Composable
-private fun Header(model: AppModel) {
-    val dot = when {
-        model.mode == Mode.DEMO -> StatusColors.busy
-        model.mode == Mode.PAIRED && model.linkState == LinkState.CONNECTED -> StatusColors.online
-        model.mode == Mode.PAIRED && model.linkState == LinkState.CONNECTING -> StatusColors.busy
-        else -> StatusColors.offline
-    }
-    Column(Modifier.padding(top = 20.dp, bottom = 4.dp)) {
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
-            Spacer(Modifier.width(8.dp))
-            Text(statusLine(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun Header(model: AppModel, onSettings: () -> Unit) {
+    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(linkDotColor(model)))
+                Spacer(Modifier.width(8.dp))
+                Text(linkStatusText(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
-    }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        Modifier.padding(top = 8.dp),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        fontWeight = FontWeight.SemiBold,
-    )
-}
-
-@Composable
-private fun statusLine(model: AppModel): String = when (model.mode) {
-    Mode.NONE -> stringResource(R.string.status_not_connected)
-    Mode.DEMO -> stringResource(R.string.demo_mode)
-    Mode.PAIRED -> when (model.linkState) {
-        LinkState.CONNECTED -> "${stringResource(R.string.status_connected)} · ${model.desktopName.orEmpty()}"
-        LinkState.CONNECTING -> stringResource(R.string.status_connecting)
-        LinkState.DISCONNECTED -> stringResource(R.string.status_not_connected)
+        Spacer(Modifier.width(Gap))
+        GearButton(stringResource(R.string.settings_title), onSettings)
     }
 }
 
@@ -321,7 +315,7 @@ private fun PairCard(model: AppModel) {
         if (PairingPayload.parse(link) != null) model.pair(link) else model.message = notALink
     }
     CoucouCard {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text(stringResource(R.string.pair_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.pair_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(
@@ -329,17 +323,17 @@ private fun PairCard(model: AppModel) {
                 label = { Text(stringResource(R.string.pair_paste)) }, singleLine = true,
                 shape = RoundedCornerShape(12.dp),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { pairWith(text) }, shape = CircleShape) { Text(stringResource(R.string.pair_button)) }
-                OutlinedButton(
-                    onClick = {
-                        val pasted = clipboard.getText()?.text.orEmpty().trim()
-                        text = pasted
-                        if (pasted.isNotEmpty()) pairWith(pasted)
-                    },
-                    shape = CircleShape,
-                ) { Text(stringResource(R.string.pair_clipboard)) }
+            Button(onClick = { pairWith(text) }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
+                Text(stringResource(R.string.pair_button), maxLines = 1)
             }
+            OutlinedButton(
+                onClick = {
+                    val pasted = clipboard.getText()?.text.orEmpty().trim()
+                    text = pasted
+                    if (pasted.isNotEmpty()) pairWith(pasted)
+                },
+                Modifier.fillMaxWidth().height(48.dp), shape = CircleShape,
+            ) { Text(stringResource(R.string.pair_clipboard), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             TextButton(onClick = { model.startDemo() }) { Text(stringResource(R.string.demo_try)) }
         }
     }
@@ -386,37 +380,12 @@ private fun ApprovalCard(model: AppModel, r: ApprovalRequest, onApprove: (Approv
 }
 
 @Composable
-private fun OverlayCard(model: AppModel, onOverlay: (Boolean) -> Unit) {
+private fun OverlayHint(onOverlay: (Boolean) -> Unit) {
     CoucouCard {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.overlay_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.overlay_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(12.dp))
-            Switch(checked = model.overlayOn, onCheckedChange = onOverlay)
+        Row(Modifier.padding(start = Gutter, top = 4.dp, bottom = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.overlay_missing), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { onOverlay(true) }) { Text(stringResource(R.string.overlay_allow), maxLines = 1) }
         }
-    }
-}
-
-@Composable
-private fun Footer(model: AppModel, onGallery: () -> Unit, onSettings: () -> Unit) {
-    Column(Modifier.padding(top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row {
-            when (model.mode) {
-                Mode.DEMO -> TextButton(onClick = { model.stopDemo() }) { Text(stringResource(R.string.demo_leave)) }
-                Mode.PAIRED -> TextButton(onClick = { model.unpair() }) {
-                    Text(stringResource(R.string.action_unpair), color = MaterialTheme.colorScheme.error)
-                }
-                Mode.NONE -> {}
-            }
-            TextButton(onClick = onSettings) { Text(stringResource(R.string.settings_title)) }
-            TextButton(onClick = onGallery) { Text(stringResource(R.string.gallery)) }
-        }
-        val dim = MaterialTheme.colorScheme.onSurfaceVariant
-        Text(stringResource(R.string.about_unofficial), style = MaterialTheme.typography.bodySmall, color = dim)
-        Text(stringResource(R.string.about_repo), style = MaterialTheme.typography.bodySmall, color = dim)
-        Text(stringResource(R.string.about_assets), style = MaterialTheme.typography.bodySmall, color = dim)
     }
 }
 
@@ -426,12 +395,10 @@ private fun Gallery(onBack: () -> Unit) {
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
     val states = remember { BotState.entries.map { s -> s to MochiEngine(clock).apply { setState(s, force = true) } } }
     val emotes = remember { BotEmote.entries.map { e -> e to MochiEngine(clock).apply { setPermanentEmote(e) } } }
-    Column(Modifier.padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.action_close)) }
-            Text(stringResource(R.string.gallery), style = MaterialTheme.typography.titleMedium)
-        }
-        LazyVerticalGrid(GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal = Gutter)) {
+        ScreenTitle(stringResource(R.string.gallery), onBack)
+        Spacer(Modifier.height(Gap))
+        LazyVerticalGrid(GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(Gap), verticalArrangement = Arrangement.spacedBy(Gap)) {
             gridItems(states) { (s, e) -> GalleryCell(s.key, e) }
             gridItems(emotes) { (m, e) -> GalleryCell(m.key, e) }
         }

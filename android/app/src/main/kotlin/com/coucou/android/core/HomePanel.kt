@@ -26,10 +26,26 @@ object HomePanel {
     /** Two pills per row, as on the PC. */
     fun rows(others: List<SessionInfo>): List<List<SessionInfo>> = others.chunked(2)
 
-    /** What the small link under the status says: pair when there is no computer yet, else the settings. */
-    enum class Link { PAIR, SETTINGS }
+    /** Two equal columns, as on the PC. */
+    const val COLUMNS = 2
 
-    fun link(paired: Boolean, demo: Boolean): Link = if (paired || demo) Link.SETTINGS else Link.PAIR
+    /**
+     * A row always has [COLUMNS] cells: a lone pill keeps its column (left) and the other cell is
+     * empty, so every pill has the same width whatever the number of agents.
+     */
+    fun cells(row: List<SessionInfo>): List<SessionInfo?> = List(COLUMNS) { row.getOrNull(it) }
+
+    /**
+     * The one link on the agent card: answer a waiting request first, else pair when there is no
+     * computer yet, else nothing (Settings has its own button at the top).
+     */
+    enum class Link { NONE, APPROVAL, PAIR }
+
+    fun link(paired: Boolean, demo: Boolean, hasApproval: Boolean): Link = when {
+        hasApproval -> Link.APPROVAL
+        !paired && !demo -> Link.PAIR
+        else -> Link.NONE
+    }
 
     /** "#8AB4F8" to a colour for a mini Mochi's body; a malformed value gives null (the default body). */
     fun rgb(hex: String): Rgb? {
