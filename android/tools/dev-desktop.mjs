@@ -2,7 +2,11 @@
 // A pretend Coucou desktop for developing and testing the Android app without the real one.
 // Speaks docs/ANDROID_LINK.md (v1): TLS with a self-signed certificate, newline-delimited JSON.
 //
-//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat]
+//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details]
+//
+// --details offers the "details" capability: the sessions then carry steps, finalLine, project (a folder
+// name) and color, like the real desktop with "Show session details on the phone" turned on. A phone that
+// did not ask for it gets the plain v1 sessions.
 //
 // --fake-chat offers the "chat" capability with a FAKE provider, so the phone's Chat screen can be tried
 // without a key and without spending anything. Models: fake/echo, fake/other. Special messages:
@@ -55,6 +59,20 @@ const certSha256 = new crypto.X509Certificate(cert).fingerprint256.replaceAll(":
 
 const log = (...a) => console.log(...a);
 
+// Details the way the real desktop adds them (hub.rs): only for a phone that asked and was offered them.
+const DETAILS = {
+  integration_claude: { steps: ["Read · README.md", "Grep · TODO", "Edit · src/app.ts", "Bash · npm test", "Edit · src/app.ts"], project: "coucou", color: "#2DD4BF" },
+  agent_codex: { steps: ["Search · the code", "Read · lib.rs"], project: "api-server", color: "#E879F9" },
+  agent_gemini: { steps: [], project: "notes", color: "#8AB4F8" },
+};
+const withDetails = (list, state) =>
+  list.map((s) => {
+    const d = DETAILS[s.pillId] ?? {};
+    const out = { ...s, ...(d.steps?.length ? { steps: d.steps } : {}), ...(d.project ? { project: d.project } : {}), ...(d.color ? { color: d.color } : {}) };
+    if (s.state === "finished") out.finalLine = "I updated the tests and everything passes.";
+    return out;
+  });
+
 // ── Fake chat (the messages are those of phone_link/chat.rs, with a fake provider) ─────────────
 const CHAT_MODELS = [
   { id: "fake/echo", provider: "fake", label: "Fake · echo" },
@@ -99,6 +117,8 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
   let pending = null; // { fingerprint }
   let step = 0;
   let chat = false; // negotiated in the hello
+  let details = false;
+  const sessionsMsg = (list) => ({ type: "sessions", sessions: details ? withDetails(list) : list });
   let run = null; // { id, timer }
   const chatError = (id, reason) => send({ type: "chatError", id, reason, message: CHAT_REASONS[reason] ?? "Something went wrong on the computer." });
   const stopRun = () => { if (run) { clearTimeout(run.timer); clearInterval(run.timer); run = null; } };
@@ -153,13 +173,13 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       const command = "npm run build";
       const fp = fingerprint("integration_claude", "dev_session", "Bash", command, `n${step}`);
       pending = { fingerprint: fp };
-      send({ type: "sessions", sessions: [
+      send(sessionsMsg([
         { pillId: "integration_claude", agent: "Claude Code", state: "approval", statusText: "Waiting for your approval", stepIndex: 3, stepCount: 6, updatedAt: Date.now() },
-      ] });
+      ]));
       send({ type: "approval", pillId: "integration_claude", fingerprint: fp, tool: "Bash", command, createdAt: Date.now() });
       log(`APPROVAL sent ${fp}`);
     } else {
-      send({ type: "sessions", sessions: e });
+      send(sessionsMsg(e));
     }
   };
 
@@ -174,7 +194,9 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       authed = true;
       log(`HELLO ok device=${JSON.stringify(m.device)}`);
       chat = flag("fake-chat") && Array.isArray(m.caps) && m.caps.includes("chat");
-      send({ type: "welcome", v: V, desktop: NAME, os: process.platform, ...(chat ? { caps: ["chat"] } : {}) });
+      details = flag("details") && Array.isArray(m.caps) && m.caps.includes("details");
+      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : [])];
+      send({ type: "welcome", v: V, desktop: NAME, os: process.platform, ...(offered.length ? { caps: offered } : {}) });
       advance();
       timer = setInterval(advance, STEP_MS);
       return;

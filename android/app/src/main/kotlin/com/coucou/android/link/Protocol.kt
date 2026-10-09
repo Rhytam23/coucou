@@ -17,8 +17,13 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat")
+    val CAPABILITIES = listOf("chat", "details")
     const val CAP_CHAT = "chat"
+    /** Steps, last line, project folder name and colour of each session. */
+    const val CAP_DETAILS = "details"
+    const val MAX_STEPS = 20
+    const val MAX_STEP_CHARS = 200
+    const val MAX_PROJECT_CHARS = 64
     /** What the desktop accepts for one chat message; longer is refused there, so it is refused here first. */
     const val CHAT_MAX_TEXT = 4000
 }
@@ -34,6 +39,13 @@ data class SessionInfo(
     val stepIndex: Int,
     val stepCount: Int,
     val updatedAtMs: Long,
+    // Only with the "details" capability (the user's switch on the computer); empty or null otherwise.
+    val steps: List<String> = emptyList(),
+    val finalLine: String? = null,
+    /** A folder name, never a path. */
+    val project: String? = null,
+    /** "#RRGGBB" or null. */
+    val color: String? = null,
 )
 
 data class ApprovalRequest(
@@ -135,7 +147,24 @@ object Wire {
         stepIndex = o.optInt("stepIndex", 0),
         stepCount = o.optInt("stepCount", 0),
         updatedAtMs = o.optLong("updatedAt", 0),
+        steps = stringList(o.optJSONArray("steps")).take(Protocol.MAX_STEPS).map { it.take(Protocol.MAX_STEP_CHARS) },
+        finalLine = o.optString("finalLine", "").take(Protocol.MAX_STEP_CHARS).ifBlank { null },
+        project = folderName(o.optString("project", "")),
+        color = o.optString("color", "").takeIf { isColor(it) },
     )
+
+    /** Strings of a JSON array, in order; anything else in it is skipped. */
+    private fun stringList(a: JSONArray?): List<String> =
+        if (a == null) emptyList() else (0 until a.length()).mapNotNull { (a.opt(it) as? String)?.takeIf { s -> s.isNotBlank() } }
+
+    /** Even from a computer that should not send one, never a path: only the last segment is kept. */
+    fun folderName(raw: String): String? {
+        val last = raw.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\')
+            .filter { !it.isISOControl() }.trim().take(Protocol.MAX_PROJECT_CHARS)
+        return last.takeIf { it.isNotEmpty() && it != "." && it != ".." }
+    }
+
+    fun isColor(s: String) = s.length == 7 && s[0] == '#' && s.drop(1).all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
 
     private fun strings(a: JSONArray?): Set<String> =
         if (a == null) emptySet() else (0 until a.length()).mapNotNull { a.optString(it, "").takeIf { s -> s.isNotEmpty() } }.toSet()

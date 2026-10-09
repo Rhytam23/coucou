@@ -284,4 +284,65 @@ class RustDesktopInteropTest {
             client.stop()
         }
     }
+
+    // ── session details, against the real server ──────────────────────────────────────────
+
+    private fun claude(rec: Rec): SessionInfo {
+        val deadline = System.currentTimeMillis() + 15_000
+        while (System.currentTimeMillis() < deadline) {
+            val list = rec.sessions.poll(1, TimeUnit.SECONDS) ?: continue
+            list.firstOrNull { it.pillId == "integration_claude" }?.let { return it }
+        }
+        error("no Claude Code session arrived")
+    }
+
+    @Test fun detailsArriveFromTheRealServerWhenItsSwitchIsOn_andNeverAPath() {
+        val info = startDesktop()
+        command("details on")
+        command("sessions")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(setOf("details"), rec.caps.poll(15, TimeUnit.SECONDS))
+            val s = claude(rec)
+            assertEquals(listOf("Read · README.md", "Edit · src/app.ts"), s.steps)
+            assertEquals("Fixed the bug", s.finalLine)
+            assertEquals("proj", s.project)
+            assertEquals("#2DD4BF", s.color)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withTheSwitchOffTheRealServerSendsNoDetailsToAnAppThatAsks() {
+        val info = startDesktop()
+        command("sessions")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            val s = claude(rec)
+            assertEquals(emptyList<String>(), s.steps)
+            assertNull(s.project); assertNull(s.finalLine); assertNull(s.color)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun anOlderAppGetsTheV1SessionsFromTheRealServerEvenWithDetailsOn() {
+        val info = startDesktop()
+        command("details on")
+        command("sessions")
+        val rec = Rec()
+        val client = chatClient(info, rec, caps = emptyList())
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            val s = claude(rec)
+            assertEquals("Editing files", s.statusText)
+            assertEquals(emptyList<String>(), s.steps)
+            assertNull(s.project)
+        } finally {
+            client.stop()
+        }
+    }
 }

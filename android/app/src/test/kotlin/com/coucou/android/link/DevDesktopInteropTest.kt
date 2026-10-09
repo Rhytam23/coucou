@@ -209,4 +209,62 @@ class DevDesktopInteropTest {
             client.stop()
         }
     }
+
+    // ── session details, against the Node desktop ─────────────────────────────────────────
+
+    /** The first sessions message that has Claude Code in it. */
+    private fun claudeSession(rec: Rec): SessionInfo {
+        val deadline = System.currentTimeMillis() + 15_000
+        while (System.currentTimeMillis() < deadline) {
+            val list = rec.sessions.poll(1, TimeUnit.SECONDS) ?: continue
+            list.firstOrNull { it.pillId == "integration_claude" }?.let { return it }
+        }
+        error("no Claude Code session arrived")
+    }
+
+    @Test fun detailsArriveWhenTheDesktopOffersThem() {
+        val info = startDesktop("--details")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("details"), rec.caps.poll(10, TimeUnit.SECONDS))
+            val s = claudeSession(rec)
+            assertTrue(s.steps.isNotEmpty() && s.steps.first().startsWith("Read"))
+            assertEquals("coucou", s.project)
+            assertEquals("#2DD4BF", s.color)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun anOlderAppGetsPlainSessionsFromADesktopThatHasDetails() {
+        val info = startDesktop("--details")
+        val rec = Rec()
+        val client = chatClient(info, rec, caps = emptyList())
+        try {
+            client.start()
+            assertEquals(emptySet<String>(), rec.caps.poll(10, TimeUnit.SECONDS))
+            val s = claudeSession(rec)
+            assertEquals(emptyList<String>(), s.steps)
+            assertNull(s.project); assertNull(s.color); assertNull(s.finalLine)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun aDesktopWithoutDetailsSendsNoneEvenToAnAppThatAsks() {
+        val info = startDesktop() // no --details: an older desktop
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(emptySet<String>(), rec.caps.poll(10, TimeUnit.SECONDS))
+            val s = claudeSession(rec)
+            assertEquals(emptyList<String>(), s.steps)
+            assertNull(s.project)
+        } finally {
+            client.stop()
+        }
+    }
 }

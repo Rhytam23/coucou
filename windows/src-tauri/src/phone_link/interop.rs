@@ -11,6 +11,7 @@
 //   clear                    the request was answered at the desk
 //   repair <token>           pair again with a new token (phones are kicked)
 //   chat on|off              the (fake) chat switch; phones learn of it when they connect
+//   details on|off           the "session details" switch, same
 //   quit
 //
 //   DECISION allow|deny <id> printed when a phone's decision is applied
@@ -22,6 +23,7 @@ use std::time::Duration;
 
 use super::chat::{BoxFuture, ChatBackend, ChatConfig, ChatFail, ChatLink, ModelOption};
 use super::hub::{ApprovalIn, Host, Hub, SessionIn};
+use super::server::Features;
 use super::pairing::{self, tests::MemStore};
 use super::server;
 
@@ -29,6 +31,15 @@ struct Printing;
 impl Host for Printing {
     fn decide(&self, request_id: &str, allow: bool) {
         println!("DECISION {} {request_id}", if allow { "allow" } else { "deny" });
+    }
+}
+
+struct Switches {
+    details: AtomicBool,
+}
+impl Features for Switches {
+    fn details(&self) -> bool {
+        self.details.load(Ordering::SeqCst)
     }
 }
 
@@ -91,7 +102,10 @@ fn interop_server() {
         let token = std::env::var("COUCOU_INTEROP_TOKEN").unwrap_or_else(|_| "interop-token-0123456789abcdef".into());
         let hub = Hub::new(Arc::new(Printing));
         let fake = Arc::new(FakeChat { on: AtomicBool::new(false) });
-        let shared = server::Shared::with_chat(hub.clone(), token.clone(), "Rust desktop".into(), Some(ChatLink::new(fake.clone())));
+        let switches = Arc::new(Switches { details: AtomicBool::new(false) });
+        let shared = server::Shared::with_features(
+            hub.clone(), token.clone(), "Rust desktop".into(), Some(ChatLink::new(fake.clone())), switches.clone(),
+        );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let handle = server::serve(listener, server::tls_acceptor(&identity).unwrap(), shared.clone());
@@ -116,7 +130,13 @@ fn interop_server() {
             match (words.next(), words.next(), words.next()) {
                 (Some("sessions"), _, _) => hub.publish(
                     vec![
-                        SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing files".into(), step_index: 2, step_count: 6, ..Default::default() },
+                        SessionIn { pill_id: "integration_claude".into(), agent: "Claude Code".into(), state: "working".into(), status_text: "Editing files".into(), step_index: 2, step_count: 6,
+                            steps: vec!["Read · README.md".into(), "Edit · src/app.ts".into()],
+                            final_line: Some("Fixed the bug".into()),
+                            // a full path, to prove only the folder's name leaves the computer
+                            project: Some("/home/someone/private/proj".into()),
+                            color: Some("#2DD4BF".into()),
+                        },
                         SessionIn { pill_id: "agent_gemini".into(), agent: "Gemini CLI".into(), state: "sleeping".into(), ..Default::default() },
                     ],
                     None,
@@ -133,6 +153,7 @@ fn interop_server() {
                     hub.kick_all("auth", "unpaired");
                 }
                 (Some("chat"), Some(state), _) => fake.on.store(state == "on", Ordering::SeqCst),
+                (Some("details"), Some(state), _) => switches.details.store(state == "on", Ordering::SeqCst),
                 (Some("quit"), _, _) => break,
                 _ => println!("? {line}"),
             }

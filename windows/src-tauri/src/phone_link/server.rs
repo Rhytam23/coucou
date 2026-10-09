@@ -71,10 +71,6 @@ pub struct Shared {
 }
 
 impl Shared {
-    pub fn with_chat(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>) -> Arc<Shared> {
-        Self::with_features(hub, token, name, chat, Arc::new(NoFeatures))
-    }
-
     pub fn with_features(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>, features: Arc<dyn Features>) -> Arc<Shared> {
         Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, features, connections: AtomicUsize::new(0) })
     }
