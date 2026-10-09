@@ -38,7 +38,7 @@ Compatibility facts (checked in `Protocol.kt` and `server.rs`): the phone ignore
 Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with biometrics, quiet/heads-up routing, pill overlay.
 
 ## Not on the phone (privacy or safety)
-- Chat with LLM providers, API keys, model lists: spends money and holds secrets.
+- Chat with LLM providers: was excluded; **reversed by the user** (stage C-chat, see `android/CHAT_PLAN.md`): the phone chats through the PC, API keys stay on the PC.
 - Dropped files, uploads, the inbox folder: local file contents.
 - Hook/agent installers and any `~/.claude`-style config writes.
 - The prompt text, command output and Claude's full answer: the iPhone sends them (encrypted in iCloud); here nothing leaves the PC except what is listed above, and each extra is a separate toggle, off by default, travelling only over the pinned TLS link.
