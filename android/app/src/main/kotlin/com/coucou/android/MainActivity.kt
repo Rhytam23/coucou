@@ -82,6 +82,8 @@ import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentCard
 import com.coucou.android.ui.ChatEntry
+import com.coucou.android.ui.PairConfirm
+import com.coucou.android.ui.ScanScreen
 import com.coucou.android.ui.SessionScreen
 import com.coucou.android.ui.ChatScreen
 import com.coucou.android.ui.AgentChipRow
@@ -97,7 +99,7 @@ import com.coucou.android.ui.SectionTitle
 import com.coucou.android.ui.linkDotColor
 import com.coucou.android.ui.linkStatusText
 
-private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION }
+private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION, SCAN }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
@@ -120,6 +122,11 @@ class MainActivity : ComponentActivity() {
                             screen = if (screen == Screen.HISTORY || screen == Screen.GALLERY) Screen.SETTINGS else Screen.HOME
                         }
                         when (screen) {
+                            Screen.SCAN -> ScanScreen(
+                                onBack = { screen = Screen.HOME },
+                                // True if it was a pairing code: the camera is released and the user is asked to confirm.
+                                onText = { text -> model.requestPairing(text).also { if (it) screen = Screen.HOME } },
+                            )
                             Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })
                             Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
                             Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
@@ -133,8 +140,11 @@ class MainActivity : ComponentActivity() {
                                 onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
                                 onChat = { screen = Screen.CHAT },
                                 onSession = { detailPill = it; screen = Screen.SESSION },
+                                onScan = { screen = Screen.SCAN },
                             )
                         }
+                        // A scanned code or a link from the camera app: the user decides before anything is paired.
+                        model.pairRequest?.let { PairConfirm(model, it) }
                     }
                 }
             }
@@ -178,8 +188,9 @@ class MainActivity : ComponentActivity() {
         Log.d("CoucouLaunch", "MainActivity intent: action=${i.action} allow=${i.getBooleanExtra(Notifications.EXTRA_ALLOW, false)} data=${i.data != null}")
         i.data?.let { uri ->
             if (uri.scheme == "coucou") {
-                model.pair(uri.toString())
-                i.data = null // handled once: a rotation must not pair again
+                // Opened from the camera app or a browser: never paired without the user's OK.
+                if (!model.requestPairing(uri.toString())) model.message = getString(R.string.msg_bad_link)
+                i.data = null // handled once: a rotation must not ask again
             }
         }
         val fp = i.getStringExtra(Notifications.EXTRA_FP) ?: return
@@ -208,7 +219,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit, onSession: (String) -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit, onSession: (String) -> Unit, onScan: () -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -271,7 +282,7 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
                 },
             )
         }
-        if (model.mode == Mode.NONE) item { PairCard(model) }
+        if (model.mode == Mode.NONE) item { PairCard(model, onScan) }
 
         val rows = HomePanel.rows(HomePanel.others(model.sessions, focus))
         if (rows.isNotEmpty()) {
@@ -323,7 +334,7 @@ private fun Header(model: AppModel, onSettings: () -> Unit) {
 }
 
 @Composable
-private fun PairCard(model: AppModel) {
+private fun PairCard(model: AppModel, onScan: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
     val notALink = stringResource(R.string.msg_bad_link)
@@ -334,12 +345,15 @@ private fun PairCard(model: AppModel) {
         Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
             Text(stringResource(R.string.pair_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.pair_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onScan, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
+                Text(stringResource(R.string.scan_button), maxLines = 1)
+            }
             OutlinedTextField(
                 text, { text = it }, Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.pair_paste)) }, singleLine = true,
                 shape = RoundedCornerShape(12.dp),
             )
-            Button(onClick = { pairWith(text) }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
+            OutlinedButton(onClick = { pairWith(text) }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
                 Text(stringResource(R.string.pair_button), maxLines = 1)
             }
             OutlinedButton(

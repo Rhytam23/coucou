@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -95,6 +95,14 @@ class DebugPillReceiver : BroadcastReceiver() {
                         SessionInfo("agent_gemini", "Gemini CLI", BotState.SLEEPING, "", 0, 0, now),
                     ),
                 )
+            }
+            // Pairing without the camera: the text is handed over as a scanned code would be (a pairing link asks
+            // the user to confirm in the app; anything else shows the same hint as the scanner). Never logged.
+            //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind scan --es text "coucou://pair?..."
+            "scan" -> {
+                val accepted = model.requestPairing(intent.getStringExtra("text"))
+                if (!accepted) model.message = context.getString(com.coucou.android.R.string.scan_not_pairing)
+                android.util.Log.d("CoucouScan", "debug scan accepted=$accepted")
             }
             "clear" -> {
                 model.onSessions(emptyList())

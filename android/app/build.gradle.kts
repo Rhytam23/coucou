@@ -36,6 +36,14 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
+    // Scanning the pairing QR code. CameraX (androidx) shows the camera; zxing-core (Apache 2.0, pure Java) reads the
+    // code. Neither talks to any server; the reasoning is in the commit message.
+    val cameraX = "1.3.4"
+    implementation("androidx.camera:camera-core:$cameraX")
+    implementation("androidx.camera:camera-camera2:$cameraX")
+    implementation("androidx.camera:camera-lifecycle:$cameraX")
+    implementation("androidx.camera:camera-view:$cameraX")
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // android.jar stubs org.json in JVM tests
 }

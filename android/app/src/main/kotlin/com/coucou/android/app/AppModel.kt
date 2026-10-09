@@ -22,6 +22,8 @@ import com.coucou.android.core.Pills
 import com.coucou.android.ui.IslandOverlay
 import com.coucou.android.link.Protocol
 import com.coucou.android.link.ChatModel
+import com.coucou.android.core.PairingScan
+import com.coucou.android.core.ScanDecision
 import com.coucou.android.core.ChatHistory
 import com.coucou.android.core.ChatMessage
 import com.coucou.android.core.ChatModels
@@ -285,6 +287,28 @@ class AppModel(private val context: Context) : LinkListener {
         val p = store.loadPairing() ?: return
         connect(p)
     }
+
+    /**
+     * A pairing link waiting for the user's OK: read from the QR code, or opened from the camera app. Held in
+     * memory only while the question is on screen; it is never logged and goes nowhere but into [pair].
+     */
+    var pairRequest by mutableStateOf<String?>(null); private set
+
+    /** True if [text] is a Coucou pairing link (the user is now asked to confirm); false for any other text. */
+    fun requestPairing(text: String?): Boolean {
+        val d = PairingScan.decide(text)
+        if (d !is ScanDecision.Pairing) return false
+        pairRequest = d.link
+        return true
+    }
+
+    fun confirmPairing() {
+        val link = pairRequest ?: return
+        pairRequest = null
+        pair(link)
+    }
+
+    fun cancelPairing() { pairRequest = null }
 
     fun pair(text: String): Boolean {
         val p = PairingPayload.parse(text)

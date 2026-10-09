@@ -121,4 +121,18 @@
     <string name="session_hint">Turn on “Show session details on the phone” in your computer\'s Settings to see the steps and the last message here.</string>
     <string name="session_ended">This session is no longer running.</string>
     <string name="session_project">Project: %1$s</string>
+    <string name="scan_button">Scan QR code</string>
+    <string name="scan_title">Scan QR code</string>
+    <string name="scan_hint">Point the camera at the code in your computer\'s Settings → Android phone.</string>
+    <string name="scan_not_pairing">That is not a Coucou pairing code</string>
+    <string name="scan_why">Coucou uses the camera only on this screen, to read the pairing code. Nothing is saved or sent.</string>
+    <string name="scan_allow">Allow camera</string>
+    <string name="scan_blocked">The camera is off for Coucou. Turn it on in Android\'s settings, or paste the link instead.</string>
+    <string name="scan_open_settings">Open settings</string>
+    <string name="scan_paste_instead">Paste the link instead</string>
+    <string name="scan_camera_error">The camera could not start. Paste the link instead.</string>
+    <string name="pair_confirm_title">Pair with %1$s?</string>
+    <string name="pair_confirm_body">%1$s:%2$d on your network. Only pair with a computer you own.</string>
+    <string name="pair_confirm_replace">This replaces the computer you are connected to now.</string>
+    <string name="pair_confirm_ok">Pair</string>
 </resources>

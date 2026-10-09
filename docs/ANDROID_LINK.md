@@ -27,8 +27,10 @@ coucou://pair?v=1&host=192.168.1.20&port=47821&fp=<sha256 hex of the TLS certifi
 - `token` is 16 to 128 characters of `[A-Za-z0-9_-]`, random, created per pairing. It is the shared
   secret; it travels only inside the pinned TLS connection and is stored on the phone encrypted
   with a key from the Android Keystore.
-- Scanning the QR with the phone camera opens the link in the app (the app registers the
-  `coucou://pair` scheme). The link can also be pasted.
+- The app can read the QR code itself ("Scan QR code" on the pairing card; CameraX for the preview, zxing-core to
+  decode, no Play services). Scanning the QR with the phone's own camera app also opens the link in the app (the
+  app registers the `coucou://pair` scheme). Either way the app names the computer and asks the user to confirm
+  before it pairs; the link can also be pasted. The camera is used only on the scan screen and nothing is stored or sent.
 - Unpairing on either side deletes the token. The desktop should accept one token per phone and let
   the user revoke it.
 

@@ -88,4 +88,4 @@ jobs:
       - name: Tests, debug build, lint
         run: ./gradlew test assembleDebug lint --console=plain
       - name: No ads, billing or analytics (condition of the author's permission)
-        run: "! grep -rEi 'admob|play-services-ads|billingclient|firebase-analytics|crashlytics|com.google.android.gms' app/build.gradle.kts"
+        run: "! grep -rEi 'admob|play-services|billingclient|firebase|crashlytics|com.google.android.gms|mlkit' app/build.gradle.kts"

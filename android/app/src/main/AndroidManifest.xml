@@ -6,6 +6,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Asked only when the user taps "Scan QR code" to read the pairing code; used on that screen only. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- A phone without a camera can still pair by pasting the link. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- Optional, asked only when the user turns on the pill that drops from the top of the screen. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

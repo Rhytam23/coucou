@@ -129,3 +129,15 @@ card on Home opens a detail screen: the project's **folder name** (never a path)
 and the steps it took, newest first and in plain words. Pills use the colour chosen for them on the computer. Without the
 switch the screen says where to turn it on. Try it free: `node android/tools/dev-desktop.mjs --details --host <LAN IP>`,
 or in a debug build `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind details`.
+
+## Pairing by QR code
+
+On the pairing card, **Scan QR code** opens the camera (asked for only then, with a one-line reason; if it is refused for good the
+screen points to Android's settings or to pasting the link). It reads the code in the computer's Settings > Android phone with
+CameraX and zxing-core, both offline. A code that is a Coucou pairing link (the same parser as pasting) asks "Pair with <computer>?"
+and pairs only after OK; any other code is ignored with "That is not a Coucou pairing code". The same question is asked when the
+phone's own camera app opens a `coucou://pair` link. The camera is released when the screen is left, paused, or a code was
+accepted; no picture is stored or sent, and neither the token nor the scanned text is ever logged.
+
+Try without the camera (debug builds): `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind scan --es text "coucou://pair?..."`
+then open the app: the confirmation appears. Any other `--es text` shows the "not a Coucou pairing code" hint.
