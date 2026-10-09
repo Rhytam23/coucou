@@ -16,6 +16,9 @@ android {
         // English only for now: the values-xx folders stay in the repo but are not in the app.
         resourceConfigurations += listOf("en")
     }
+    // English only for now: the kept values-xx folders are not in the app, so lint must not compare them
+    // with the English strings (it would flag every string added or removed since they were written).
+    lint { disable += listOf("MissingTranslation", "ExtraTranslation") }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

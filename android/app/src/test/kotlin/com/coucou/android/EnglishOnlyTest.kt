@@ -15,6 +15,11 @@ class EnglishOnlyTest {
         assertTrue(Regex("""resourceConfigurations\s*\+=\s*listOf\("en"\)""").containsMatchIn(gradle))
     }
 
+    @Test fun lintDoesNotCompareTheKeptTranslationsWithEnglish() {
+        val gradle = read("build.gradle.kts")
+        assertTrue(gradle.contains("MissingTranslation") && gradle.contains("ExtraTranslation"))
+    }
+
     @Test fun thereIsNoLanguageChoiceAnywhere() {
         assertFalse(read("src/main/AndroidManifest.xml").contains("localeConfig"))
         assertFalse(File("src/main/res/xml/locales_config.xml").exists())
