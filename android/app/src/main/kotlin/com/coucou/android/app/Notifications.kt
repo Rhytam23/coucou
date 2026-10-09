@@ -10,8 +10,10 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.net.Uri
+import android.util.Log
 import com.coucou.android.MainActivity
 import com.coucou.android.R
+import com.coucou.android.core.OverlayPolicy
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.LinkState
 
@@ -27,6 +29,14 @@ class Notifications(private val context: Context) {
         nm.createNotificationChannel(
             NotificationChannel(CH_LINK, "Connection", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows that Coucou is connected to your computer"
+                setShowBadge(false)
+            },
+        )
+        // The same request while the pill is on screen: in the shade only, no heads-up and no sound,
+        // so the pill and the notification never overlap at the top of the screen.
+        nm.createNotificationChannel(
+            NotificationChannel(CH_APPROVAL_QUIET, "Approvals (quiet)", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "A waiting request, kept in the shade while the pill shows it"
                 setShowBadge(false)
             },
         )
@@ -71,15 +81,17 @@ class Notifications(private val context: Context) {
         if (model.mode == Mode.PAIRED) runCatching { nm.notify(ONGOING_ID, ongoing(model)) }
     }
 
-    fun showApproval(r: ApprovalRequest, agentName: String) {
+    fun showApproval(r: ApprovalRequest, agentName: String, alert: OverlayPolicy.ApprovalAlert = OverlayPolicy.ApprovalAlert.HEADS_UP) {
+        val channel = if (alert == OverlayPolicy.ApprovalAlert.QUIET) CH_APPROVAL_QUIET else CH_APPROVAL
+        Log.d("CoucouOverlay", "approval notification: $alert")
         val id = idFor(r.fingerprint)
         val deny = PendingIntent.getBroadcast(
             context, id, Intent(context, ActionReceiver::class.java).setAction(ACTION_DENY).putExtra(EXTRA_FP, r.fingerprint),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val publicVersion = Notification.Builder(context, CH_APPROVAL)
+        val publicVersion = Notification.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_mochi).setContentTitle(context.getString(R.string.approval_title)).setContentText(context.getString(R.string.notif_unlock)).build()
-        val n = Notification.Builder(context, CH_APPROVAL)
+        val n = Notification.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_stat_mochi)
             .setContentTitle(agentName)
             .setSubText(context.getString(R.string.approval_title))
@@ -100,13 +112,20 @@ class Notifications(private val context: Context) {
     fun cancelApproval(fp: String) = nm.cancel(idFor(fp))
 
     /** Opens the app on the biometric prompt for this request (the same as tapping Allow in the notification). */
-    fun openAllow(fp: String) { runCatching { open(fp, true, idFor(fp) + 1).send() } }
+    fun openAllow(fp: String) {
+        Log.d("CoucouLaunch", "open the app on Allow (tap on the pill)")
+        runCatching { open(fp, true, idFor(fp) + 1).send() }
+    }
 
-    fun openApp() { runCatching { open(null, false, 0).send() } }
+    fun openApp() {
+        Log.d("CoucouLaunch", "open the app (tap on the pill)")
+        runCatching { open(null, false, 0).send() }
+    }
 
     companion object {
         const val CH_LINK = "link"
         const val CH_APPROVAL = "approvals"
+        const val CH_APPROVAL_QUIET = "approvals_quiet"
         const val ONGOING_ID = 1
         const val ACTION_DENY = "com.coucou.android.DENY"
         const val EXTRA_FP = "fingerprint"

@@ -25,6 +25,23 @@ object OverlayPolicy {
     fun shouldShow(enabled: Boolean, permitted: Boolean, appInForeground: Boolean): Boolean =
         blocker(enabled, permitted, appInForeground) == null
 
+    /**
+     * A tap in the first moments is most likely meant for the app underneath (the pill slides in over
+     * it) or lands by accident. Buttons and the body of the pill ignore it.
+     */
+    const val TAP_GUARD_MS = 600.0
+
+    fun tapAccepted(shownAtMs: Double, nowMs: Double): Boolean = nowMs - shownAtMs >= TAP_GUARD_MS
+
+    /**
+     * How a permission request is announced. When the pill is on screen it is the one thing that
+     * appears; the notification still goes to the shade, quietly, as the fallback. Otherwise the
+     * notification is what tells the user (heads-up and sound).
+     */
+    enum class ApprovalAlert { HEADS_UP, QUIET }
+
+    fun approvalAlert(pillShown: Boolean): ApprovalAlert = if (pillShown) ApprovalAlert.QUIET else ApprovalAlert.HEADS_UP
+
     /** Why the pill stays away (for the log), or null when it may show. */
     fun blocker(enabled: Boolean, permitted: Boolean, appInForeground: Boolean): String? = when {
         !enabled -> "switch is off"

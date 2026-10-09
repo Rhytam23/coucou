@@ -214,8 +214,9 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onApproval(request: ApprovalRequest) {
         main.post {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
-            notifier.showApproval(request, agentName(request.pillId))
-            if (overlayWanted()) overlay.showApproval(request, agentName(request.pillId))
+            // One announcement only: the pill if it can show, else the heads-up notification.
+            val pill = overlayWanted() && overlay.showApproval(request, agentName(request.pillId))
+            notifier.showApproval(request, agentName(request.pillId), OverlayPolicy.approvalAlert(pill))
             // Offered for 120 s from now, by this phone's clock (the notification times out then too).
             expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
             val gone = Runnable { removeApproval(request.fingerprint) }

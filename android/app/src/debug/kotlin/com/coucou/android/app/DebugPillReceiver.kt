@@ -3,6 +3,8 @@ package com.coucou.android.app
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotState
@@ -15,12 +17,21 @@ import com.coucou.android.mochi.BotState
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
  * kind = finished | error | question | ratelimit | approval
+ *
+ * `--ez foreground true` pretends Coucou is on screen for a moment, so the pill must stay away and an
+ * approval is announced by the heads-up notification instead (the case "pill not allowed").
+ * Watch `adb logcat -s CoucouOverlay CoucouLaunch`: the first says which announcement was chosen
+ * (pill / quiet or heads-up notification), the second lists every start of the app and why.
  */
 class DebugPillReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val model = (context.applicationContext as CoucouApp).model
         val kind = intent.getStringExtra("kind") ?: "finished"
         val now = System.currentTimeMillis()
+        if (intent.getBooleanExtra("foreground", false)) {
+            model.inForeground = true
+            Handler(Looper.getMainLooper()).postDelayed({ model.inForeground = false }, 400)
+        }
         fun session(state: BotState, text: String) =
             SessionInfo("agent_gemini", "Gemini CLI", state, text, 1, 3, now)
         when (kind) {

@@ -53,8 +53,14 @@ card with Deny / Allow until answered (Allow opens the app for the fingerprint c
 ```bash
 adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
 # kind = finished | error | question | ratelimit | approval
-adb logcat -s CoucouOverlay   # says why the pill stayed away, if it did
+adb logcat -s CoucouOverlay CoucouLaunch   # why the pill stayed away / which announcement was chosen / every start of the app and why
+# add --ez foreground true to an approval to see the heads-up notification instead of the pill
 ```
+
+One announcement at a time: while the pill shows a request, its notification is posted quietly (channel
+"Approvals (quiet)", shade only); when the pill cannot show, the heads-up notification is used. Taps in the
+first 600 ms on the pill are ignored (they were meant for the app underneath). Deny acts without opening the
+app; only Allow (biometric) and a tap on the pill's header open it.
 
 ## Layout
 

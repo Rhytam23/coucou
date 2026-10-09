@@ -84,4 +84,27 @@ class OverlayPolicyTest {
         choice.choose(false)
         assertFalse(OverlayChoice(disk).active(permitted = true))
     }
+
+    @Test fun withThePillOnScreenTheNotificationIsQuiet() {
+        // Regression: the expanded pill and Android's heads-up notification overlapped at the top.
+        assertEquals(OverlayPolicy.ApprovalAlert.QUIET, OverlayPolicy.approvalAlert(pillShown = true))
+        assertEquals(OverlayPolicy.ApprovalAlert.HEADS_UP, OverlayPolicy.approvalAlert(pillShown = false))
+    }
+
+    @Test fun theHeadsUpComesBackWhenThePillCannotShow() {
+        for ((enabled, permitted, foreground) in listOf(
+            Triple(false, true, false), Triple(true, false, false), Triple(true, true, true),
+        )) {
+            val pill = OverlayPolicy.shouldShow(enabled, permitted, foreground)
+            assertEquals(OverlayPolicy.ApprovalAlert.HEADS_UP, OverlayPolicy.approvalAlert(pill))
+        }
+    }
+
+    @Test fun aTapInTheFirstMomentsIsIgnored() {
+        // Regression: a tap meant for the app underneath, while the pill slides in, hit Allow / open.
+        assertFalse(OverlayPolicy.tapAccepted(shownAtMs = 1_000.0, nowMs = 1_050.0))
+        assertFalse(OverlayPolicy.tapAccepted(shownAtMs = 1_000.0, nowMs = 1_599.0))
+        assertTrue(OverlayPolicy.tapAccepted(shownAtMs = 1_000.0, nowMs = 1_600.0))
+        assertTrue(OverlayPolicy.tapAccepted(shownAtMs = 1_000.0, nowMs = 9_000.0))
+    }
 }

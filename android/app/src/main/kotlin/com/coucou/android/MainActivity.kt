@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -135,6 +136,7 @@ class MainActivity : ComponentActivity() {
     /** A coucou://pair link (from the camera app or a browser) or a tap on an approval notification. */
     private fun handle(i: Intent?) {
         i ?: return
+        Log.d("CoucouLaunch", "MainActivity intent: action=${i.action} allow=${i.getBooleanExtra(Notifications.EXTRA_ALLOW, false)} data=${i.data != null}")
         i.data?.let { uri ->
             if (uri.scheme == "coucou") {
                 model.pair(uri.toString())

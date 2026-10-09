@@ -96,9 +96,19 @@ class IslandOverlay(
     private var content by mutableStateOf<Content?>(null)
     private var transition = MutableTransitionState(false)
     private var view: ComposeView? = null
+    private var shownAt = 0.0
     private var owner: Owner? = null
     private val slideAwayLater = Runnable { slideAway() }
     private val removeLater = Runnable { removeView() }
+
+    /** Every tap on the pill goes through here: one made in the first moments is ignored (see OverlayPolicy). */
+    private fun tap(what: String, action: () -> Unit) {
+        if (!OverlayPolicy.tapAccepted(shownAt, clock())) {
+            Log.d("CoucouOverlay", "ignored an early tap on $what")
+            return
+        }
+        action()
+    }
 
     fun permitted(): Boolean = Settings.canDrawOverlays(context)
 
@@ -111,9 +121,13 @@ class IslandOverlay(
     }
 
     /** A permission request: stays until it is answered, withdrawn or expired. */
-    fun showApproval(request: ApprovalRequest, agent: String) = safely {
-        main.removeCallbacks(slideAwayLater)
-        present(Content.Approval(request, agent))
+    fun showApproval(request: ApprovalRequest, agent: String): Boolean {
+        var shown = false
+        safely {
+            main.removeCallbacks(slideAwayLater)
+            shown = present(Content.Approval(request, agent)) && view != null
+        }
+        return shown
     }
 
     /** The request was answered elsewhere, withdrawn or expired. */
@@ -140,6 +154,7 @@ class IslandOverlay(
         if (!permitted()) return false
         main.removeCallbacks(removeLater)
         content = c
+        shownAt = clock()
         ensureView()
         transition.targetState = true
         return true
@@ -226,7 +241,7 @@ class IslandOverlay(
         val engine = remember(c.state) { MochiEngine(clock).apply { setState(c.state, force = true) } }
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(ink)
-                .clickable { onOpen() }.padding(horizontal = 14.dp, vertical = 8.dp),
+                .clickable { tap("the status pill") { onOpen() } }.padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MochiView(engine, Modifier.size(40.dp))
@@ -245,7 +260,7 @@ class IslandOverlay(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(ink).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(Modifier.clickable { onOpen() }, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.clickable { tap("the request header") { onOpen() } }, verticalAlignment = Alignment.CenterVertically) {
                 MochiView(engine, Modifier.size(40.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -260,12 +275,12 @@ class IslandOverlay(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    onClick = { onDeny(c.request) }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
+                    onClick = { tap("Deny") { onDeny(c.request) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
                     border = BorderStroke(1.dp, line),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                 ) { Text(stringResource(R.string.action_deny)) }
                 Button(
-                    onClick = { onAllow(c.request) }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
+                    onClick = { tap("Allow") { onAllow(c.request) } }, Modifier.weight(1f).height(44.dp), shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.Black),
                 ) { Text(stringResource(R.string.action_allow)) }
             }
