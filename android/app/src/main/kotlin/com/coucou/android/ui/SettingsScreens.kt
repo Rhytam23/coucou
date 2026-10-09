@@ -46,10 +46,11 @@ import java.time.format.FormatStyle
 
 /** Back button and the screen's title on one line; a long title is cut with "…", never wrapped letter by letter. */
 @Composable
-fun ScreenTitle(title: String, onBack: () -> Unit) {
+fun ScreenTitle(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
     Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.action_back), maxLines = 1) }
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        trailing?.invoke()
     }
 }
 

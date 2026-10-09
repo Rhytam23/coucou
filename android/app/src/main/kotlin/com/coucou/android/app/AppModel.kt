@@ -121,8 +121,21 @@ class AppModel(private val context: Context) : LinkListener {
 
     var chatModel by mutableStateOf<String?>(prefs.getString("chat_model", null)); private set
 
+    /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
+    private var chatForced = false
+
     /** Chat is usable: offered, at least one model allowed, connected. */
-    val chatAvailable: Boolean get() = chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED
+    val chatAvailable: Boolean get() = chatForced || (chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED)
+
+    /** Debug receiver only: fake models and a sample conversation, no computer needed. Nothing can be sent in this mode. */
+    internal fun debugSeedChat(models: List<ChatModel>, messages: List<ChatMessage>) {
+        chatForced = true
+        chatOffered = true
+        chatModels = models
+        chatModel = ChatModels.pick(models, chatModel)
+        chatSession.replace(messages)
+        chatChanged(save = false)
+    }
 
     private fun chatChanged(save: Boolean) {
         chatMessages = chatSession.messages
@@ -171,6 +184,7 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private fun chatLinkLost() {
+        chatForced = false
         chatOffered = false
         chatModels = emptyList()
         if (chatSession.running != null) {

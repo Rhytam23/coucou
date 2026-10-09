@@ -103,13 +103,21 @@ adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind fi
 - `i18n/` Android-only strings; the rest come from the desktop catalog
 - Tests compare pill IDs, colours, tints, eyes and sounds with the desktop sources, so a drift fails the build
 
-## Chat through the computer (in progress, see CHAT_PLAN.md)
+## Chat through the computer (see CHAT_PLAN.md)
 
-The app can chat with the AI providers the computer is set up for; the computer's API keys never leave it. It is
-offered only when the user turns on "Let the phone chat with my AI providers" in the computer's Settings, and only the
-models they tick. Done so far: the protocol client, the conversation logic (`core/ChatSession.kt`), the private history
-file with Clear (`core/ChatHistory.kt`) and `AppModel` state. The Chat screen comes next. To try the link without a key:
+The app can chat with the AI providers the computer is set up for; **the computer's API keys never leave it**. Chat is
+offered only when the user turns on "Let the phone chat with my AI providers" in the computer's Settings > Android phone,
+and only for the models they tick there. When it is offered, Home shows a slim "Ask your AI" card that opens the Chat
+screen: your messages on the right, answers as light Markdown (bold, `code`, bullets, code blocks; no links or images),
+three dots while waiting, the model above the box (tap to switch among the allowed ones), Stop while an answer is coming,
+Clear (asks first, and tells the computer to forget its side). The history is a private file on the phone (not backed up).
+The screen says "Uses your computer's API key". Limits come from the computer: 4000 characters, one answer at a time,
+12 messages per 10 minutes. It works on the computer's network, like the rest of the link.
+
+Try it without a key, spending nothing:
 
 ```bash
-node android/tools/dev-desktop.mjs --fake-chat --host <LAN IP>   # offers chat with a fake provider (free)
+node android/tools/dev-desktop.mjs --fake-chat --host <LAN IP>   # pair the app with the printed link
+# in the chat: any text is echoed; /error /auth /slow (never ends: press Stop) /long /rewrite try the odd cases
+adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind chat   # debug builds: the screen with sample messages, no computer
 ```

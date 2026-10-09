@@ -81,6 +81,8 @@ import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentCard
+import com.coucou.android.ui.ChatEntry
+import com.coucou.android.ui.ChatScreen
 import com.coucou.android.ui.AgentChipRow
 import com.coucou.android.ui.MochiTouch
 import com.coucou.android.ui.HistoryScreen
@@ -94,7 +96,7 @@ import com.coucou.android.ui.SectionTitle
 import com.coucou.android.ui.linkDotColor
 import com.coucou.android.ui.linkStatusText
 
-private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY }
+private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
@@ -115,6 +117,7 @@ class MainActivity : ComponentActivity() {
                             screen = if (screen == Screen.HISTORY || screen == Screen.GALLERY) Screen.SETTINGS else Screen.HOME
                         }
                         when (screen) {
+                            Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })
                             Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY },
@@ -124,6 +127,7 @@ class MainActivity : ComponentActivity() {
                             Screen.HOME -> Home(
                                 model, onApprove = ::approve,
                                 onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
+                                onChat = { screen = Screen.CHAT },
                             )
                         }
                     }
@@ -199,7 +203,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -281,6 +285,9 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
                 )
             }
         }
+
+        // Chat through the computer, only when the computer offers it (or there is a conversation to read).
+        if (model.chatAvailable || model.chatMessages.isNotEmpty()) item { ChatEntry(onChat) }
 
         // Only when the switch is on but Android still refuses: the one thing Home must say about it.
         if (model.overlayWished && !model.overlayPermission) item { OverlayHint(onOverlay) }

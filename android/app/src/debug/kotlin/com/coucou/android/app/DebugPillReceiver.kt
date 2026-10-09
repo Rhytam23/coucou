@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -60,6 +60,24 @@ class DebugPillReceiver : BroadcastReceiver() {
                     SessionInfo("integration_claude", "Claude Code", BotState.IDLE, "", 0, 0, now),
                     SessionInfo("agent_codex", "Codex", BotState.THINKING, "Read", 0, 3, now),
                     SessionInfo("agent_claude-desktop", "Claude Desktop with a long name", BotState.FINISHED, "All done", 3, 3, now),
+                ),
+            )
+            // The Chat screen with sample messages, no computer needed (nothing can be sent in this mode).
+            "chat" -> model.debugSeedChat(
+                listOf(
+                    com.coucou.android.link.ChatModel("anthropic/claude-x", "anthropic", "Anthropic · claude-x"),
+                    com.coucou.android.link.ChatModel("openai/gpt-y", "openai", "OpenAI · gpt-y"),
+                ),
+                listOf(
+                    com.coucou.android.core.ChatMessage("u-1", com.coucou.android.core.ChatRole.USER, "How do I undo my last commit but keep the changes?"),
+                    com.coucou.android.core.ChatMessage(
+                        "a-1", com.coucou.android.core.ChatRole.ASSISTANT,
+                        "Use **soft reset**:\n\n- `git reset --soft HEAD~1` keeps your changes staged\n- `git reset HEAD~1` keeps them unstaged\n\n```\ngit reset --soft HEAD~1\ngit status\n```\nA very_long_unbroken_word_to_check_wrapping_on_a_narrow_screen_abcdefghijklmnopqrstuvwxyz0123456789",
+                    ),
+                    com.coucou.android.core.ChatMessage("u-2", com.coucou.android.core.ChatRole.USER, "And on a branch I already pushed?"),
+                    com.coucou.android.core.ChatMessage("a-2", com.coucou.android.core.ChatRole.ASSISTANT, "You would need to force-push, which", com.coucou.android.core.ChatStatus.FAILED, "rate"),
+                    com.coucou.android.core.ChatMessage("u-3", com.coucou.android.core.ChatRole.USER, "x"),
+                    com.coucou.android.core.ChatMessage("a-3", com.coucou.android.core.ChatRole.ASSISTANT, "", com.coucou.android.core.ChatStatus.STREAMING),
                 ),
             )
             "clear" -> {
