@@ -29,6 +29,7 @@ use tokio_rustls::rustls::version::{TLS12, TLS13};
 use tokio_rustls::rustls::{crypto::ring as ring_provider, ServerConfig};
 use tokio_rustls::TlsAcceptor;
 
+use super::chat::ChatLink;
 use super::hub::{constant_eq, Hub, Out};
 use super::pairing::Identity;
 
@@ -49,12 +50,18 @@ pub struct Shared {
     pub name: String,
     /// Tests run on loopback and through a stand-in clock.
     pub clock: fn() -> u64,
+    /// Chat from the phone; None where the feature is not wired in. Offered only to a phone that asks for it.
+    pub chat: Option<Arc<ChatLink>>,
     connections: AtomicUsize,
 }
 
 impl Shared {
     pub fn new(hub: Arc<Hub>, token: String, name: String) -> Arc<Shared> {
-        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, connections: AtomicUsize::new(0) })
+        Self::with_chat(hub, token, name, None)
+    }
+
+    pub fn with_chat(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>) -> Arc<Shared> {
+        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, connections: AtomicUsize::new(0) })
     }
 }
 
@@ -75,6 +82,9 @@ impl Handle {
     pub fn stop(self) {
         self.accept.abort();
         self.shared.hub.kick_all("closed", "the phone link was turned off");
+        if let Some(chat) = &self.shared.chat {
+            chat.shutdown();
+        }
     }
 }
 
@@ -191,7 +201,15 @@ where
         let _ = tx.send(Out::Close { code: "auth", message: "bad token or version" }).await;
         return;
     }
-    let _ = say(json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS })).await;
+    // Capabilities: offered only if the phone asked and the user's switch is on right now. A phone
+    // that sends none (an older app) is never sent, and never answered, anything about chat.
+    let asked_chat = hello["caps"].as_array().is_some_and(|c| c.iter().any(|x| x == "chat"));
+    let chat = shared.chat.clone().filter(|c| asked_chat && c.enabled());
+    let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
+    if chat.is_some() {
+        welcome["caps"] = json!(["chat"]);
+    }
+    let _ = say(welcome).await;
     let (id, evicted) = shared.hub.subscribe(tx.clone(), (shared.clock)());
 
     // 2. the conversation
@@ -222,10 +240,18 @@ where
                 let _ = shared.hub.decide(fingerprint, decision, (shared.clock)());
             }
             Some("bye") => break,
+            Some(t) if t.starts_with("chat") => {
+                if let Some(chat) = &chat {
+                    chat.handle(id, &tx, &msg, (shared.clock)());
+                }
+            }
             _ => {} // unknown types are ignored
         }
     }
     shared.hub.unsubscribe(id);
+    if let Some(chat) = &chat {
+        chat.cancel_conn(id);
+    }
 }
 
 enum Next {

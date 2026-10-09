@@ -73,6 +73,39 @@ unknown value is shown as `idle`. `pillId` values come from the pill catalog
   screen lock set up, Allow is refused.
 - The command text is hidden on the lock screen.
 
+## Capabilities and chat (optional, still protocol v1)
+
+`hello` may carry `caps`, a list of optional features the phone understands; `welcome` carries `caps` with the
+ones this computer offers **to this phone right now**. A side that sends no `caps` gets none of them, so older
+phones and older computers keep working unchanged (an unknown field is ignored, an unknown message type is ignored).
+The only capability defined so far is `chat`: the phone talks to the AI providers the computer is set up for.
+**The computer's API key never leaves the computer**; the phone sends text and receives text.
+
+The computer offers `chat` only if the user turned "Let the phone chat with my AI providers" on (off by default),
+and re-reads that switch for every message. The user also chooses which provider/model pairs the phone may use.
+
+| Direction | `type` | fields |
+|---|---|---|
+| phone to computer | `chatModels` | none: ask for the allowed list |
+| computer to phone | `chatModels` | `models[]`: `{id: "provider/model", provider, label}`, only what the user allowed |
+| phone to computer | `chatSend` | `id` (1 to 64 chars of `[A-Za-z0-9_-]`, made by the phone), `model` (an `id` from the list), `text` (at most 4000 characters) |
+| computer to phone | `chatDelta` | `id`, `text` appended to the answer (pieces of at most 8 KiB) |
+| computer to phone | `chatDone` | `id`; `text` only if the streamed text must be replaced by this full answer |
+| computer to phone | `chatError` | `id`, `reason`, `message` |
+| phone to computer | `chatCancel` | `id`: stop waiting for this answer |
+| phone to computer | `chatReset` | none: new chat; the computer forgets the conversation and stops a running answer |
+
+- `reason` is one of `off not_allowed busy rate too_long empty no_key unreachable auth provider canceled internal`.
+  `message` is a fixed English sentence written by the computer; a provider's own error text is never sent
+  (some providers echo part of a key in an error).
+- One answer runs at a time (`busy`), at most 12 sends per 10 minutes (`rate`). An answer stops when its phone leaves,
+  when the user turns the switch or the link off, or on `chatCancel`. Stopping cannot undo what a provider already started.
+- A `chatSend` whose id is not valid is ignored (there is nothing to answer to). A phone that did not negotiate `chat` is
+  never sent, and never answered about, any `chat*` message.
+- The computer keeps the conversation in memory only while the switch is on; nothing new is written to disk. The phone
+  sends no files, window context, keys or addresses, and the computer would not accept them.
+- Cloud providers answer all at once (as on the computer's own chat), local models stream.
+
 ## Behaviour rules (same as the other ports)
 
 - Never block the agent: if the phone does not answer, the desktop's own approval stays usable.

@@ -1,4 +1,6 @@
-# Stage C-chat: chat on the phone through the PC (plan, nothing coded yet)
+# Stage C-chat: chat on the phone through the PC
+
+Status: plan approved with the defaults below. **C1 done** (PC protocol core, tested with a fake provider; not wired to a real provider yet, so the feature is dark in the app). C2 to C4 pending.
 
 Decision by the user: the earlier "no chat on the phone" is reversed. The phone chats with the LLM
 providers the PC is set up for. **The API key never leaves the PC**: the phone sends text, the PC calls
@@ -90,7 +92,10 @@ the provider, the PC streams the answer back. Protocol stays v1; old phones and 
 - **C5 (optional, later).** Real streaming for cloud providers.
 Stage B (details) is not started in this series.
 
-## 6. Questions for you before I code
+## 6. Decisions (user: "go with your defaults")
+Limits as proposed (4000 chars, one at a time, 12 per 10 min); web search stays as on the PC; no screen lock to open Chat; the PC keeps the phone's conversation in memory while the switch is on.
+
+## 7. Questions that were asked
 
 1. **Limits OK?** 4000 characters, one running request, 12 sends per 10 minutes. Say other numbers if you prefer.
 2. **Web search for the phone's Claude chat:** allow as on the PC (default), or turn it off for the phone to keep costs predictable?

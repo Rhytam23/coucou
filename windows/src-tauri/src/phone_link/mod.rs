@@ -13,6 +13,7 @@
 // `coucou-hook` exactly as a click on the island would — but only for the request
 // that is still pending (hub.rs). The desktop's own card keeps working all along.
 
+mod chat;
 mod hub;
 #[cfg(test)]
 mod interop;
