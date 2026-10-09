@@ -106,6 +106,23 @@ and re-reads that switch for every message. The user also chooses which provider
   sends no files, window context, keys or addresses, and the computer would not accept them.
 - Cloud providers answer all at once (as on the computer's own chat), local models stream.
 
+## Session details (optional capability `details`)
+
+A phone that sends `caps: ["details"]` in its `hello`, while the user has turned on "Show session details on the phone" on the
+computer (off by default; re-read for every connection), is offered `details` in `welcome.caps`. Its `sessions` lines then
+carry these optional fields on each session; any other phone gets the exact v1 fields and nothing else:
+
+| field | meaning |
+|---|---|
+| `steps` | the last steps of the session, oldest first: at most 20, each at most 200 characters, as the island shows them (a file change is its file name). Can include commands. |
+| `finalLine` | the agent's final line after it stopped, at most 200 characters |
+| `project` | the **folder name** the session runs in, at most 64 characters. Never a path (only the last segment survives, on both the island and the link) |
+| `color` | the pill's colour as `#RRGGBB`; anything else is dropped |
+
+The whole `sessions` line stays under 56 KiB: when many sessions carry many steps, the oldest steps are dropped until it fits.
+A field with nothing to say is left out. Turning the switch on or off disconnects the phones once so they reconnect and are told.
+Not sent, ever: the prompt, command output, Claude's full answer, file contents, full paths.
+
 ## Behaviour rules (same as the other ports)
 
 - Never block the agent: if the phone does not answer, the desktop's own approval stays usable.

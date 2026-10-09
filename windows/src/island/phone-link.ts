@@ -29,6 +29,18 @@ export function bareCommand(tool: string, command: string): string {
   return command.startsWith(prefix) ? command.slice(prefix.length) : command;
 }
 
+/** Only the last segment of a folder path, whichever way it is written; never the path itself. */
+export function folderName(path: string | null | undefined): string | undefined {
+  const last = (path ?? "").split(/[\\/]+/).filter(Boolean).pop();
+  return last && last !== "." && last !== ".." ? last : undefined;
+}
+
+/** A step as the phone sees it: a file diff by its file name, anything else as it is. */
+function stepText(step: string): string {
+  const diff = parseDiffStep(step);
+  return diff ? diff.filename : step;
+}
+
 /** The agents' sessions — not the services — and the request the phone may answer. */
 export function linkSnapshot(): LinkSnapshot {
   const sessions: PhoneLinkSession[] = State.tasks
@@ -44,6 +56,12 @@ export function linkSnapshot(): LinkSnapshot {
         statusText: diff ? diff.filename : last,
         stepIndex: t.stepIndex,
         stepCount: t.steps.length,
+        // Session details. Rust sends them only to a phone that asked and was offered them (the user's
+        // switch), and cuts them to size; the folder's name is all that leaves this file, not the path.
+        steps: t.steps.slice(-20).map(stepText),
+        finalLine: t.finalLine || undefined,
+        project: folderName(t.sessionCwd),
+        color: t.color,
       };
     });
 

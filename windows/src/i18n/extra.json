@@ -3569,6 +3569,28 @@
    "pt-BR": "Nenhum provedor está pronto: adicione primeiro uma chave de API ou conecte um modelo local.",
    "ru": "Нет готовых провайдеров: сначала добавьте ключ API или подключите локальную модель.",
    "id": "Belum ada penyedia yang siap: tambahkan kunci API atau hubungkan model lokal terlebih dahulu."
+  },
+  "Show session details on the phone": {
+   "zh-Hans": "在手机上显示会话详情",
+   "hi": "फ़ोन पर सत्र का विवरण दिखाएँ",
+   "es": "Mostrar los detalles de la sesión en el teléfono",
+   "ar": "إظهار تفاصيل الجلسة على الهاتف",
+   "fr": "Afficher les détails de la session sur le téléphone",
+   "bn": "ফোনে সেশনের বিবরণ দেখান",
+   "pt-BR": "Mostrar os detalhes da sessão no celular",
+   "ru": "Показывать детали сессии на телефоне",
+   "id": "Tampilkan detail sesi di ponsel"
+  },
+  "Sends the last steps (as shown on the island, so they can include commands), the final line, the project's folder name and the colour. Never a path.": {
+   "zh-Hans": "发送最近的步骤（与灵动岛上显示的一致，可能包含命令）、最后一行、项目文件夹名称和颜色。绝不发送路径。",
+   "hi": "आख़िरी चरण (जैसे आइलैंड पर दिखते हैं, इसलिए उनमें कमांड हो सकते हैं), आख़िरी पंक्ति, प्रोजेक्ट के फ़ोल्डर का नाम और रंग भेजता है। कभी कोई पाथ नहीं।",
+   "es": "Envía los últimos pasos (tal como se ven en la isla, por lo que pueden incluir comandos), la línea final, el nombre de la carpeta del proyecto y el color. Nunca una ruta.",
+   "ar": "يرسل الخطوات الأخيرة (كما تظهر في الجزيرة، فقد تتضمن أوامر) والسطر الأخير واسم مجلد المشروع واللون. لا يرسل مسارًا أبدًا.",
+   "fr": "Envoie les dernières étapes (telles qu'elles apparaissent sur l'île, donc elles peuvent contenir des commandes), la dernière ligne, le nom du dossier du projet et la couleur. Jamais un chemin.",
+   "bn": "শেষ ধাপগুলো (আইল্যান্ডে যেমন দেখায়, তাই তাতে কমান্ড থাকতে পারে), শেষ লাইন, প্রকল্পের ফোল্ডারের নাম ও রং পাঠায়। কখনও কোনো পাথ নয়।",
+   "pt-BR": "Envia as últimas etapas (como aparecem na ilha, então podem incluir comandos), a linha final, o nome da pasta do projeto e a cor. Nunca um caminho.",
+   "ru": "Отправляет последние шаги (как на острове, поэтому в них могут быть команды), последнюю строку, имя папки проекта и цвет. Никогда не путь.",
+   "id": "Mengirim langkah terakhir (seperti tampil di pulau, jadi bisa berisi perintah), baris akhir, nama folder proyek, dan warna. Tidak pernah jalur."
   }
  }
 }

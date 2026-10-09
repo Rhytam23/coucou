@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { calls, emit, internals, sent } from "./tauri.mjs";
-import { bareCommand, linkSnapshot, registerPhoneLink } from "../src/island/phone-link.ts";
+import { bareCommand, folderName, linkSnapshot, registerPhoneLink } from "../src/island/phone-link.ts";
 import { makeDiffStep } from "../src/core/diff.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 
@@ -180,4 +180,45 @@ test("an answer from the phone closes the card for that request only", async () 
   assert.ok(asked.includes("dropPin"));
   // The island itself sends nothing: Rust already answered the agent.
   assert.equal(sent("approval_decision").length, 0);
+});
+
+// ── session details (cap `details`) ──────────────────────────────────────────────────────────
+
+test("a session carries its last steps, its final line, its folder name and its colour", () => {
+  State.appendStep(CLAUDE, "Reading the project");
+  State.appendStep(CLAUDE, makeDiffStep("src/app.ts", 3, 1, 7));
+  const task = State.tasks.find((t) => t.id === CLAUDE);
+  task.finalLine = "All done";
+  task.sessionCwd = "/home/me/private/coucou";
+  const claude = linkSnapshot().sessions.find((s) => s.pillId === CLAUDE);
+  assert.deepEqual(claude.steps.slice(-2), ["Reading the project", "src/app.ts"], "a diff step is its file name");
+  assert.equal(claude.finalLine, "All done");
+  assert.equal(claude.project, "coucou", "the folder's name, not the path");
+  assert.equal(claude.color, task.color);
+  assert.ok(!JSON.stringify(claude).includes("private"));
+});
+
+test("at most the last twenty steps go to Rust", () => {
+  for (let i = 0; i < 30; i++) State.appendStep(CLAUDE, `step ${i}`);
+  const claude = linkSnapshot().sessions.find((s) => s.pillId === CLAUDE);
+  assert.equal(claude.steps.length, 20);
+  assert.equal(claude.steps.at(-1), "step 29");
+});
+
+test("a folder name is the last segment, whichever way the path is written", () => {
+  assert.equal(folderName("/home/me/work/app"), "app");
+  assert.equal(folderName("/home/me/work/app/"), "app");
+  assert.equal(folderName("C:\\Users\\me\\app"), "app");
+  assert.equal(folderName("C:\\Users\\me\\app\\"), "app");
+  assert.equal(folderName("app"), "app");
+  for (const none of [null, undefined, "", "/", "\\", "..", "/a/.."]) assert.equal(folderName(none), undefined, String(none));
+});
+
+test("a session with nothing to add has no empty details", () => {
+  const task = State.tasks.find((t) => t.id === "agent_gemini") ?? State.tasks[0];
+  const s = linkSnapshot().sessions.find((x) => x.pillId === task.id);
+  if (s) {
+    assert.equal(s.finalLine, undefined);
+    assert.equal(s.project, undefined);
+  }
 });

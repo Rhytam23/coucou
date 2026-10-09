@@ -43,6 +43,11 @@ export interface PhoneLinkStatus {
   error: string | null;
 }
 
+/** Session details for the phone: the switch (off by default). */
+export interface PhoneDetailsStatus {
+  enabled: boolean;
+}
+
 /** Chat from the phone: the switch and the models the phone may use ("provider/model"). */
 export interface PhoneChatStatus {
   enabled: boolean;
@@ -66,6 +71,12 @@ export interface PhoneLinkSession {
   statusText: string;
   stepIndex: number;
   stepCount: number;
+  /** Details, for a phone that has the capability (the user's switch). */
+  steps?: string[];
+  finalLine?: string;
+  /** A folder name, never a path. */
+  project?: string;
+  color?: string;
 }
 
 export interface PhoneLinkApproval {
@@ -189,6 +200,9 @@ export const Bridge = {
   phoneLinkPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_pairing"),
   /** A new code: the phone that had the old one is disconnected. */
   phoneLinkNewPairing: () => callOrThrow<PhoneLinkPairing>("phone_link_new_pairing"),
+  phoneDetailsStatus: () => call<PhoneDetailsStatus>("phone_details_status"),
+  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
+  phoneDetailsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDetailsStatus>("phone_details_set_enabled", { enabled }),
   phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),

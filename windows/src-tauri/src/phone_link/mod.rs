@@ -71,7 +71,19 @@ struct Running {
     identity: pairing::Identity,
 }
 
+/// The switches in Settings → Android phone, read when a phone connects.
+struct TauriFeatures {
+    app: AppHandle,
+}
+
+impl server::Features for TauriFeatures {
+    fn details(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_details
+    }
+}
+
 pub struct PhoneLink {
+    app: AppHandle,
     hub: Arc<Hub>,
     /// Chat from the phone; offered to phones only while the user's switch is on (chat.rs).
     chat: Arc<chat::ChatLink>,
@@ -84,7 +96,8 @@ impl PhoneLink {
     pub fn new(app: AppHandle) -> Self {
         Self {
             chat: chat::ChatLink::new(Arc::new(chat_backend::AppChat::new(app.clone()))),
-            hub: Hub::new(Arc::new(TauriHost { app })),
+            hub: Hub::new(Arc::new(TauriHost { app: app.clone() })),
+            app,
             store: Arc::new(Keystore),
             running: Mutex::new(None),
             error: Mutex::new(None),
@@ -124,7 +137,9 @@ impl PhoneLink {
         std_listener.set_nonblocking(true).map_err(|e| e.to_string())?;
         let port = std_listener.local_addr().map_err(|e| e.to_string())?.port();
         let acceptor = server::tls_acceptor(&identity)?;
-        let shared = server::Shared::with_chat(self.hub.clone(), token, pairing::computer_name(), Some(self.chat.clone()));
+        let shared = server::Shared::with_features(
+            self.hub.clone(), token, pairing::computer_name(), Some(self.chat.clone()), Arc::new(TauriFeatures { app: self.app.clone() }),
+        );
         let handle = {
             let shared = shared.clone();
             tauri::async_runtime::block_on(async move {
@@ -247,6 +262,44 @@ pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> 
     link.hub.kick_all("auth", "unpaired");
     log::line("phone link: new pairing code, phones disconnected");
     pairing_of(r)
+}
+
+// ── Session details for the phone: the switch (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetailsStatus {
+    pub enabled: bool,
+}
+
+#[tauri::command]
+pub fn phone_details_status(shared: State<Shared>) -> DetailsStatus {
+    DetailsStatus { enabled: shared.settings.lock().unwrap().phone_details }
+}
+
+/// "Show session details on the phone". Off by default. A change disconnects the phones once so they
+/// reconnect and are told (or not) about the capability.
+#[tauri::command]
+pub fn phone_details_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<DetailsStatus, String> {
+    only_settings(&window)?;
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_details = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "details setting changed");
+    log::line(format!("phone link: details {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(DetailsStatus { enabled })
 }
 
 // ── Chat from the phone: the switch and the list of models (Settings → Android phone) ──

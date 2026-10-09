@@ -43,6 +43,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       clients,
       h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
       h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
+      detailsBlock(makeToggle),
       chatBlock(makeToggle, settings),
     );
   };
@@ -84,6 +85,39 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
     detail,
   );
   return section;
+}
+
+/**
+ * Session details for the phone (the steps, the last line, the folder name, the colour): off until the
+ * user turns it on. The phone is told only if it asks; Rust re-reads this switch for every connection.
+ */
+function detailsBlock(makeToggle: Toggle): HTMLElement {
+  const note = h("div", { class: "hint" });
+  const switchEl = makeToggle(false, (next) => {
+    void (async () => {
+      note.textContent = "";
+      try {
+        await Bridge.phoneDetailsSetEnabled(next);
+      } catch (err) {
+        switchEl.classList.remove("on");
+        switchEl.setAttribute("aria-pressed", "false");
+        note.textContent = String(err);
+      }
+    })();
+  });
+  // The switch shows what Rust says, not what the page remembers.
+  void Bridge.phoneDetailsStatus().then((status) => {
+    if (!status) return;
+    switchEl.classList.toggle("on", status.enabled);
+    switchEl.setAttribute("aria-pressed", String(status.enabled));
+  });
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Show session details on the phone") }), switchEl),
+    h("div", { class: "hint", text: t("Sends the last steps (as shown on the island, so they can include commands), the final line, the project's folder name and the colour. Never a path.") }),
+    note,
+  );
 }
 
 /**

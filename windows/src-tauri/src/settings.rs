@@ -80,6 +80,9 @@ pub struct Settings {
     /// Which models the phone may use, as "provider/model". Empty allows none.
     /// Also owned by the Rust side (phone_link::set_chat_models cleans it).
     pub phone_chat_models: Vec<String>,
+    /// The phone may see session details (steps, last line, project folder name, colour). Off until the
+    /// user turns it on in Settings → Android phone; owned by the Rust side like `phone_link`.
+    pub phone_details: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -138,6 +141,7 @@ impl Default for Settings {
             phone_link: false,
             phone_chat: false,
             phone_chat_models: Vec::new(),
+            phone_details: false,
         }
     }
 }
@@ -417,7 +421,8 @@ mod tests {
   "desktopMochi": { "onDesktop": true, "spot": { "x": 1500.5, "y": -300.0, "space": "screen" } },
   "phoneLink": true,
   "phoneChat": true,
-  "phoneChatModels": ["openai/gpt-x"]
+  "phoneChatModels": ["openai/gpt-x"],
+  "phoneDetails": true
 }"##;
 
     fn custom() -> Value {
@@ -558,6 +563,17 @@ mod tests {
         assert_eq!(models.phone_chat_models, vec!["openai/gpt-x".to_string()]);
         let bad = parse(&custom_with("phoneChatModels", Some(serde_json::json!("openai/gpt-x")))).unwrap();
         assert!(bad.phone_chat_models.is_empty());
+    }
+
+    #[test]
+    fn a_file_from_before_phone_details_keeps_them_off() {
+        // Details can include commands and folder names: never on by default, an older file is not consent.
+        assert!(!Settings::default().phone_details);
+        assert!(!parse(&custom_with("phoneDetails", None)).unwrap().phone_details);
+        assert!(parse(&custom_with("phoneDetails", Some(serde_json::json!(true)))).unwrap().phone_details);
+        let odd = parse(&custom_with("phoneDetails", Some(serde_json::json!("yes")))).unwrap();
+        assert!(!odd.phone_details, "a wrong type does not switch it on");
+        assert_eq!(odd.mochi_outfit, "witchHat");
     }
 
     #[test]
@@ -861,6 +877,7 @@ mod tests {
                 "phoneLink",
                 "phoneChat",
                 "phoneChatModels",
+                "phoneDetails",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

@@ -153,6 +153,8 @@ export interface Settings {
   phoneLink?: boolean;
   /** The phone may chat through this computer's API keys. Rust owns it too. */
   phoneChat?: boolean;
+  /** The phone may see session details (steps, last line, folder name, colour). Rust owns it too. */
+  phoneDetails?: boolean;
   /** Which models the phone may use, "provider/model". Rust owns it too. */
   phoneChatModels?: string[];
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
