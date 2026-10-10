@@ -14,6 +14,16 @@ import javax.net.ssl.SSLContext
 
 enum class LinkState { DISCONNECTED, CONNECTING, CONNECTED }
 
+/** Why a link that had been working ended, as far as the phone can tell. */
+enum class LostReason {
+    /** Nothing came back: the read timed out or a liveness check got no answer (typical after the phone slept). */
+    SILENT,
+    /** The computer closed the connection (it restarted, or dropped a connection that had been silent for too long). */
+    CLOSED,
+    /** The network under it failed (reset, unreachable, Wi-Fi changed). */
+    NETWORK,
+}
+
 interface LinkListener {
     fun onState(state: LinkState) {}
     fun onWelcome(desktopName: String, os: String) {}
@@ -37,6 +47,8 @@ interface LinkListener {
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
+    /** A link that had been working ended without the user asking for it (not for a wrong token or version: see [onError]). */
+    fun onLinkLost(reason: LostReason) {}
     fun onChatModels(models: List<ChatModel>) {}
     fun onChatDelta(id: String, text: String) {}
     fun onChatDone(id: String, text: String?) {}
@@ -50,6 +62,11 @@ interface DesktopLink {
     fun stop()
     /** Try the connection again now (the network changed); the demo has nothing to retry. */
     fun retryNow() {}
+    /**
+     * Is the link alive right now? Connected: asks the computer for a pong and drops the connection (so it reconnects) if none
+     * comes in time. Not connected: reconnects at once. Called when the screen turns on, when a network appears, and by the alarm.
+     */
+    fun checkNow() {}
     /** allow/deny for a pending approval; false if unknown, expired, already decided or not connected. */
     fun decide(fingerprint: String, allow: Boolean): Boolean
 
@@ -105,6 +122,8 @@ class LinkClient(
     private val caps: List<String> = Protocol.CAPABILITIES,
     /** How long the saved address gets to accept the connection before it counts as a failure (then the network is searched). */
     private val connectTimeoutMs: Int = DiscoveryPolicy.SAVED_CONNECT_TIMEOUT_MS,
+    /** How long a liveness check ([checkNow]) waits for any answer before it gives the connection up. */
+    private val pongWaitMs: Long = 8_000,
 ) : DesktopLink {
     override val approvals = ApprovalBook(clockMs)
 
@@ -124,6 +143,10 @@ class LinkClient(
     /** The computer's welcome offered `relay` on this connection. */
     @Volatile private var relayOffered = false
     @Volatile private var socket: Socket? = null
+    /** When the last line arrived (the clock of [clockMs]); a liveness check compares it with the moment it asked. */
+    @Volatile private var lastInboundMs = 0L
+    /** Set when a liveness check closed the socket itself, so the loss is reported as silence, not as a network error. */
+    @Volatile private var probeKilled = false
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
     private val writeLock = Any()
@@ -155,6 +178,25 @@ class LinkClient(
 
     /** Try again now instead of waiting out the backoff: the network changed, or a new address was found. */
     override fun retryNow() { wake.release() }
+
+    override fun checkNow() {
+        if (!running) return
+        val s = socket
+        if (out == null || s == null) { wake.release(); return } // not connected: do not wait out the backoff
+        val asked = clockMs()
+        if (!queue(ClientMsg.Ping)) return
+        // Any line that arrives after the question proves the connection works. If none does, it is half-dead
+        // (the phone slept, the Wi-Fi changed): close it, and the loop reconnects.
+        Thread({
+            try {
+                Thread.sleep(pongWaitMs)
+                if (running && socket === s && lastInboundMs < asked) {
+                    probeKilled = true
+                    runCatching { s.close() }
+                }
+            } catch (_: InterruptedException) { }
+        }, "coucou-link-check").apply { isDaemon = true; start() }
+    }
 
     /** Sends allow/deny for a pending approval. False if it is unknown, expired, decided or the link is down. */
     override fun decide(fingerprint: String, allow: Boolean): Boolean {
@@ -217,11 +259,17 @@ class LinkClient(
         while (running) {
             listener.onState(LinkState.CONNECTING)
             var connectedOnce = false
+            var lost: LostReason? = null
+            probeKilled = false
             try {
                 val s = connector.connect(connectTimeoutMs)
                 socket = s
                 s.soTimeout = readTimeoutMs
                 s.tcpNoDelay = true
+                // The system's own probe of a silent connection; its default delay is long, so the real liveness
+                // checks are the app's pings and checkNow(). It costs nothing and catches a connection the network dropped.
+                runCatching { s.keepAlive = true }
+                lastInboundMs = clockMs()
                 out = s.getOutputStream()
                 send(ClientMsg.Hello(Protocol.VERSION, pairing.token, deviceName, caps))
                 val pinger = startPinger()
@@ -230,8 +278,10 @@ class LinkClient(
                 } finally {
                     pinger.interrupt()
                 }
+            } catch (e: java.net.SocketTimeoutException) {
+                lost = LostReason.SILENT
             } catch (_: IOException) {
-                // fall through to reconnect
+                lost = LostReason.NETWORK
             } catch (_: InterruptedException) {
                 // stop() was called
             } finally {
@@ -248,6 +298,8 @@ class LinkClient(
             }
             if (fatal) running = false
             if (!running) break
+            // A link that had been working and ended on its own: say why (a clean end of the stream is the computer closing it).
+            if (connectedOnce) listener.onLinkLost(if (probeKilled) LostReason.SILENT else lost ?: LostReason.CLOSED)
             listener.onState(LinkState.DISCONNECTED)
             if (connectedOnce) attempt = 0 else listener.onConnectFailed(attempt + 1)
             val wait = backoffMs[minOf(attempt, backoffMs.size - 1)]
@@ -273,6 +325,7 @@ class LinkClient(
         var first = true
         while (running) {
             val line = readLine(input) ?: return
+            lastInboundMs = clockMs()
             val msg = Wire.decodeServer(line) ?: continue
             if (first) { first = false; onFirstMessage() }
             when (msg) {

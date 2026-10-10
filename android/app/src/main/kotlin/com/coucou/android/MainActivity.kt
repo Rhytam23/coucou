@@ -100,6 +100,9 @@ import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.link.DiscoveryState
 import com.coucou.android.ui.AddressSheet
+import com.coucou.android.ui.BatteryCard
+import com.coucou.android.ui.DiagnosticsScreen
+import com.coucou.android.ui.LinkHealthPanel
 import com.coucou.android.ui.AgentRows
 import com.coucou.android.ui.DiscoveryHint
 import com.coucou.android.ui.ApprovalSheet
@@ -169,14 +172,16 @@ class MainActivity : ComponentActivity() {
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onHistory = { screen = Screen.HISTORY },
                                 onGallery = { screen = Screen.GALLERY }, onWardrobe = { screen = Screen.WARDROBE }, onOverlay = ::setOverlay,
+                                onDiagnostics = { screen = Screen.DIAGNOSTICS },
                             )
                             Screen.WARDROBE -> WardrobeScreen(model, onBack = { screen = Screen.SETTINGS })
+                            Screen.DIAGNOSTICS -> DiagnosticsScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HOME -> if (model.mode == Mode.NONE) PairingScreen(model, onScan = { screen = Screen.SCAN }, onAbout = { screen = Screen.SETTINGS }) else Home(
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN }, onReview = { closedApproval = null }, onQuestion = { questionPill = it },
-                                onHistory = { screen = Screen.HISTORY },
+                                onHistory = { screen = Screen.HISTORY }, onDiagnostics = { screen = Screen.DIAGNOSTICS },
                             )
                         }
                         }
@@ -212,6 +217,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         model.inForeground = true
         model.refreshOverlayPermission() // maybe granted meanwhile, from this app's switch or Android's settings
+        model.refreshBattery() // the battery setting may have been changed in Android's screen
     }
 
     override fun onStop() {
@@ -297,7 +303,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Home(
     model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit,
-    onScan: () -> Unit, onHistory: () -> Unit, onReview: () -> Unit, onQuestion: (String) -> Unit,
+    onScan: () -> Unit, onHistory: () -> Unit, onReview: () -> Unit, onQuestion: (String) -> Unit, onDiagnostics: () -> Unit,
 ) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
@@ -356,6 +362,11 @@ private fun Home(
                 },
             )
         }
+        // The link had worked and ended: what happened and how long ago, instead of a silent state. And, only if it would help, the battery setting.
+        if (model.mode == Mode.PAIRED && model.linkState != LinkState.CONNECTED) {
+            item { Box(Modifier.padding(horizontal = Gutter)) { LinkHealthPanel(model, onDiagnostics) } }
+        }
+        if (model.batteryHintVisible) item { Box(Modifier.padding(horizontal = Gutter)) { BatteryCard(model) } }
         // The saved address failed and a search found nothing: a calm hint with two ways out.
         if (model.mode == Mode.PAIRED && model.linkState != LinkState.CONNECTED && model.discovery == DiscoveryState.NOT_FOUND) {
             item { Box(Modifier.padding(horizontal = Gutter)) { DiscoveryHint(onPairAgain = onScan, onEnterAddress = { addressOpen = true }) } }

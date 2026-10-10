@@ -34,7 +34,7 @@ class WardrobeChoiceTest {
     @Test fun theWardrobeIsOneTapFromSettingsAndGoesBackToSettings() {
         assertTrue(src("ui/SettingsScreens.kt").contains("onWardrobe"))
         assertTrue(src("MainActivity.kt").contains("Screen.WARDROBE -> WardrobeScreen"))
-        assertTrue(src("core/Navigation.kt").contains("Screen.HISTORY, Screen.GALLERY, Screen.WARDROBE -> Screen.SETTINGS"))
+        assertTrue(src("core/Navigation.kt").contains("Screen.HISTORY, Screen.GALLERY, Screen.WARDROBE, Screen.DIAGNOSTICS -> Screen.SETTINGS"))
     }
 
     @Test fun everyWardrobeValueHasAnEnglishName() {

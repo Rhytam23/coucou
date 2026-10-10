@@ -24,7 +24,7 @@ approve a permission without an explicit click; don't restyle Louis's shipped de
 ## Where things are
 
 - `android/app/src/main/kotlin/com/coucou/android`: `mochi/` (engine, painter, `outfit/`), `link/` (protocol, pairing, TLS client, discovery,
-  `WebSocket.kt`, `RelayLink.kt`, `RelayCrypto.kt`, `Transport.kt`), `core/` (pure rules), `ui/` (Compose), `app/` (`AppModel`, notifications,
+  `WebSocket.kt`, `RelayLink.kt`, `RelayCrypto.kt`, `Transport.kt`, `LinkHealth.kt` (what Home says, the alarm and battery rules), `Reconnect.kt`, `Diagnostics.kt`), `core/` (pure rules), `ui/` (Compose), `app/` (`AppModel`, notifications,
   `LinkService`, `SecureStore`, biometric gate), `scan/` (QR), `sound/`. Overview and features: `android/README.md`.
 - Desktop side: `windows/src-tauri/src/phone_link/` (hub = rules, server = TLS, pairing, admission, discovery, chat, `relay_client.rs`,
   `relay_crypto.rs`), front end `windows/src/island/phone-link.ts` and `windows/src/settings/phone.ts`. Protocol: `docs/ANDROID_LINK.md`.
@@ -48,7 +48,7 @@ Gradle and Compose compile only in CI in a cloud session; the pure Kotlin files 
 ## What has and has not been seen on a real phone
 
 Seen (Samsung Galaxy A12s, Android 13, earlier stages): Mochi renders, demo mode, pairing over Wi-Fi, Allow reaches the computer.
-**Not seen on a device**: the redesigned screens, the island and its motion, the widget/tile/notification, QR scan, chat, answers,
+**Not seen on a device**: the keep-alive alarm and "Can't connect?" (the Galaxy A12s with the screen off for 10+ minutes is the test), the redesigned screens, the island and its motion, the widget/tile/notification, QR scan, chat, answers,
 file changes, the relay path (and Doze/battery with it), anything on real Cloudflare. CI proves compilation, lint and the unit and
 interop tests, not how it looks or feels.
 

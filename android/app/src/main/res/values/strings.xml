@@ -234,4 +234,17 @@
     <string name="usage_credits">%1$d free resets available</string>
     <string name="usage_desc">%1$s, %2$s: %3$d percent used</string>
     <string name="services_title">Services</string>
+    <string name="diag_title">Can\'t connect?</string>
+    <string name="diag_intro">These checks find where the connection breaks. Nothing secret is shown or copied: the report hides the pairing code, the fingerprint, the computer\'s name and its full address.</string>
+    <string name="diag_run">Check again</string>
+    <string name="diag_running">Checking…</string>
+    <string name="diag_copy">Copy report</string>
+    <string name="diag_copied">Report copied</string>
+    <string name="diag_ok">OK</string>
+    <string name="diag_problem">Problem</string>
+    <string name="diag_skipped">Not checked</string>
+    <string name="battery_title">Keep the connection while the screen is off</string>
+    <string name="battery_body">Android pauses background apps to save battery. If requests stop reaching you when the phone is locked, let Coucou run without restrictions. This is only a suggestion.</string>
+    <string name="battery_open">Open settings</string>
+    <string name="battery_not_now">Not now</string>
 </resources>

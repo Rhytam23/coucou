@@ -130,7 +130,7 @@ val BarClearance = 96.dp
  * from the everyday switches), the island, sound, notices, more, and About (Louis Raillé's required notice).
  */
 @Composable
-fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit, onWardrobe: () -> Unit, onOverlay: (Boolean) -> Unit) {
+fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit, onWardrobe: () -> Unit, onOverlay: (Boolean) -> Unit, onDiagnostics: () -> Unit) {
     val s = model.settings
     val uri = LocalUriHandler.current
     val t = tokens()
@@ -150,6 +150,8 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
                 when (model.mode) {
                     Mode.PAIRED -> {
                         RowDivider()
+                        LinkRow(stringResource(R.string.diag_title), onDiagnostics)
+                        RowDivider()
                         PillButton(stringResource(R.string.action_unpair), { model.unpair() }, Modifier.fillMaxWidth().padding(Spacing.INSIDE.dp), PillKind.DANGER)
                     }
                     Mode.DEMO -> {
@@ -168,6 +170,8 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
             item { SectionHeading(stringResource(R.string.settings_section_away)) }
             item { RelayCard(model) }
         }
+
+        if (model.batteryHintVisible) item { BatteryCard(model) }
 
         item { SectionHeading(stringResource(R.string.settings_section_display)) }
         item { Panel { SettingSwitch(stringResource(R.string.overlay_title), stringResource(R.string.overlay_hint), model.overlayOn, onOverlay) } }

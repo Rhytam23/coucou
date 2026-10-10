@@ -233,6 +233,19 @@
     "usage_resets_week": "Resets %1$s",
     "usage_credits": "%1$d free resets available",
     "usage_desc": "%1$s, %2$s: %3$d percent used",
-    "services_title": "Services"
+    "services_title": "Services",
+    "diag_title": "Can't connect?",
+    "diag_intro": "These checks find where the connection breaks. Nothing secret is shown or copied: the report hides the pairing code, the fingerprint, the computer's name and its full address.",
+    "diag_run": "Check again",
+    "diag_running": "Checking…",
+    "diag_copy": "Copy report",
+    "diag_copied": "Report copied",
+    "diag_ok": "OK",
+    "diag_problem": "Problem",
+    "diag_skipped": "Not checked",
+    "battery_title": "Keep the connection while the screen is off",
+    "battery_body": "Android pauses background apps to save battery. If requests stop reaching you when the phone is locked, let Coucou run without restrictions. This is only a suggestion.",
+    "battery_open": "Open settings",
+    "battery_not_now": "Not now"
   }
 }

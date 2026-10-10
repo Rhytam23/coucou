@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Held for at most 15 seconds, only while the periodic alarm checks that the link to the computer is alive. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Asked only when the user taps "Scan QR code" to read the pairing code; used on that screen only. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- A phone without a camera can still pair by pasting the link. -->
@@ -50,6 +52,8 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <receiver android:name=".app.KeepAliveReceiver" android:exported="false" />
 
         <service
             android:name=".app.LinkService"

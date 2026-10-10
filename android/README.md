@@ -42,6 +42,7 @@ The desktop side is in `windows/src-tauri/src/phone_link`; the protocol is `docs
   link always asks to confirm. The certificate is pinned. If the computer's address changes the phone finds it again by itself (mDNS,
   checked against the pinned certificate before the token is sent), or you can type the address.
 - **Away from home Wi-Fi** (optional): through your own Cloudflare relay, end-to-end encrypted; the direct link is always tried first.
+- **Keeping the link alive with the screen off**: an alarm every few minutes checks that the computer still answers and reconnects if not (Doze allows nothing more); Home says when and why the link was lost; Settings > Computer > *Can't connect?* checks the network, address, discovery, certificate, pairing code and relay; a calm hint suggests the battery setting ("Unrestricted", with the Samsung steps) only if it would help. Details and limits: `docs/ANDROID_LINK.md`, "Keeping the link alive".
 - **Widget, quick-settings tile, ongoing notification**: agent names and state words only. Updated when something changes, never on a timer.
 - Mochi and his 11 outfits, sounds, wardrobe (Settings), a tap on Mochi slaps him, a long press pets him.
 

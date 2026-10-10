@@ -22,7 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** A pretend desktop: real TLS with the test certificate, speaking the v1 protocol. */
-private class FakeDesktop(tls: Boolean) : AutoCloseable {
+internal class FakeDesktop(tls: Boolean) : AutoCloseable {
     val server: ServerSocket
     val certSha256: String
     val received = LinkedBlockingQueue<String>()
@@ -30,6 +30,8 @@ private class FakeDesktop(tls: Boolean) : AutoCloseable {
     val peerClosed = CountDownLatch(1)
     @Volatile var welcomeVersion = Protocol.VERSION
     @Volatile var expectedToken = "T".repeat(20)
+    /** False: the desktop reads everything and answers nothing, like a connection that died quietly. */
+    @Volatile var answerPings = true
     /** Extra JSON in the welcome, such as `,"caps":["chat"]`. */
     @Volatile var welcomeExtra = ""
     private val fp = "f".repeat(64)
@@ -68,7 +70,7 @@ private class FakeDesktop(tls: Boolean) : AutoCloseable {
                         send("""{"type":"welcome","v":$welcomeVersion,"desktop":"Test PC","os":"windows"$welcomeExtra}""")
                         send("""{"type":"sessions","sessions":[{"pillId":"agent_codex","state":"working"}]}""")
                     }
-                    if (line.contains("\"type\":\"ping\"")) send("""{"type":"pong"}""")
+                    if (answerPings && line.contains("\"type\":\"ping\"")) send("""{"type":"pong"}""")
                 }
             } catch (_: Exception) { } finally { runCatching { s.close() }; peerClosed.countDown() }
         }.apply { isDaemon = true; start() }
@@ -88,6 +90,7 @@ private class Recorder : LinkListener {
     val approvals = LinkedBlockingQueue<ApprovalRequest>()
     val resolved = LinkedBlockingQueue<String>()
     val errors = LinkedBlockingQueue<String>()
+    val lost = LinkedBlockingQueue<LostReason>()
     val connected = CountDownLatch(1)
     @Volatile var desktop: String? = null
     override fun onState(state: LinkState) { states.add(state) }
@@ -96,6 +99,7 @@ private class Recorder : LinkListener {
     override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
     override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
     override fun onError(code: String, message: String) { errors.add(code) }
+    override fun onLinkLost(reason: LostReason) { lost.add(reason) }
     val caps = LinkedBlockingQueue<Set<String>>()
     val chatEvents = LinkedBlockingQueue<String>()
     override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
@@ -116,9 +120,9 @@ class LinkClientTest {
 
     private fun payload(d: FakeDesktop, fp: String = d.certSha256) = PairingPayload("127.0.0.1", d.port, fp, token, "Test PC")
 
-    private fun client(d: FakeDesktop, rec: Recorder, p: PairingPayload = payload(d), plain: Boolean = false, backoff: LongArray = longArrayOf(50)): LinkClient {
+    private fun client(d: FakeDesktop, rec: Recorder, p: PairingPayload = payload(d), plain: Boolean = false, backoff: LongArray = longArrayOf(50), readTimeoutMs: Int = 2_000): LinkClient {
         val connector = if (plain) Connector { ms -> Socket().apply { connect(java.net.InetSocketAddress(p.host, p.port), ms) } } else PinnedTls.connector(p)
-        return LinkClient(p, "Pixel", rec, connector, clockMs = { now }, readTimeoutMs = 2_000, pingEveryMs = 100, backoffMs = backoff)
+        return LinkClient(p, "Pixel", rec, connector, clockMs = { now }, readTimeoutMs = readTimeoutMs, pingEveryMs = 100, backoffMs = backoff, pongWaitMs = 300)
             .also { closeables.add(AutoCloseable { it.stop() }) }
     }
 
@@ -373,5 +377,73 @@ class LinkClientTest {
     @Test fun theDemoOffersNoChat() {
         val demo = DemoLink(object : LinkListener {}, autoRun = false)
         assertFalse(demo.chatSend("c1", "a/b", "hi"))
+    }
+
+    // ── Keeping the link alive while the phone sleeps ──
+
+    @Test fun aLivenessCheckDropsAConnectionThatStoppedAnsweringAndReconnects() {
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        // A read timeout of 30 s: only the liveness check can notice the silence within this test.
+        client(d, rec, plain = true, backoff = longArrayOf(30), readTimeoutMs = 30_000).also { it.start() }.let { c ->
+            assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+            d.answerPings = false
+            now += 10_000 // the test's clock only moves when told to
+            c.checkNow()
+            assertEquals(LostReason.SILENT, rec.lost.poll(10, TimeUnit.SECONDS))
+            d.answerPings = true
+            // And it came back by itself with a new hello.
+            val hellos = generateSequence { d.received.poll(3, TimeUnit.SECONDS) }.take(40).count { it.contains("\"type\":\"hello\"") }
+            assertTrue("a second hello after the drop", hellos >= 2)
+        }
+    }
+
+    @Test fun aLivenessCheckLeavesAHealthyConnectionAlone() {
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        val c = client(d, rec, plain = true)
+        c.start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        repeat(3) { now += 10_000; c.checkNow(); Thread.sleep(150) }
+        Thread.sleep(600)
+        assertNull("no loss", rec.lost.poll())
+        assertEquals(LinkState.CONNECTED, rec.states.last())
+    }
+
+    @Test fun aLivenessCheckWhileDisconnectedReconnectsAtOnceInsteadOfWaitingOutTheBackoff() {
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        val c = client(d, rec, plain = true, backoff = longArrayOf(60_000))
+        c.start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        d.dropConnection()
+        assertEquals(LostReason.CLOSED, rec.lost.poll(3, TimeUnit.SECONDS))
+        Thread.sleep(200) // now it waits 60 s
+        val before = d.received.count { it.contains("\"type\":\"hello\"") }
+        c.checkNow()
+        val deadline = System.currentTimeMillis() + 3_000
+        var after = before
+        while (after <= before && System.currentTimeMillis() < deadline) { Thread.sleep(50); after = d.received.count { it.contains("\"type\":\"hello\"") } }
+        assertTrue("reconnected without waiting", after > before)
+    }
+
+    @Test fun aSilentConnectionIsReportedAsSilentAndAClosedOneAsClosed() {
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        client(d, rec, plain = true, backoff = longArrayOf(30)).start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        d.answerPings = false // the 2 s read timeout is what notices this one
+        assertEquals(LostReason.SILENT, rec.lost.poll(5, TimeUnit.SECONDS))
+    }
+
+    @Test fun nothingIsReportedWhenTheUserStopsTheLink() {
+        val d = FakeDesktop(tls = false).track()
+        val rec = Recorder()
+        val c = client(d, rec, plain = true)
+        c.start()
+        assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
+        c.stop()
+        Thread.sleep(400)
+        assertNull(rec.lost.poll())
     }
 }

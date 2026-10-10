@@ -3,6 +3,7 @@ package com.coucou.android.app
 import android.content.Context
 import android.os.Build
 import android.os.Handler
+import android.os.PowerManager
 import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -44,7 +45,17 @@ import com.coucou.android.link.PinnedTls
 import com.coucou.android.link.LinkClient
 import com.coucou.android.link.LinkListener
 import com.coucou.android.link.LinkState
+import com.coucou.android.link.BatteryHint
+import com.coucou.android.link.DiagResult
+import com.coucou.android.link.DiagStep
+import com.coucou.android.link.Diagnostics
+import com.coucou.android.link.Found
+import com.coucou.android.link.LanDiagnostics
+import com.coucou.android.link.LinkHealth
+import com.coucou.android.link.LostReason
 import com.coucou.android.link.PairingPayload
+import com.coucou.android.link.ReconnectPolicy
+import com.coucou.android.link.Wake
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.sound.SoundPlayer
 import com.coucou.android.mochi.BotState
@@ -87,7 +98,7 @@ class AppModel(private val context: Context) : LinkListener {
     val hasRelay: Boolean get() = currentPairing?.relay != null
     val relayHost: String? get() = currentPairing?.relay?.relayUrl()?.host
 
-    private val netWatch = NetworkWatch(context) { up -> main.post { onNetworkChanged(up) } }
+    private val netWatch = NetworkWatch(context, { up -> main.post { onNetworkChanged(up) } }, { main.post { onWake(Wake.NEW_NETWORK) } })
     private val finder = AddressFinder(
         source = NsdDiscovery(context), probe = PinnedProbe,
         pairing = { currentPairing }, allowed = { mayDiscover() },
@@ -396,6 +407,8 @@ class AppModel(private val context: Context) : LinkListener {
         currentPairing = p
         link = newLink(p).also { it.start() }
         netWatch.start()
+        screenWatch.start()
+        KeepAliveAlarm.arm(context)
         LinkService.start(context)
     }
 
@@ -436,6 +449,89 @@ class AppModel(private val context: Context) : LinkListener {
         if (mode != Mode.PAIRED || currentPairing == null) return
         Log.d("CoucouDiscovery", "address updated")
         useAddress(host, port)
+    }
+
+    // ── Keeping the link alive while the phone sleeps (docs/ANDROID_LINK.md, "Keeping the link alive") ──
+
+    /** What happened to the link: when it was lost and why, and how often the screen had been off when it was. */
+    var health by mutableStateOf(LinkHealth(dropsWhileScreenOff = kv.getInt("link_drops_off", 0))); private set
+    /** The screen was off at some point since the link last came up. */
+    @Volatile private var screenWasOff = false
+    private val power = context.getSystemService(PowerManager::class.java)
+    private val screenWatch = ScreenWatch(context) { on -> main.post { if (on) onWake(Wake.SCREEN_ON) else screenWasOff = true } }
+    private var batteryTick by mutableStateOf(0)
+    var batterySnoozedAt by mutableStateOf(kv.getString("battery_snoozed_at", "").toLongOrNull()); private set
+
+    /** The screen turned on, a network appeared, or the alarm fired: look at the link now (rules in [ReconnectPolicy]). */
+    private fun onWake(event: Wake) {
+        val relay = currentPairing?.relay != null && settings.useRelay
+        when (ReconnectPolicy.decide(event, mode == Mode.PAIRED, linkState == LinkState.CONNECTED, netWatch.wifiUp, relay)) {
+            ReconnectPolicy.Action.RETRY_NOW -> link?.retryNow()
+            ReconnectPolicy.Action.CHECK_NOW -> link?.checkNow()
+            ReconnectPolicy.Action.NONE -> {}
+        }
+    }
+
+    /** The periodic alarm. If Android had stopped the app, this is also what brings the link back (the pairing is stored). */
+    fun keepAliveTick() {
+        if (mode == Mode.NONE) resume()
+        if (mode != Mode.PAIRED) return
+        onWake(Wake.ALARM)
+        KeepAliveAlarm.arm(context)
+    }
+
+    /** Suggest the battery setting only when the link ended on its own after the screen had been off and the app is still restricted. */
+    val batteryHintVisible: Boolean get() {
+        batteryTick // read so a change of the setting redraws Home
+        return BatteryHint.shouldShow(mode == Mode.PAIRED, health, power?.isIgnoringBatteryOptimizations(context.packageName) == true, batterySnoozedAt, System.currentTimeMillis())
+    }
+    val batterySteps: List<String> get() = BatteryHint.steps(BatteryHint.isSamsung(Build.MANUFACTURER))
+    /** The user may have changed the setting in Android's screen: look again when the app comes back. */
+    fun refreshBattery() { batteryTick++ }
+    fun snoozeBatteryHint() {
+        val now = System.currentTimeMillis()
+        kv.put("battery_snoozed_at", now.toString())
+        batterySnoozedAt = now
+    }
+
+    // ── "Can't connect?" ──
+    var diagResults by mutableStateOf<List<Pair<DiagStep, DiagResult>>>(emptyList()); private set
+    var diagRunning by mutableStateOf(false); private set
+
+    fun runDiagnostics() {
+        val p = currentPairing ?: return
+        if (diagRunning) return
+        diagRunning = true
+        diagResults = emptyList()
+        probeExecutor.execute {
+            val env = LanDiagnostics(
+                p, wifiUp = { netWatch.isWifiUp() }, onCellular = { netWatch.isCellular() }, discover = { browse(4_000) },
+                relayCheck = p.relay?.let { r -> { LanDiagnostics.relayReachable(r) } },
+            )
+            Diagnostics.run(env) { step, result -> main.post { diagResults = diagResults + (step to result) } }
+            main.post { diagRunning = false }
+        }
+    }
+
+    /** Listens for the computer's announcement for [ms] on a separate browser, so the link's own search is not disturbed. */
+    private fun browse(ms: Long): List<Found> {
+        val seen = java.util.concurrent.CopyOnWriteArrayList<Found>()
+        val source = NsdDiscovery(context)
+        source.start { seen.add(it) }
+        try { Thread.sleep(ms) } finally { source.stop() }
+        return seen.toList()
+    }
+
+    /** The text the user can copy: the checks and what they found, with no code, fingerprint, name or full address. */
+    fun diagnosticsReport(): String {
+        val p = currentPairing
+        val version = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "?"
+        val via = when {
+            linkState != LinkState.CONNECTED -> "not connected"
+            route == com.coucou.android.link.Route.RELAY -> "the relay"
+            else -> "the direct link"
+        }
+        return Diagnostics.report(version, Build.VERSION.RELEASE, "${Build.MANUFACTURER} ${Build.MODEL}", diagResults, p?.let { Diagnostics.maskHost(it.host) } ?: "none", via)
     }
 
     private fun onNetworkChanged(wifiUp: Boolean) {
@@ -483,6 +579,9 @@ class AppModel(private val context: Context) : LinkListener {
         relayIssue = com.coucou.android.link.RelayIssue.NONE
         finder.stop()
         netWatch.stop()
+        screenWatch.stop()
+        KeepAliveAlarm.cancel(context)
+        health = health.recovered()
         currentPairing = null
         link?.stop()
         link = null
@@ -537,6 +636,10 @@ class AppModel(private val context: Context) : LinkListener {
         main.post {
             linkState = state
             relayIssue = relayConnector?.issue ?: com.coucou.android.link.RelayIssue.NONE
+            if (state == LinkState.CONNECTED) {
+                health = health.recovered()
+                screenWasOff = power?.isInteractive == false // the screen is off right now: this link starts its life asleep
+            }
             if (state == LinkState.CONNECTED) finder.connected() // found it (or never lost it): stop looking
             // A card for a request we can no longer answer would only produce "no longer pending".
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
@@ -716,7 +819,16 @@ class AppModel(private val context: Context) : LinkListener {
         }
     }
 
+    /** A link that had worked ended on its own: remembered with its reason, so Home can say what happened. */
+    override fun onLinkLost(reason: LostReason) {
+        main.post {
+            health = health.lost(System.currentTimeMillis(), reason, screenWasOff)
+            kv.put("link_drops_off", health.dropsWhileScreenOff)
+        }
+    }
+
     override fun onConnectFailed(consecutive: Int) {
+        main.post { health = health.failedAttempt(consecutive) }
         // The saved address failed: now (and only now) look for the computer on the network.
         if (consecutive >= DiscoveryPolicy.FAILURES_BEFORE_DISCOVERY) main.post { if (mayDiscover()) finder.request() }
     }

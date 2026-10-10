@@ -16,7 +16,7 @@ class NavigationTest {
 
     @Test fun theBarShowsOnTheThreeRootsOnly() {
         for (s in listOf(Screen.HOME, Screen.CHAT, Screen.SETTINGS)) assertTrue("$s", Nav.barVisible(s, keyboardOpen = false))
-        for (s in listOf(Screen.HISTORY, Screen.GALLERY, Screen.SESSION, Screen.SCAN)) assertFalse("$s", Nav.barVisible(s, false))
+        for (s in listOf(Screen.HISTORY, Screen.GALLERY, Screen.DIAGNOSTICS, Screen.SESSION, Screen.SCAN)) assertFalse("$s", Nav.barVisible(s, false))
     }
 
     @Test fun theBarHidesWhileTheKeyboardIsOpen() {
@@ -31,6 +31,7 @@ class NavigationTest {
         assertEquals(Screen.HOME, Nav.back(Screen.SCAN))
         assertEquals(Screen.SETTINGS, Nav.back(Screen.HISTORY))
         assertEquals(Screen.SETTINGS, Nav.back(Screen.GALLERY))
+        assertEquals(Screen.SETTINGS, Nav.back(Screen.DIAGNOSTICS))
     }
 
     @Test fun backAlwaysReachesHomeAndNeverLoops() {
@@ -46,7 +47,7 @@ class NavigationTest {
     }
 
     @Test fun pagesBelowSettingsKeepSettingsHighlighted() {
-        for (s in listOf(Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY)) assertEquals(Tab.SETTINGS, Nav.tabOf(s))
+        for (s in listOf(Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY, Screen.DIAGNOSTICS)) assertEquals(Tab.SETTINGS, Nav.tabOf(s))
         assertNull(Nav.tabOf(Screen.SCAN))
         assertNull(Nav.tabOf(Screen.SESSION))
     }
