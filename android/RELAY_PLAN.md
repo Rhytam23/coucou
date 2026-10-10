@@ -409,8 +409,7 @@ no permission is ever approved without an explicit click and the phone's screen-
 - The pairing, K and the access key stay in the same Keystore-encrypted blob as the token (`PairingCodec`; a pairing saved by an older
   build loads as LAN-only). Nothing in the new code logs, and a test fails if a log line in `AppModel` names a relay secret.
 - New Settings card "Away from home Wi-Fi" (a switch, on by default, shown only when the pairing has a relay, and one sentence saying
-  how the phone is connected right now or why not). Debug only: `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver
-  --es kind relayonly --ez on true` skips the direct link so the relay path can be tried at home; `adb logcat -s CoucouRelay`.
+  how the phone is connected right now or why not). (A debug-only broadcast that skipped the direct link was removed in the cleanup.)
 - Not tested here: Compose and lint (CI only), a real phone, the Doze behaviour and battery cost of the foreground-service WebSocket, and
   real Cloudflare. R5 runs the Rust PC against the Kotlin phone through the real Worker.
 

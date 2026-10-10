@@ -27,7 +27,6 @@ import com.coucou.android.link.ChatModel
 import com.coucou.android.core.PairingScan
 import com.coucou.android.core.ScanDecision
 import com.coucou.android.core.ChatHistory
-import com.coucou.android.core.ChatMessage
 import com.coucou.android.core.ChatModels
 import com.coucou.android.core.ChatSession
 import com.coucou.android.link.AddressFinder
@@ -160,7 +159,6 @@ class AppModel(private val context: Context) : LinkListener {
         decisions = emptyList()
     }
 
-    /** Also used by the debug receiver, to fill the history without a real decision. */
     fun recordDecision(d: Decision) {
         decisionLog.add(d)
         decisions = decisionLog.all()
@@ -194,32 +192,13 @@ class AppModel(private val context: Context) : LinkListener {
     /** The read-only service cards the user allowed on the computer; empty: none. */
     var services by mutableStateOf<List<com.coucou.android.link.ServiceCard>>(emptyList()); private set
 
-    /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
-    private var chatForced = false
-
-    /** Debug builds only: shows one state of the Chat tab without a computer (see [debugChatState]). */
-    private var chatStateOverride by mutableStateOf<ChatTabState?>(null)
-
     /** What the Chat tab shows: not paired, not reachable, chat off on the computer, no model allowed, or ready. */
-    val chatTabState: ChatTabState get() = chatStateOverride ?: ChatTab.state(
-        paired = mode == Mode.PAIRED, connected = linkState == LinkState.CONNECTED, offered = chatOffered,
-        modelCount = chatModels.size, forcedReady = chatForced,
+    val chatTabState: ChatTabState get() = ChatTab.state(
+        paired = mode == Mode.PAIRED, connected = linkState == LinkState.CONNECTED, offered = chatOffered, modelCount = chatModels.size,
     )
 
-    internal fun debugChatState(state: ChatTabState?) { chatStateOverride = state }
-
     /** Chat is usable: offered, at least one model allowed, connected. */
-    val chatAvailable: Boolean get() = chatStateOverride?.let { it == ChatTabState.READY } ?: (chatForced || (chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED))
-
-    /** Debug receiver only: fake models and a sample conversation, no computer needed. Nothing can be sent in this mode. */
-    internal fun debugSeedChat(models: List<ChatModel>, messages: List<ChatMessage>) {
-        chatForced = true
-        chatOffered = true
-        chatModels = models
-        chatModel = ChatModels.pick(models, chatModel)
-        chatSession.replace(messages)
-        chatChanged(save = false)
-    }
+    val chatAvailable: Boolean get() = chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED
 
     private fun chatChanged(save: Boolean) {
         chatMessages = chatSession.messages
@@ -269,7 +248,6 @@ class AppModel(private val context: Context) : LinkListener {
 
     private fun chatLinkLost() {
         detailsOffered = false
-        chatForced = false
         chatOffered = false
         chatModels = emptyList()
         if (chatSession.running != null) {
@@ -479,18 +457,6 @@ class AppModel(private val context: Context) : LinkListener {
         return true
     }
 
-    /** Debug only (see DebugPillReceiver): skip the direct link so the relay path can be tried on the home Wi-Fi. */
-    fun debugRelayOnly(on: Boolean) {
-        transport.relayOnly = on
-        currentPairing?.let { restartLink(it) }
-    }
-
-    /** Debug only (see DebugPillReceiver): pretend the computer's address changed, so the search has to repair it. */
-    fun debugAddressChanged() {
-        if (currentPairing == null) return
-        useAddress("192.0.2.77", currentPairing!!.port) // a documentation address that never answers
-    }
-
     fun startDemo() {
         stopLink()
         mode = Mode.DEMO
@@ -601,12 +567,6 @@ class AppModel(private val context: Context) : LinkListener {
         main.post { services = cards }
     }
 
-    /** Debug receiver only: samples, as if the computer had sent them. */
-    internal fun applyServices(cards: List<com.coucou.android.link.ServiceCard>) { services = cards }
-
-    /** Debug receiver only: a sample, as if the computer had sent it. */
-    internal fun applyUsage(usage: com.coucou.android.link.UsageSnapshot?) { this.usage = usage }
-
     override fun onPrefs(outfit: String) {
         main.post { applyComputerOutfit(outfit) }
     }
@@ -687,14 +647,6 @@ class AppModel(private val context: Context) : LinkListener {
         questions = questions.filter { it.fingerprint != fingerprint }
     }
 
-    private var answersLocal = false
-
-    /** Debug receiver only: a sample question with two parts, answerable here without a computer. */
-    internal fun debugQuestion(pillId: String, request: QuestionRequest) {
-        answersLocal = true
-        questions = questions.filter { it.fingerprint != request.fingerprint } + request
-    }
-
     /** The question of this agent, if one waits for the phone's answer. */
     fun questionFor(pillId: String): QuestionRequest? = questions.firstOrNull { it.pillId == pillId }
 
@@ -703,8 +655,7 @@ class AppModel(private val context: Context) : LinkListener {
      * picked is not logged, not stored and not put in the history.
      */
     fun answerQuestion(fingerprint: String, picks: List<List<String>>): Boolean {
-        // Debug sample only (see debugQuestion): there is no computer to send to, so a tap simply completes.
-        val sent = if (answersLocal && link == null) true else link?.answer(fingerprint, picks) ?: false
+        val sent = link?.answer(fingerprint, picks) ?: false
         if (sent) removeQuestion(fingerprint)
         return sent
     }
@@ -720,16 +671,8 @@ class AppModel(private val context: Context) : LinkListener {
     /** What the file-change sheet shows; Idle closes it. The lines are held only while it is open. */
     var diffState by mutableStateOf<com.coucou.android.core.DiffState>(com.coucou.android.core.DiffState.Idle); private set
 
-    /** Debug: serve this sample for any file instead of asking a computer. */
-    internal var debugDiff: ((com.coucou.android.link.FileChange) -> com.coucou.android.core.FileDiffView)? = null
-
     /** Opens the sheet for a file of a session's list and asks the computer for its lines. */
     fun openDiff(pillId: String, file: com.coucou.android.link.FileChange) {
-        val local = debugDiff
-        if (local != null && link == null) {
-            diffState = com.coucou.android.core.DiffState.Ready(local(file))
-            return
-        }
         diffState = com.coucou.android.core.DiffState.Loading(pillId, file.id, file.name)
         diffAssembler.expect(pillId, file.id)
         main.removeCallbacks(diffTimeout)

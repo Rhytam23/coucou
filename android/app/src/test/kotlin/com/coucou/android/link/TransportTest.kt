@@ -46,18 +46,6 @@ class TransportTest {
         assertEquals(listOf(Route.LAN, Route.RELAY), policy.order())
     }
 
-    @Test fun relayOnlyIsForTestingTheRelayOnTheHomeNetwork() {
-        policy.relayOnly = true
-        assertEquals(listOf(Route.RELAY), policy.order())
-        relayOn = false
-        assertEquals("no relay, nothing to force", listOf(Route.LAN), policy.order())
-    }
-
-    @Test fun theProbeIsDueEveryNinetySeconds() {
-        assertFalse(policy.probeDue(now - TransportPolicy.LAN_PROBE_MS + 1))
-        assertTrue(policy.probeDue(now - TransportPolicy.LAN_PROBE_MS))
-    }
-
     // ── the connector on top of the policy ──
 
     private class FakeSocket : Socket()

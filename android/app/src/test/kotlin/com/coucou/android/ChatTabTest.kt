@@ -12,8 +12,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatTabTest {
-    private fun s(paired: Boolean = true, connected: Boolean = true, offered: Boolean = true, models: Int = 2, forced: Boolean = false) =
-        ChatTab.state(paired, connected, offered, models, forced)
+    private fun s(paired: Boolean = true, connected: Boolean = true, offered: Boolean = true, models: Int = 2) =
+        ChatTab.state(paired, connected, offered, models)
 
     @Test fun nothingPairedComesFirst() {
         assertEquals(ChatTabState.NOT_PAIRED, s(paired = false, connected = false, offered = false, models = 0))
@@ -38,10 +38,6 @@ class ChatTabTest {
     @Test fun connectedOfferedWithAModelIsReady() {
         assertEquals(ChatTabState.READY, s())
         assertEquals(ChatTabState.READY, s(models = 1))
-    }
-
-    @Test fun theDebugSampleIsReadyWhateverElseIsTrue() {
-        assertEquals(ChatTabState.READY, s(paired = false, connected = false, offered = false, models = 0, forced = true))
     }
 
     @Test fun everyStateButReadyHasAWayOutOrAHint() {
@@ -119,13 +115,8 @@ class ChatTabSourceTest {
         for (b in body) for (bad in listOf("token", "key=", "exception", "error:", "http", "sha")) assertFalse("'$b' mentions $bad", b.contains(bad))
     }
 
-    @Test fun theModelStatePicksTheScreenAndTheDebugKindShowsEachOne() {
-        val model = src("app/AppModel.kt")
-        assertTrue(model.contains("val chatTabState: ChatTabState get() = chatStateOverride ?: ChatTab.state("))
-        val dbg = File("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt").readText()
-        for (k in listOf("notpaired", "offline", "off", "nomodels", "ready")) assertTrue(k, dbg.contains("\"$k\" ->"))
-        assertTrue(dbg.contains("\"chatstate\" -> model.debugChatState("))
-        assertFalse(File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" && it.name != "AppModel.kt" }.any { it.readText().contains("debugChatState") })
+    @Test fun theModelStatePicksTheScreen() {
+        assertTrue(src("app/AppModel.kt").contains("val chatTabState: ChatTabState get() = ChatTab.state("))
     }
 
     @Test fun homeNoLongerHasAChatEntryAndThereIsNoUnreadDotToKeep() {

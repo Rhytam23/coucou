@@ -32,10 +32,6 @@ class SessionScreenTest {
         assertTrue(src("app/AppModel.kt").contains("detailsOffered = Protocol.CAP_DETAILS in caps"))
     }
 
-    @Test fun theDebugKindShowsDetailsWithoutAComputer() {
-        assertTrue(File("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt").readText().contains("\"details\" -> {"))
-    }
-
     @Test fun noStepCounterAnywhereBecauseTheComputerCannotKnowTheTotal() {
         for (f in listOf("ui/SessionScreen.kt", "ui/HomePanel.kt", "MainActivity.kt")) {
             val text = src(f)

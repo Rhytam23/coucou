@@ -53,7 +53,7 @@ class DiscoverySourceTest {
     @Test fun aFoundAddressChangesOnlyTheAddressInTheStoredPairing() {
         val use = model.substringAfter("private fun useAddress").substringBefore("/** A computer matching")
         assertTrue(use.contains("Discovery.withAddress(p, host, port)") && use.contains("store.savePairing(q)"))
-        assertTrue("a manual address goes through the same function", model.substringAfter("fun setAddress").substringBefore("/** Debug only").contains("useAddress(host, port)"))
+        assertTrue("a manual address goes through the same function", model.substringAfter("fun setAddress").substringBefore("/**").contains("useAddress(host, port)"))
     }
 
     @Test fun theNetworkCallbackIsRegisteredOnlyWhilePairedAndNeverPolls() {
@@ -72,10 +72,4 @@ class DiscoverySourceTest {
         assertTrue(strings.contains("same Wi-Fi") && strings.contains("client isolation") && strings.contains("private networks"))
     }
 
-    @Test fun theDebugTriggerExistsOnlyInTheDebugReceiver() {
-        assertTrue(File("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt").readText().contains("\"addrchange\" -> model.debugAddressChanged()"))
-        for (f in File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" && it.name != "AppModel.kt" }) {
-            assertFalse(f.name, f.readText().contains("debugAddressChanged"))
-        }
-    }
 }

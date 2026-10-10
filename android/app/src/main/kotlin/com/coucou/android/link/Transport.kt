@@ -21,13 +21,9 @@ class TransportPolicy(
     private val clockMs: () -> Long = System::currentTimeMillis,
 ) {
     @Volatile private var lanFailedAt: Long = NEVER
-    /** Debug only: skip the LAN so the relay path can be tried on the home Wi-Fi. */
-    @Volatile var relayOnly: Boolean = false
-
     /** The routes to try now, in order. */
     fun order(): List<Route> {
         if (!relayConfigured()) return listOf(Route.LAN)
-        if (relayOnly) return listOf(Route.RELAY)
         val recently = lanFailedAt != NEVER && clockMs() - lanFailedAt in 0 until LAN_SKIP_MS
         return if (recently) listOf(Route.RELAY, Route.LAN) else listOf(Route.LAN, Route.RELAY)
     }
@@ -37,9 +33,6 @@ class TransportPolicy(
 
     fun lanFailed() { lanFailedAt = clockMs() }
     fun lanWorked() { lanFailedAt = NEVER }
-
-    /** True when it is time to look for the LAN again while on the relay. */
-    fun probeDue(lastProbeMs: Long): Boolean = clockMs() - lastProbeMs >= LAN_PROBE_MS
 
     companion object {
         const val LAN_FAST_MS = 2_500

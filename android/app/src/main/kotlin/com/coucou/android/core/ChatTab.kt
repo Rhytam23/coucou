@@ -6,10 +6,9 @@ enum class ChatTabState { NOT_PAIRED, NOT_CONNECTED, CHAT_OFF, NO_MODELS, READY 
 object ChatTab {
     /**
      * In order of what the user can do about it: no computer paired, the computer not reachable, the computer not offering
-     * chat (its switch is off), offering it with no model allowed, or ready. [forcedReady] is the debug sample only.
+     * chat (its switch is off), offering it with no model allowed, or ready.
      */
-    fun state(paired: Boolean, connected: Boolean, offered: Boolean, modelCount: Int, forcedReady: Boolean = false): ChatTabState = when {
-        forcedReady -> ChatTabState.READY
+    fun state(paired: Boolean, connected: Boolean, offered: Boolean, modelCount: Int): ChatTabState = when {
         !paired -> ChatTabState.NOT_PAIRED
         !connected -> ChatTabState.NOT_CONNECTED
         !offered -> ChatTabState.CHAT_OFF

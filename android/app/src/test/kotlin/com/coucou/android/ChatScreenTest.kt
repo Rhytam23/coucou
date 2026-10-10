@@ -53,13 +53,6 @@ class ChatScreenTest {
         assertTrue(ui.contains("enabled = model.chatAvailable"))
     }
 
-    @Test fun theDebugKindShowsTheScreenWithoutAComputer() {
-        val dbg = File("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt").readText()
-        assertTrue(dbg.contains("\"chat\" -> model.debugSeedChat("))
-        // and the release code has no such trigger
-        assertFalse(File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" }.any { it.readText().contains("DebugPillReceiver") && it.name != "AppModel.kt" })
-    }
-
     @Test fun theScreenWearsTheNewLookAndNoLongerTheOldAccent() {
         val ui = src("ui/ChatScreen.kt")
         assertFalse("no blue bubbles any more", ui.contains("colorScheme.primary"))

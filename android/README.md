@@ -55,16 +55,8 @@ Tapping it opens Coucou.
   the next deadline at most, none while it is hidden. Rules live in `core/IslandTimeline.kt`,
   `IslandPlan.kt`, `IslandGeometry.kt`, `IslandMotion.kt` (pure Kotlin, unit-tested); `ui/IslandOverlay.kt` draws.
 - Taps in the first 600 ms are ignored (they were meant for the app underneath).
-- Try it without an agent (**debug builds only**). Switch on, press Home first:
-
-```bash
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind working    # opens and stays
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished   # result, then up after 10 s
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind clear      # goes up now
-# kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi
-adb logcat -s CoucouIsland CoucouOverlay CoucouLaunch
-# add --ez foreground true to an approval to see the heads-up notification instead of the island
-```
+- To see it, run a real agent on the computer (or `node android/tools/dev-desktop.mjs`, the pretend computer), switch the
+  island on and press Home.
 
 One announcement at a time: while the island shows a request, its notification is posted quietly (channel
 "Approvals (quiet)", shade only); when the island cannot show, the heads-up notification is used.
@@ -86,14 +78,6 @@ it in the card. The bar at the bottom (Home, Chat when your computer offers it, 
 island switch, sound, notices, History, Mochi gallery and About (the notice Louis Raillé's permission requires).
 Home shows a line about the island only when its switch is on but Android's permission is missing.
 
-```bash
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind history     # sample decisions (debug builds)
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind multi       # 4 agents: pill grid, one lone pill
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind long        # very long agent name and tool name
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind tool        # raw tool name ask_question
-adb shell settings put system font_scale 1.3                                          # text 30 % bigger; put 1.0 back after
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished    # with the app in the background: a notice in the shade
-```
 
 ## Layout
 
@@ -119,7 +103,6 @@ Try it without a key, spending nothing:
 ```bash
 node android/tools/dev-desktop.mjs --fake-chat --host <LAN IP>   # pair the app with the printed link
 # in the chat: any text is echoed; /error /auth /slow (never ends: press Stop) /long /rewrite try the odd cases
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind chat   # debug builds: the screen with sample messages, no computer
 ```
 
 ## Session details (opt-in on the computer)
@@ -127,8 +110,7 @@ adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind ch
 With "Show session details on the phone" turned on in the computer's Settings > Android phone (off by default), the agent
 card on Home opens a detail screen: the project's **folder name** (never a path), how far the agent got, its last message
 and the steps it took, newest first and in plain words. Pills use the colour chosen for them on the computer. Without the
-switch the screen says where to turn it on. Try it free: `node android/tools/dev-desktop.mjs --details --host <LAN IP>`,
-or in a debug build `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind details`.
+switch the screen says where to turn it on. Try it free: `node android/tools/dev-desktop.mjs --details --host <LAN IP>`.
 
 ## Pairing by QR code
 
@@ -139,8 +121,6 @@ and pairs only after OK; any other code is ignored with "That is not a Coucou pa
 phone's own camera app opens a `coucou://pair` link. The camera is released when the screen is left, paused, or a code was
 accepted; no picture is stored or sent, and neither the token nor the scanned text is ever logged.
 
-Try without the camera (debug builds): `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind scan --es text "coucou://pair?..."`
-then open the app: the confirmation appears. Any other `--es text` shows the "not a Coucou pairing code" hint.
 
 ## When the computer's address changes
 
@@ -156,8 +136,7 @@ and a short certificate id), and the phone finds it again by itself:
 
 If nothing is found, the app says so calmly and offers "Pair again" and "Enter address manually". Some hotspots and guest
 networks block devices from finding each other (client isolation); then the typed address is the way. Multicast does not
-cross VPNs or routers. Debug builds: `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange`
-breaks the saved address on purpose so you can watch it repair itself.
+cross VPNs or routers.
 
 
 ## Widget, tile and notification

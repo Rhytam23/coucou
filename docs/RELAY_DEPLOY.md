@@ -89,14 +89,6 @@ Tick each line and note anything odd. "Expect" is what should happen.
 | 14 | Phone on mobile data, screen off, not moving, **30 minutes** | Does an approval still arrive? (Doze and the carrier decide; this is the one result I cannot predict) |
 | 15 | Overnight battery: before, `adb shell dumpsys batterystats --reset`; after, `adb shell dumpsys batterystats --charged com.coucou.android` | Note the percentage used and tell me |
 
-To try the relay path **without leaving the home Wi-Fi** (debug build only): 
-
-```
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind relayonly --ez on true
-adb logcat -s CoucouRelay      # prints "relay only: true"; never an address or a key
-adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind relayonly --ez on false
-```
-
 ## 5. Rotating, losing a phone, switching off
 
 - **A phone is lost or stolen:** on the computer press **Pair again** (a new key and a new room; the old phone can no longer read

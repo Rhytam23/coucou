@@ -78,9 +78,6 @@ class ScanScreenTest {
                 assertFalse("${f.name}: $line", secrets.containsMatchIn(msg.substringAfter(",", msg)))
             }
         }
-        val dbg = file("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt")
-        assertTrue(dbg.contains("\"scan\" -> {"))
-        assertTrue(dbg.contains("""Log.d("CoucouScan", "debug scan accepted=${'$'}accepted")"""))
     }
 
     @Test fun theNewLibrariesAreCameraXAndZxingCoreOnly_noPlayServicesNoMlKit() {

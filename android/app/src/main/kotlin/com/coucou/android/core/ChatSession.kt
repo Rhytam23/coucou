@@ -96,12 +96,6 @@ class ChatSession(
         running?.let { fail(it, "connection") }
     }
 
-    /** Debug builds only: shows these messages as if they had arrived (the Chat screen can be looked at without a computer). */
-    internal fun replace(list: List<ChatMessage>) {
-        messages = list.takeLast(MAX_MESSAGES)
-        running = null
-    }
-
     /** New chat / Clear. */
     fun clear() {
         messages = emptyList()
