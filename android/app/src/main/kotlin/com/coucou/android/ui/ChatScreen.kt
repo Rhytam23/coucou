@@ -93,7 +93,7 @@ private fun reasonText(code: String?): String = stringResource(
  * API key is used on the computer; this screen only ever has text.
  */
 @Composable
-fun ChatScreen(model: AppModel, onBack: () -> Unit) {
+fun ChatScreen(model: AppModel) {
     var text by rememberSaveable { mutableStateOf("") }
     var refusal by remember { mutableStateOf<ChatSession.Refusal?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -109,7 +109,7 @@ fun ChatScreen(model: AppModel, onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = Gutter)) {
         ScreenTitle(
-            stringResource(R.string.chat_title), onBack,
+            stringResource(R.string.chat_title), null,
             trailing = {
                 if (messages.isNotEmpty()) {
                     TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.chat_clear), maxLines = 1) }
@@ -302,21 +302,6 @@ private fun ModelChip(model: AppModel) {
                     onClick = { model.chatSelect(m.id); open = false },
                 )
             }
-        }
-    }
-}
-
-/** A slim card on Home: only when chat is available (or there is something to read). */
-@Composable
-fun ChatEntry(onOpen: () -> Unit) {
-    CoucouCard(Modifier.clickable(onClick = onOpen)) {
-        Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.chat_entry_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(stringResource(R.string.chat_entry_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-            }
-            Spacer(Modifier.size(Gap))
-            Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

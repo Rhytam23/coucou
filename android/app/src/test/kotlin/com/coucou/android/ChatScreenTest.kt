@@ -39,10 +39,12 @@ class ChatScreenTest {
         assertTrue(src("app/AppModel.kt").contains("link?.chatReset()"))
     }
 
-    @Test fun homeOffersChatOnlyWhenAvailableOrThereIsAConversationToRead() {
+    @Test fun chatIsATabOnlyWhenOfferedOrThereIsAConversationToRead() {
         val main = src("MainActivity.kt")
-        assertTrue(main.contains("if (model.chatAvailable || model.chatMessages.isNotEmpty()) item { ChatEntry(onChat) }"))
-        assertTrue(main.contains("Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })"))
+        assertTrue(main.contains("Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())"))
+        assertTrue(main.contains("Screen.CHAT -> ChatScreen(model)"))
+        assertFalse("the old card on Home is gone", main.contains("ChatEntry"))
+        assertFalse(src("ui/ChatScreen.kt").contains("fun ChatEntry"))
     }
 
     @Test fun theBoxCannotSendWhenUnavailableEmptyOrTooLong() {

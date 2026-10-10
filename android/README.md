@@ -82,7 +82,7 @@ coloured dot, what the agent is doing in plain words (a raw tool name such as `a
 "Asking a question" / "Running a command", see `core/ToolLabels.kt`; the island says the same), "Step 3 of 8" with its
 bar, and at most one link ("Allow / Deny" when a request waits, "Pair with your computer" when not paired). The other
 agents are pills in two equal columns, full name on up to two lines; the chosen one has a clear frame; tap one to put
-it in the card. The gear at the top right opens Settings. Settings holds the rest: this computer (Disconnect), the
+it in the card. The bar at the bottom (Home, Chat when your computer offers it, Settings) is the navigation. Settings holds the rest: this computer (Disconnect), the
 island switch, sound, notices, History, Mochi gallery and About (the notice Louis Raillé's permission requires).
 Home shows a line about the island only when its switch is on but Android's permission is missing.
 

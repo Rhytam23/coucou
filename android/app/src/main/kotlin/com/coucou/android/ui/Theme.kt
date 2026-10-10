@@ -23,19 +23,21 @@ import com.coucou.android.core.Tokens
  * The look of the Coucou website (docs/site.css): near-black page, slightly lighter cards with a thin
  * border, soft blue accent, rounded corners and pill-shaped buttons. Mochi itself is untouched.
  */
-private fun scheme(p: Palette, dark: Boolean): ColorScheme {
+private fun scheme(p: Palette, t: Tokens, dark: Boolean): ColorScheme {
     val base = if (dark) darkColorScheme() else lightColorScheme()
+    // Surfaces and text come from the redesign's tokens, so every screen sits on the same black (or paper)
+    // as the new ones; the accent still comes from Palette until each screen moves over (U2..U6).
     return base.copy(
-        background = Color(p.background), surface = Color(p.background),
-        surfaceVariant = Color(p.card), surfaceContainer = Color(p.card),
-        onBackground = Color(p.text), onSurface = Color(p.text), onSurfaceVariant = Color(p.textDim),
-        outline = Color(p.line), outlineVariant = Color(p.line),
+        background = Color(t.bg), surface = Color(t.bg),
+        surfaceVariant = Color(t.panel), surfaceContainer = Color(t.panel),
+        onBackground = Color(t.text), onSurface = Color(t.text), onSurfaceVariant = Color(t.textDim),
+        outline = Color(t.line), outlineVariant = Color(t.line),
         primary = Color(p.accent), onPrimary = Color(p.onAccent), error = Color(p.error),
     )
 }
 
-private val Dark = scheme(Palette.DARK, dark = true)
-private val Light = scheme(Palette.LIGHT, dark = false)
+private val Dark = scheme(Palette.DARK, Tokens.DARK, dark = true)
+private val Light = scheme(Palette.LIGHT, Tokens.LIGHT, dark = false)
 
 /** Link status colours (the dot next to "Connected"). */
 object StatusColors {

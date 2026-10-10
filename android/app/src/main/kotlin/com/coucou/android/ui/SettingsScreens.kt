@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +29,14 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.alpha
+import com.coucou.android.core.IconKind
+import com.coucou.android.core.Spacing
+import com.coucou.android.core.TypeScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.coucou.android.Attribution
@@ -44,9 +50,19 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
-/** Back button and the screen's title on one line; a long title is cut with "…", never wrapped letter by letter. */
+/**
+ * The screen's title on one line; a long title is cut with "…". Sub-pages pass [onBack] and get a Back
+ * button; the three tab screens pass null (the bar is their navigation) and get the plain title.
+ */
 @Composable
-fun ScreenTitle(title: String, onBack: () -> Unit, trailing: @Composable (() -> Unit)? = null) {
+fun ScreenTitle(title: String, onBack: (() -> Unit)?, trailing: @Composable (() -> Unit)? = null) {
+    if (onBack == null) {
+        Row(Modifier.padding(top = Spacing.INSIDE.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f).padding(start = 4.dp), style = TypeScale.TITLE.style(tokens().text.c()), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            trailing?.invoke()
+        }
+        return
+    }
     Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = onBack) { Text(stringResource(R.string.action_back), maxLines = 1) }
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -64,99 +80,115 @@ fun SectionTitle(text: String) {
     )
 }
 
+/** A setting with a switch at its end. */
 @Composable
-fun SwitchRow(title: String, hint: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            if (hint != null) Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(Gap))
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
+fun SettingSwitch(title: String, hint: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    ListRow(title, hint = hint, trailing = { CoucouSwitch(checked, onChange, label = title) })
 }
 
-/** A card row that opens another screen. */
+/** A row that opens another page: its title and a chevron. */
 @Composable
 private fun LinkRow(title: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(Gutter),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Text("›", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    ListRow(title, onClick = onClick, trailing = { CoucouIcon(IconKind.CHEVRON, tint = tokens().textDim.c(), size = 20.dp) })
 }
 
 private fun clock(min: Int) = "%02d:%02d".format(QuietHours.wrap(min) / 60, QuietHours.wrap(min) % 60)
 
+/** A round 48 dp "−" or "+" button for stepping a time. */
 @Composable
-private fun TimeRow(label: String, minutes: Int, enabled: Boolean, onChange: (Int) -> Unit) {
-    Row(Modifier.padding(horizontal = Gutter, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        OutlinedButton(onClick = { onChange(minutes - QuietHours.STEP) }, enabled = enabled) { Text("−") }
-        Text(clock(minutes), Modifier.padding(horizontal = Gap), fontFamily = FontFamily.Monospace)
-        OutlinedButton(onClick = { onChange(minutes + QuietHours.STEP) }, enabled = enabled) { Text("+") }
-    }
+private fun StepButton(text: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.alpha(if (enabled) 1f else 0.4f).size(Spacing.MIN_TOUCH.dp).clip(CircleShape).background(tokens().secondaryButton.c())
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick).semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = TypeScale.HEADLINE.style(tokens().text.c())) }
 }
 
 @Composable
-fun SettingsScreen(
-    model: AppModel, onBack: () -> Unit, onHistory: () -> Unit, onGallery: () -> Unit, onOverlay: (Boolean) -> Unit,
-) {
+private fun TimeRow(label: String, minutes: Int, enabled: Boolean, onChange: (Int) -> Unit) {
+    val t = tokens()
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Spacing.INSIDE.dp, vertical = 4.dp).alpha(if (enabled) 1f else 0.5f),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = TypeScale.BODY.style(t.text.c()))
+        StepButton("−", "$label, ${QuietHours.STEP} minutes earlier", enabled) { onChange(minutes - QuietHours.STEP) }
+        Text(clock(minutes), Modifier.width(56.dp), style = TypeScale.BODY.style(t.text.c()).copy(fontFamily = FontFamily.Monospace), maxLines = 1)
+        StepButton("+", "$label, ${QuietHours.STEP} minutes later", enabled) { onChange(minutes + QuietHours.STEP) }
+    }
+}
+
+/** Room under a list so its last row can scroll above the floating bar (64 + 16 gap + 16 margin). */
+val BarClearance = 96.dp
+
+/**
+ * Settings, a tab. Grouped, each group one panel: your computer (with Disconnect at the bottom, away
+ * from the everyday switches), the island, sound, notices, more, and About (Louis Raillé's required notice).
+ */
+@Composable
+fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit, onOverlay: (Boolean) -> Unit) {
     val s = model.settings
     val uri = LocalUriHandler.current
-    LazyColumn(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-        item { ScreenTitle(stringResource(R.string.settings_title), onBack) }
+    val t = tokens()
+    LazyColumn(
+        Modifier.padding(horizontal = Gutter), contentPadding = PaddingValues(bottom = BarClearance),
+        verticalArrangement = Arrangement.spacedBy(Gap),
+    ) {
+        item { ScreenTitle(stringResource(R.string.settings_title), null) }
 
-        item { SectionTitle(stringResource(R.string.settings_section_computer)) }
+        item { SectionHeading(stringResource(R.string.settings_section_computer)) }
         item {
-            CoucouCard {
-                Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(8.dp).clip(CircleShape).background(linkDotColor(model)))
-                        Spacer(Modifier.width(8.dp))
-                        Text(linkStatusText(model), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                    when (model.mode) {
-                        Mode.PAIRED -> OutlinedButton(onClick = { model.unpair() }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                            Text(stringResource(R.string.action_unpair), color = MaterialTheme.colorScheme.error, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Mode.DEMO -> OutlinedButton(onClick = { model.stopDemo() }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                            Text(stringResource(R.string.demo_leave), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        Mode.NONE -> Text(stringResource(R.string.settings_computer_none), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            Panel {
+                Row(Modifier.padding(Spacing.INSIDE.dp), horizontalArrangement = Arrangement.spacedBy(Spacing.GAP.dp), verticalAlignment = Alignment.CenterVertically) {
+                    StateDot(linkDotColor(model))
+                    Text(linkStatusText(model), Modifier.weight(1f), style = TypeScale.BODY.style(t.text.c()), maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-            }
-        }
-
-        item { SectionTitle(stringResource(R.string.settings_section_display)) }
-        item {
-            CoucouCard { SwitchRow(stringResource(R.string.overlay_title), stringResource(R.string.overlay_hint), model.overlayOn, onOverlay) }
-        }
-
-        item { SectionTitle(stringResource(R.string.settings_section_sound)) }
-        item {
-            CoucouCard {
-                SwitchRow(stringResource(R.string.settings_sound), null, s.soundOn) { model.updateSettings(s.copy(soundOn = it)) }
-                Column(Modifier.padding(start = Gutter, end = Gutter, bottom = 8.dp)) {
-                    Text(stringResource(R.string.settings_volume), style = MaterialTheme.typography.bodyMedium)
-                    Slider(
-                        value = s.volume, onValueChange = { model.updateSettings(s.copy(volume = SoundVolume.clamp(it))) },
-                        valueRange = 0f..SoundVolume.MAX, enabled = s.soundOn,
+                when (model.mode) {
+                    Mode.PAIRED -> {
+                        RowDivider()
+                        PillButton(stringResource(R.string.action_unpair), { model.unpair() }, Modifier.fillMaxWidth().padding(Spacing.INSIDE.dp), PillKind.DANGER)
+                    }
+                    Mode.DEMO -> {
+                        RowDivider()
+                        PillButton(stringResource(R.string.demo_leave), { model.stopDemo() }, Modifier.fillMaxWidth().padding(Spacing.INSIDE.dp))
+                    }
+                    Mode.NONE -> Text(
+                        stringResource(R.string.settings_computer_none), Modifier.padding(start = Spacing.INSIDE.dp, end = Spacing.INSIDE.dp, bottom = Spacing.INSIDE.dp),
+                        style = TypeScale.SECONDARY.style(t.textDim.c()),
                     )
                 }
             }
         }
 
-        item { SectionTitle(stringResource(R.string.settings_section_notices)) }
+        item { SectionHeading(stringResource(R.string.settings_section_display)) }
+        item { Panel { SettingSwitch(stringResource(R.string.overlay_title), stringResource(R.string.overlay_hint), model.overlayOn, onOverlay) } }
+
+        item { SectionHeading(stringResource(R.string.settings_section_sound)) }
         item {
-            CoucouCard {
-                SwitchRow(stringResource(R.string.notify_done), stringResource(R.string.notify_done_hint), s.notifyDone) {
+            Panel {
+                SettingSwitch(stringResource(R.string.settings_sound), null, s.soundOn) { model.updateSettings(s.copy(soundOn = it)) }
+                RowDivider()
+                Column(Modifier.padding(horizontal = Spacing.INSIDE.dp, vertical = 8.dp)) {
+                    Row {
+                        Text(stringResource(R.string.settings_volume), Modifier.weight(1f), style = TypeScale.BODY.style(t.text.c()))
+                        Text("${(s.volume / SoundVolume.MAX * 100).toInt().coerceIn(0, 100)}%", style = TypeScale.SECONDARY.style(t.textDim.c()))
+                    }
+                    CoucouSlider(
+                        value = s.volume, onChange = { model.updateSettings(s.copy(volume = SoundVolume.clamp(it))) },
+                        valueRange = 0f..SoundVolume.MAX, enabled = s.soundOn, label = stringResource(R.string.settings_volume),
+                    )
+                }
+            }
+        }
+
+        item { SectionHeading(stringResource(R.string.settings_section_notices)) }
+        item {
+            Panel {
+                SettingSwitch(stringResource(R.string.notify_done), stringResource(R.string.notify_done_hint), s.notifyDone) {
                     model.updateSettings(s.copy(notifyDone = it))
                 }
-                SwitchRow(stringResource(R.string.quiet_hours), stringResource(R.string.quiet_hint), s.quiet.enabled) {
+                RowDivider()
+                SettingSwitch(stringResource(R.string.quiet_hours), stringResource(R.string.quiet_hint), s.quiet.enabled) {
                     model.updateSettings(s.copy(quiet = s.quiet.copy(enabled = it)))
                 }
                 TimeRow(stringResource(R.string.quiet_from), s.quiet.fromMin, s.quiet.enabled) {
@@ -169,27 +201,27 @@ fun SettingsScreen(
             }
         }
 
-        item { SectionTitle(stringResource(R.string.settings_section_more)) }
+        item { SectionHeading(stringResource(R.string.settings_section_more)) }
         item {
-            CoucouCard {
+            Panel {
                 LinkRow(stringResource(R.string.history_title), onHistory)
+                RowDivider()
                 LinkRow(stringResource(R.string.gallery), onGallery)
             }
         }
 
         // Required by Louis Raillé's permission: visible, one tap from Home.
-        item { SectionTitle(stringResource(R.string.settings_section_about)) }
+        item { SectionHeading(stringResource(R.string.settings_section_about)) }
         item {
-            CoucouCard {
-                Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val dim = MaterialTheme.colorScheme.onSurfaceVariant
-                    Text(stringResource(R.string.about_unofficial), style = MaterialTheme.typography.bodyMedium)
+            Panel {
+                Column(Modifier.padding(Spacing.INSIDE.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.about_unofficial), style = TypeScale.BODY.style(t.text.c()))
                     Text(
                         stringResource(R.string.about_repo),
-                        Modifier.clickable { runCatching { uri.openUri(Attribution.REPO_URL) } },
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary,
+                        Modifier.clickable(role = Role.Button) { runCatching { uri.openUri(Attribution.REPO_URL) } },
+                        style = TypeScale.BODY.style(t.text.c()).copy(textDecoration = TextDecoration.Underline),
                     )
-                    Text(stringResource(R.string.about_assets), style = MaterialTheme.typography.bodySmall, color = dim)
+                    Text(stringResource(R.string.about_assets), style = TypeScale.SECONDARY.style(t.textDim.c()))
                 }
             }
         }

@@ -59,13 +59,17 @@ class DesignSystemTest {
         assertTrue(src("ui/Theme.kt").contains("LocalTokens provides"))
         val main = src("MainActivity.kt")
         assertTrue(main.contains("onDesign = { screen = Screen.DESIGN }"))
-        assertTrue(main.contains("Screen.DESIGN -> Screen.GALLERY"))
+        assertTrue(main.contains("Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })"))
     }
 
-    @Test fun existingScreensAreNotMovedYet() {
-        // U0 only adds the blocks. Each screen moves in its own stage, together with its guard tests.
-        for (file in listOf("MainActivity.kt", "ui/SettingsScreens.kt", "ui/HomePanel.kt", "ui/ChatScreen.kt", "ui/SessionScreen.kt")) {
-            assertFalse("$file already uses the new panel", Regex("""\bPanel\(""").containsMatchIn(src(file)))
+    @Test fun settingsUsesTheNewBlocksAndTheRestHasNotMovedYet() {
+        // Each screen moves in its own stage (U1 Settings, U2 Home, ...), together with its guard tests.
+        val settings = src("ui/SettingsScreens.kt")
+        for (block in listOf("Panel {", "PillButton(", "CoucouSwitch(", "CoucouSlider(", "RowDivider()")) assertTrue("Settings uses $block", settings.contains(block))
+        assertFalse("no stock Material switch or slider in Settings", settings.contains("Slider(") && !settings.contains("CoucouSlider("))
+        assertFalse(Regex("""\bSwitch\(""").containsMatchIn(settings))
+        for (file in listOf("MainActivity.kt", "ui/HomePanel.kt", "ui/ChatScreen.kt", "ui/SessionScreen.kt")) {
+            assertFalse("$file already uses the new panel", Regex("""\bPanel[ (]""").containsMatchIn(src(file)))
         }
     }
 }

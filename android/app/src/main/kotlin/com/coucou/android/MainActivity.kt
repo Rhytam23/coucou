@@ -18,12 +18,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -59,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +72,9 @@ import com.coucou.android.app.BiometricGate
 import com.coucou.android.app.CoucouApp
 import com.coucou.android.app.Mode
 import com.coucou.android.app.Notifications
+import com.coucou.android.core.Nav
 import com.coucou.android.core.Pills
+import com.coucou.android.core.Screen
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.LinkState
 import com.coucou.android.link.PairingPayload
@@ -81,7 +86,8 @@ import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentCard
-import com.coucou.android.ui.ChatEntry
+import com.coucou.android.ui.BarClearance
+import com.coucou.android.ui.BottomBar
 import com.coucou.android.ui.DesignScreen
 import com.coucou.android.ui.PairConfirm
 import com.coucou.android.ui.ScanScreen
@@ -94,13 +100,10 @@ import com.coucou.android.ui.SettingsScreen
 import com.coucou.android.ui.StatusColors
 import com.coucou.android.ui.Gap
 import com.coucou.android.ui.Gutter
-import com.coucou.android.ui.GearButton
 import com.coucou.android.ui.ScreenTitle
 import com.coucou.android.ui.SectionTitle
 import com.coucou.android.ui.linkDotColor
 import com.coucou.android.ui.linkStatusText
-
-private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION, SCAN, DESIGN }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
@@ -118,35 +121,41 @@ class MainActivity : ComponentActivity() {
         setContent {
             CoucouTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
-                        BackHandler(enabled = screen != Screen.HOME) {
-                            screen = when (screen) {
-                                Screen.HISTORY, Screen.GALLERY -> Screen.SETTINGS
-                                Screen.DESIGN -> Screen.GALLERY
-                                else -> Screen.HOME
-                            }
-                        }
+                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                        val tabs = Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())
+                        // The computer stopped offering chat while it was open: back to Home, never a screen with no tab.
+                        LaunchedEffect(tabs, screen) { Nav.resolve(screen, tabs).let { if (it != screen) screen = it } }
+                        val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+                        val barVisible = Nav.barVisible(screen, keyboardOpen)
+                        BackHandler(enabled = Nav.back(screen) != null) { Nav.back(screen)?.let { screen = it } }
+                        // Chat keeps its message box above the bar; Home and Settings scroll under it (their own bottom padding).
+                        Box(Modifier.fillMaxSize().padding(bottom = if (barVisible && screen == Screen.CHAT) BarClearance else 0.dp)) {
                         when (screen) {
                             Screen.SCAN -> ScanScreen(
                                 onBack = { screen = Screen.HOME },
                                 // True if it was a pairing code: the camera is released and the user is asked to confirm.
                                 onText = { text -> model.requestPairing(text).also { if (it) screen = Screen.HOME } },
                             )
-                            Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })
+                            Screen.CHAT -> ChatScreen(model)
                             Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
                             Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS }, onDesign = { screen = Screen.DESIGN })
                             Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })
                             Screen.SETTINGS -> SettingsScreen(
-                                model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY },
+                                model, onHistory = { screen = Screen.HISTORY },
                                 onGallery = { screen = Screen.GALLERY }, onOverlay = ::setOverlay,
                             )
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HOME -> Home(
-                                model, onApprove = ::approve,
-                                onSettings = { screen = Screen.SETTINGS }, onOverlay = ::setOverlay,
-                                onChat = { screen = Screen.CHAT },
+                                model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN },
+                            )
+                        }
+                        }
+                        if (barVisible) {
+                            BottomBar(
+                                tabs, Nav.tabOf(screen), onSelect = { screen = Nav.screenOf(it) },
+                                alert = model.approvals.isNotEmpty(), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
                             )
                         }
                         // A scanned code or a link from the camera app: the user decides before anything is paired.
@@ -225,7 +234,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettings: () -> Unit, onOverlay: (Boolean) -> Unit, onChat: () -> Unit, onSession: (String) -> Unit, onScan: () -> Unit) {
+private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit, onScan: () -> Unit) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -254,9 +263,10 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().padding(horizontal = Gutter),
+        contentPadding = PaddingValues(bottom = BarClearance),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        item { Header(model, onSettings) }
+        item { Header(model) }
         model.message?.let { msg ->
             item {
                 CoucouCard {
@@ -312,9 +322,6 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
             }
         }
 
-        // Chat through the computer, only when the computer offers it (or there is a conversation to read).
-        if (model.chatAvailable || model.chatMessages.isNotEmpty()) item { ChatEntry(onChat) }
-
         // Only when the switch is on but Android still refuses: the one thing Home must say about it.
         if (model.overlayWished && !model.overlayPermission) item { OverlayHint(onOverlay) }
         item { Spacer(Modifier.height(Gutter)) }
@@ -324,7 +331,7 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onSettin
 private const val HOME_KEY = "home"
 
 @Composable
-private fun Header(model: AppModel, onSettings: () -> Unit) {
+private fun Header(model: AppModel) {
     Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -334,8 +341,6 @@ private fun Header(model: AppModel, onSettings: () -> Unit) {
                 Text(linkStatusText(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Spacer(Modifier.width(Gap))
-        GearButton(stringResource(R.string.settings_title), onSettings)
     }
 }
 

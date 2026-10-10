@@ -17,12 +17,28 @@ class ScreenLayoutTest {
     private val settings get() = src("ui/SettingsScreens.kt")
     private val homePanel get() = src("ui/HomePanel.kt")
 
-    @Test fun homeHasAGearAndNoCrampedBottomRow() {
-        assertTrue(main.contains("GearButton("))
+    @Test fun homeHasNoGearAndTheBarLeadsToSettings() {
+        assertFalse("the sun-like gear is gone", main.contains("GearButton("))
+        assertFalse(File("src/main/kotlin/com/coucou/android/ui/GearButton.kt").exists())
+        assertTrue(main.contains("BottomBar("))
+        val bar = src("ui/BottomBar.kt")
+        assertTrue("Settings is drawn as sliders", bar.contains("Tab.SETTINGS -> IconKind.SLIDERS"))
         for (s in listOf("R.string.action_unpair", "R.string.about_unofficial", "R.string.about_assets", "R.string.overlay_hint")) {
             assertFalse("Home must not carry $s", main.contains(s))
         }
         assertFalse("the old footer row is gone", main.contains("fun Footer"))
+    }
+
+    @Test fun disconnectSitsAtTheBottomOfTheComputerPanel() {
+        val computer = settings.substringAfter("settings_section_computer").substringBefore("settings_section_display")
+        assertTrue(computer.indexOf("StateDot(") < computer.indexOf("R.string.action_unpair"))
+        assertTrue("it is the red pill", computer.contains("PillKind.DANGER"))
+    }
+
+    @Test fun theTabScreensScrollAboveTheBar() {
+        assertTrue(main.contains("PaddingValues(bottom = BarClearance)"))
+        assertTrue(settings.contains("PaddingValues(bottom = BarClearance)"))
+        assertTrue("chat keeps its message box above the bar", main.contains("screen == Screen.CHAT) BarClearance"))
     }
 
     @Test fun settingsHoldsDisconnectGalleryOverlayAndTheRequiredNotice() {
