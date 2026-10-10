@@ -3734,6 +3734,171 @@
    "pt-BR": "O link que você copiou contém o código de pareamento: quem o obtiver pode parear um celular com este computador. Se ele for parar onde não deveria, toque em Parear de novo para gerar um código novo; o antigo deixa de funcionar.",
    "ru": "Скопированная ссылка содержит код сопряжения: любой, кто её получит, сможет связать телефон с этим компьютером. Если ссылка попала не туда, нажмите «Связать заново», чтобы создать новый код; старый перестанет работать.",
    "id": "Tautan yang Anda salin berisi kode pemasangan: siapa pun yang mendapatkannya dapat memasangkan ponsel ke komputer ini. Jika tautan itu sampai ke tempat yang tidak semestinya, tekan Pasangkan lagi untuk membuat kode baru; kode lama berhenti berfungsi."
+  },
+  "Reaching the relay…": {
+   "zh-Hans": "正在连接中继…",
+   "hi": "रिले से जुड़ रहा है…",
+   "es": "Conectando con el relé…",
+   "ar": "جارٍ الاتصال بالمرحّل…",
+   "fr": "Connexion au relais…",
+   "bn": "রিলেতে সংযোগ হচ্ছে…",
+   "pt-BR": "Conectando ao relay…",
+   "ru": "Подключение к ретранслятору…",
+   "id": "Menghubungi relay…"
+  },
+  "Connected to the relay, waiting for the phone.": {
+   "zh-Hans": "已连接到中继,正在等待手机。",
+   "hi": "रिले से जुड़ गया, फ़ोन की प्रतीक्षा है।",
+   "es": "Conectado al relé, esperando al teléfono.",
+   "ar": "تم الاتصال بالمرحّل، في انتظار الهاتف.",
+   "fr": "Connecté au relais, en attente du téléphone.",
+   "bn": "রিলেতে সংযুক্ত, ফোনের অপেক্ষায়।",
+   "pt-BR": "Conectado ao relay, aguardando o celular.",
+   "ru": "Подключено к ретранслятору, ожидание телефона.",
+   "id": "Terhubung ke relay, menunggu ponsel."
+  },
+  "The phone is connected through the relay.": {
+   "zh-Hans": "手机已通过中继连接。",
+   "hi": "फ़ोन रिले के ज़रिए जुड़ा है।",
+   "es": "El teléfono está conectado a través del relé.",
+   "ar": "الهاتف متصل عبر المرحّل.",
+   "fr": "Le téléphone est connecté via le relais.",
+   "bn": "ফোন রিলের মাধ্যমে সংযুক্ত।",
+   "pt-BR": "O celular está conectado pelo relay.",
+   "ru": "Телефон подключён через ретранслятор.",
+   "id": "Ponsel terhubung melalui relay."
+  },
+  "The relay refused the access key.": {
+   "zh-Hans": "中继拒绝了该访问密钥。",
+   "hi": "रिले ने एक्सेस की अस्वीकार कर दी।",
+   "es": "El relé rechazó la clave de acceso.",
+   "ar": "رفض المرحّل مفتاح الوصول.",
+   "fr": "Le relais a refusé la clé d'accès.",
+   "bn": "রিলে অ্যাক্সেস কী প্রত্যাখ্যান করেছে।",
+   "pt-BR": "O relay recusou a chave de acesso.",
+   "ru": "Ретранслятор отклонил ключ доступа.",
+   "id": "Relay menolak kunci akses."
+  },
+  "The relay cannot be reached. Trying again.": {
+   "zh-Hans": "无法连接到中继,正在重试。",
+   "hi": "रिले तक नहीं पहुँचा जा सकता। फिर कोशिश की जा रही है।",
+   "es": "No se puede contactar con el relé. Reintentando.",
+   "ar": "يتعذّر الوصول إلى المرحّل. تتم إعادة المحاولة.",
+   "fr": "Le relais est injoignable. Nouvelle tentative.",
+   "bn": "রিলেতে পৌঁছানো যাচ্ছে না। আবার চেষ্টা করা হচ্ছে।",
+   "pt-BR": "Não foi possível alcançar o relay. Tentando novamente.",
+   "ru": "Ретранслятор недоступен. Повторная попытка.",
+   "id": "Relay tidak dapat dijangkau. Mencoba lagi."
+  },
+  "This pairing is in use somewhere else. Press Pair again.": {
+   "zh-Hans": "此配对正在别处使用。请点击“重新配对”。",
+   "hi": "यह पेयरिंग कहीं और उपयोग में है। “फिर से पेयर करें” दबाएँ।",
+   "es": "Este emparejamiento se está usando en otro sitio. Pulsa «Emparejar de nuevo».",
+   "ar": "هذا الاقتران مستخدم في مكان آخر. اضغط «إعادة الاقتران».",
+   "fr": "Cet appairage est utilisé ailleurs. Appuyez sur « Associer à nouveau ».",
+   "bn": "এই পেয়ারিং অন্য কোথাও ব্যবহৃত হচ্ছে। “আবার পেয়ার করুন” চাপুন।",
+   "pt-BR": "Este pareamento está em uso em outro lugar. Toque em «Parear de novo».",
+   "ru": "Это сопряжение используется где-то ещё. Нажмите «Сопрячь заново».",
+   "id": "Penyandingan ini dipakai di tempat lain. Tekan «Sandingkan ulang»."
+  },
+  "The relay is limiting connections from here. Trying again later.": {
+   "zh-Hans": "中继正在限制来自此处的连接,稍后重试。",
+   "hi": "रिले यहाँ से कनेक्शन सीमित कर रहा है। बाद में फिर कोशिश की जाएगी।",
+   "es": "El relé está limitando las conexiones desde aquí. Se reintentará más tarde.",
+   "ar": "يحدّ المرحّل من الاتصالات الواردة من هنا. ستتم إعادة المحاولة لاحقًا.",
+   "fr": "Le relais limite les connexions depuis ici. Nouvelle tentative plus tard.",
+   "bn": "রিলে এখান থেকে সংযোগ সীমিত করছে। পরে আবার চেষ্টা করা হবে।",
+   "pt-BR": "O relay está limitando as conexões daqui. Tentando de novo mais tarde.",
+   "ru": "Ретранслятор ограничивает подключения отсюда. Повтор позже.",
+   "id": "Relay membatasi koneksi dari sini. Mencoba lagi nanti."
+  },
+  "Off": {
+   "zh-Hans": "关",
+   "hi": "बंद",
+   "es": "Desactivado",
+   "ar": "متوقف",
+   "fr": "Désactivé",
+   "bn": "বন্ধ",
+   "pt-BR": "Desligado",
+   "ru": "Выключено",
+   "id": "Mati"
+  },
+  "Save address": {
+   "zh-Hans": "保存地址",
+   "hi": "पता सहेजें",
+   "es": "Guardar dirección",
+   "ar": "حفظ العنوان",
+   "fr": "Enregistrer l'adresse",
+   "bn": "ঠিকানা সংরক্ষণ করুন",
+   "pt-BR": "Salvar endereço",
+   "ru": "Сохранить адрес",
+   "id": "Simpan alamat"
+  },
+  "Away from home Wi-Fi": {
+   "zh-Hans": "不在家中 Wi-Fi 时",
+   "hi": "घर के Wi-Fi से दूर",
+   "es": "Fuera del Wi-Fi de casa",
+   "ar": "بعيدًا عن شبكة Wi-Fi المنزلية",
+   "fr": "Hors du Wi-Fi de la maison",
+   "bn": "বাড়ির Wi-Fi-এর বাইরে",
+   "pt-BR": "Fora do Wi-Fi de casa",
+   "ru": "Вне домашнего Wi-Fi",
+   "id": "Di luar Wi-Fi rumah"
+  },
+  "Reach this computer from your phone on mobile data or another network, through a relay you deployed yourself. Everything is encrypted end to end: the relay only forwards data it cannot read. Off by default.": {
+   "zh-Hans": "通过你自己部署的中继,让手机在移动数据或其他网络下也能连接此电脑。所有内容均为端到端加密:中继只转发它无法读取的数据。默认关闭。",
+   "hi": "अपने खुद के तैनात किए रिले के ज़रिए, मोबाइल डेटा या किसी दूसरे नेटवर्क पर अपने फ़ोन से इस कंप्यूटर तक पहुँचें। सब कुछ एंड-टू-एंड एन्क्रिप्टेड है: रिले केवल वह डेटा आगे भेजता है जिसे वह पढ़ नहीं सकता। डिफ़ॉल्ट रूप से बंद।",
+   "es": "Conecta tu teléfono con este ordenador con datos móviles u otra red, mediante un relé que has desplegado tú mismo. Todo va cifrado de extremo a extremo: el relé solo reenvía datos que no puede leer. Desactivado por defecto.",
+   "ar": "يمكنك الوصول إلى هذا الكمبيوتر من هاتفك عبر بيانات الجوال أو شبكة أخرى، من خلال مرحّل نشرتَه بنفسك. كل شيء مشفّر من طرف إلى طرف: المرحّل لا يمرّر سوى بيانات لا يستطيع قراءتها. متوقف افتراضيًا.",
+   "fr": "Joignez cet ordinateur depuis votre téléphone en données mobiles ou sur un autre réseau, via un relais que vous avez déployé vous-même. Tout est chiffré de bout en bout : le relais ne fait que transmettre des données qu'il ne peut pas lire. Désactivé par défaut.",
+   "bn": "আপনার নিজের স্থাপন করা রিলের মাধ্যমে মোবাইল ডেটা বা অন্য নেটওয়ার্কে থাকা ফোন থেকে এই কম্পিউটারে পৌঁছান। সবকিছু এন্ড-টু-এন্ড এনক্রিপ্টেড: রিলে শুধু এমন ডেটা এগিয়ে দেয় যা সে পড়তে পারে না। ডিফল্টভাবে বন্ধ।",
+   "pt-BR": "Acesse este computador pelo celular com dados móveis ou outra rede, usando um relay que você mesmo publicou. Tudo é criptografado de ponta a ponta: o relay só repassa dados que não consegue ler. Desligado por padrão.",
+   "ru": "Подключайтесь к этому компьютеру с телефона через мобильный интернет или другую сеть с помощью ретранслятора, который вы развернули сами. Всё шифруется сквозным шифрованием: ретранслятор лишь пересылает данные, которые не может прочитать. По умолчанию выключено.",
+   "id": "Jangkau komputer ini dari ponsel lewat data seluler atau jaringan lain, melalui relay yang Anda pasang sendiri. Semuanya terenkripsi ujung ke ujung: relay hanya meneruskan data yang tidak bisa dibacanya. Nonaktif secara bawaan."
+  },
+  "Relay address": {
+   "zh-Hans": "中继地址",
+   "hi": "रिले का पता",
+   "es": "Dirección del relé",
+   "ar": "عنوان المرحّل",
+   "fr": "Adresse du relais",
+   "bn": "রিলের ঠিকানা",
+   "pt-BR": "Endereço do relay",
+   "ru": "Адрес ретранслятора",
+   "id": "Alamat relay"
+  },
+  "Relay access key": {
+   "zh-Hans": "中继访问密钥",
+   "hi": "रिले एक्सेस की",
+   "es": "Clave de acceso del relé",
+   "ar": "مفتاح وصول المرحّل",
+   "fr": "Clé d'accès du relais",
+   "bn": "রিলের অ্যাক্সেস কী",
+   "pt-BR": "Chave de acesso do relay",
+   "ru": "Ключ доступа к ретранслятору",
+   "id": "Kunci akses relay"
+  },
+  "Paste the access key you set when you deployed the relay. It is kept in the system keystore and never shown again.": {
+   "zh-Hans": "粘贴部署中继时设置的访问密钥。它保存在系统密钥库中,之后不会再显示。",
+   "hi": "रिले तैनात करते समय आपने जो एक्सेस की सेट की थी उसे चिपकाएँ। यह सिस्टम कीस्टोर में रखी जाती है और दोबारा नहीं दिखाई जाती।",
+   "es": "Pega la clave de acceso que definiste al desplegar el relé. Se guarda en el almacén de claves del sistema y no se vuelve a mostrar.",
+   "ar": "الصق مفتاح الوصول الذي عيّنتَه عند نشر المرحّل. يُحفظ في مخزن مفاتيح النظام ولا يُعرض مرة أخرى.",
+   "fr": "Collez la clé d'accès définie lors du déploiement du relais. Elle est conservée dans le trousseau du système et n'est plus jamais affichée.",
+   "bn": "রিলে স্থাপনের সময় যে অ্যাক্সেস কী সেট করেছিলেন তা পেস্ট করুন। এটি সিস্টেম কীস্টোরে থাকে এবং আর দেখানো হয় না।",
+   "pt-BR": "Cole a chave de acesso definida ao publicar o relay. Ela fica no cofre de chaves do sistema e nunca é mostrada novamente.",
+   "ru": "Вставьте ключ доступа, заданный при развёртывании ретранслятора. Он хранится в системном хранилище ключей и больше не показывается.",
+   "id": "Tempel kunci akses yang Anda atur saat memasang relay. Kunci disimpan di penyimpanan kunci sistem dan tidak ditampilkan lagi."
+  },
+  "This code also carries the access key and the end-to-end key for the relay {host}. Pair again makes a new key and a new room.": {
+   "zh-Hans": "此代码还包含中继 {host} 的访问密钥和端到端密钥。“重新配对”会生成新的密钥和新的房间。",
+   "hi": "इस कोड में रिले {host} की एक्सेस की और एंड-टू-एंड कुंजी भी है। “फिर से पेयर करें” नई कुंजी और नया रूम बनाता है।",
+   "es": "Este código también incluye la clave de acceso y la clave de extremo a extremo del relé {host}. «Emparejar de nuevo» crea una clave y una sala nuevas.",
+   "ar": "يتضمن هذا الرمز أيضًا مفتاح الوصول والمفتاح الطرفي للمرحّل {host}. «إعادة الاقتران» تنشئ مفتاحًا وغرفة جديدين.",
+   "fr": "Ce code contient aussi la clé d'accès et la clé de bout en bout du relais {host}. « Associer à nouveau » crée une nouvelle clé et une nouvelle salle.",
+   "bn": "এই কোডে রিলে {host}-এর অ্যাক্সেস কী ও এন্ড-টু-এন্ড কী-ও আছে। “আবার পেয়ার করুন” নতুন কী ও নতুন রুম তৈরি করে।",
+   "pt-BR": "Este código também inclui a chave de acesso e a chave de ponta a ponta do relay {host}. «Parear de novo» cria uma chave e uma sala novas.",
+   "ru": "Этот код также содержит ключ доступа и сквозной ключ для ретранслятора {host}. «Сопрячь заново» создаёт новый ключ и новую комнату.",
+   "id": "Kode ini juga memuat kunci akses dan kunci ujung ke ujung untuk relay {host}. «Sandingkan ulang» membuat kunci dan ruang baru."
   }
  }
 }

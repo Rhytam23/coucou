@@ -59,6 +59,10 @@ pub trait Features: Send + Sync {
     fn usage(&self) -> bool {
         false
     }
+    /// The relay is switched on (the phone then follows an access key rotation).
+    fn relay(&self) -> bool {
+        false
+    }
     /// The services the user allowed for the phone (their ids); empty: none.
     fn services(&self) -> Vec<String> {
         Vec::new()
@@ -94,6 +98,23 @@ impl Shared {
         Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, features, admission: Admission::new() })
     }
 }
+
+impl Shared {
+    /// A slot for the relay link, which reaches the server as one source: the relay's own forwarding is not a LAN
+    /// address, and the relay never shows who is behind it. One slot at a time, so a flood at the relay cannot
+    /// use more of the pool than a flood from one LAN address could.
+    #[cfg(test)]
+    pub(super) fn admission_counts(&self) -> (usize, usize) {
+        self.admission.counts()
+    }
+
+    pub(super) fn admit_relay(&self) -> Option<Ticket> {
+        self.admission.admit(RELAY_SOURCE)
+    }
+}
+
+/// The stand-in source address of everything that arrives through the relay (a documentation address, never routable).
+pub(super) const RELAY_SOURCE: IpAddr = IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 255));
 
 pub fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -178,7 +199,7 @@ async fn one_connection(tcp: TcpStream, acceptor: TlsAcceptor, shared: &Arc<Shar
 }
 
 /// The conversation over a byte stream (TLS in the app), holding its admission ticket until it ends.
-async fn run_with<S>(stream: S, shared: &Arc<Shared>, ticket: Option<Arc<Ticket>>)
+pub(super) async fn run_with<S>(stream: S, shared: &Arc<Shared>, ticket: Option<Arc<Ticket>>)
 where
     S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
 {
@@ -245,6 +266,7 @@ where
     let prefs = asked("prefs");
     let diffs = asked("diffs") && shared.features.diffs();
     let usage = asked("usage") && shared.features.usage();
+    let relay = asked("relay") && shared.features.relay();
     let services: Vec<String> = if asked("services") { shared.features.services() } else { Vec::new() };
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
@@ -265,6 +287,9 @@ where
     if usage {
         offered.push("usage");
     }
+    if relay {
+        offered.push("relay");
+    }
     if !services.is_empty() {
         offered.push("services");
     }
@@ -273,7 +298,7 @@ where
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs, usage, services });
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs, usage, relay, services });
 
     // 2. the conversation
     loop {

@@ -101,6 +101,8 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         settings.phone_diffs = current.phone_diffs;
         settings.phone_usage = current.phone_usage;
         settings.phone_services = current.phone_services.clone();
+        settings.phone_relay = current.phone_relay;
+        settings.phone_relay_url = current.phone_relay_url.clone();
         settings.phone_chat_models = current.phone_chat_models.clone();
         *current = settings;
         (screen_changed, autostart_changed, shortcuts_changed)
@@ -737,6 +739,9 @@ pub fn run() {
             phone_link::phone_link_send_diff,
             phone_link::phone_usage_status,
             phone_link::phone_usage_set_enabled,
+            phone_link::phone_relay_status,
+            phone_link::phone_relay_set,
+            phone_link::phone_relay_set_access,
             phone_link::phone_link_publish_usage,
             phone_link::phone_services_status,
             phone_link::phone_services_set,

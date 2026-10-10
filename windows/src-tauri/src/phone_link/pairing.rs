@@ -97,6 +97,27 @@ pub fn pairing_link(host: &str, port: u16, fingerprint: &str, token: &str, name:
     )
 }
 
+/// What the pairing link carries so the phone can also reach this computer through the user's relay
+/// (docs/RELAY_LINK.md section 2). All four are present together or not at all.
+pub struct RelayLink<'a> {
+    pub url: &'a str,
+    pub room: &'a str,
+    pub key: &'a str,
+    pub access: &'a str,
+}
+
+/// The link with the relay fields appended. Whoever holds this link holds K: it is shown only in Settings.
+pub fn pairing_link_with_relay(host: &str, port: u16, fingerprint: &str, token: &str, name: &str, relay: &RelayLink) -> String {
+    format!(
+        "{}&relay={}&room={}&key={}&access={}",
+        pairing_link(host, port, fingerprint, token, name),
+        percent_encode(relay.url),
+        relay.room,
+        relay.key,
+        relay.access
+    )
+}
+
 fn percent_encode(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
@@ -237,6 +258,23 @@ pub mod tests {
                 "coucou://pair?v=1&host=192.168.1.20&port=47821&fp={}&token=tok_en-1234567890abcd&name=L%C3%A9a%27s%20PC%20%26%20co",
                 "ab".repeat(32)
             )
+        );
+    }
+
+    #[test]
+    fn the_relay_fields_follow_the_lan_ones_and_nothing_is_lost() {
+        let base = pairing_link("192.168.1.20", 47821, &"ab".repeat(32), "tok_en-1234567890abcd", "PC");
+        let relay = RelayLink {
+            url: "wss://relay.example.workers.dev:8443",
+            room: "AAAAAAAAAAAAAAAAAAAAAA",
+            key: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+            access: "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC",
+        };
+        let link = pairing_link_with_relay("192.168.1.20", 47821, &"ab".repeat(32), "tok_en-1234567890abcd", "PC", &relay);
+        assert!(link.starts_with(&base), "an older phone reads the same LAN part");
+        assert_eq!(
+            &link[base.len()..],
+            "&relay=wss:%2F%2Frelay.example.workers.dev:8443&room=AAAAAAAAAAAAAAAAAAAAAA&key=BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&access=CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"
         );
     }
 

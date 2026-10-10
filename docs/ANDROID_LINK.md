@@ -341,3 +341,12 @@ simply keeps using the saved address.**
   line, late decision, answered-at-the-desk, pairing again, local-network filter...).
 - `RustDesktopInteropTest` runs the Android client against the real Rust server
   (`COUCOU_RUST_INTEROP=1`, needs cargo; the `Phone link` workflow does it).
+
+## Through a relay (optional capability `relay`)
+
+When the user turns on "Away from home Wi-Fi" in Settings > Android phone, the pairing link carries four more fields
+(`relay`, `room`, `key`, `access`) and a phone that sends `caps: ["relay"]` is offered `relay` in `welcome.caps` (re-read for
+every connection). The conversation itself is unchanged and runs inside an end-to-end encrypted channel through the user's own
+relay; the wire is in `docs/RELAY_LINK.md`. When the user replaces the relay's access key, each phone that negotiated `relay`
+is sent `{"type":"relayAccess","access":"<43 base64url characters>"}` and follows the new key. A phone that did not negotiate
+`relay` is never sent it.

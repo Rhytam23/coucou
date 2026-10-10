@@ -415,6 +415,9 @@ struct Sub {
     diffs: bool,
     /// The phone asked for `usage` and the user's switch was on when it connected.
     usage: bool,
+    /// The phone asked for `relay` and the relay switch was on when it connected: it is sent the new access key
+    /// when the user rotates it (docs/RELAY_LINK.md section 6).
+    relay: bool,
     /// The services this phone may see (the user's ticks when it connected); empty: none.
     services: Vec<String>,
     /// When this phone asked for a diff lately (ms), to keep it from flooding the island.
@@ -429,6 +432,7 @@ pub struct Caps {
     pub prefs: bool,
     pub diffs: bool,
     pub usage: bool,
+    pub relay: bool,
     /// The services the user allowed for the phone (empty: the capability is not offered).
     pub services: Vec<String>,
 }
@@ -547,7 +551,7 @@ impl Hub {
 
     /// Like [`subscribe`], for a phone that may also have been offered `answers` and `prefs`.
     pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, caps: Caps) -> (u64, Arc<AtomicBool>) {
-        let Caps { details, answers, prefs, diffs, usage, services } = caps;
+        let Caps { details, answers, prefs, diffs, usage, relay, services } = caps;
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -578,12 +582,32 @@ impl Hub {
             }
         }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, usage, services, diff_asks: Vec::new() });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, usage, relay, services, diff_asks: Vec::new() });
         (id, evicted)
     }
 
     pub fn unsubscribe(&self, id: u64) {
         self.inner.lock().unwrap().subs.retain(|s| s.id != id);
+    }
+
+    /// The access key was rotated: phones that negotiated `relay` are told the new one, inside the authenticated
+    /// channel, so they follow without scanning again. Returns how many were told.
+    pub fn send_relay_access(&self, access: &str) -> usize {
+        let line: Arc<str> = json!({ "type": "relayAccess", "access": access }).to_string().into();
+        let mut told = 0;
+        self.inner.lock().unwrap().subs.retain(|s| {
+            if !s.relay {
+                return true;
+            }
+            let kept = s.tx.try_send(Out::Line(line.clone())).is_ok();
+            if kept {
+                told += 1;
+            } else {
+                s.evicted.store(true, Ordering::SeqCst);
+            }
+            kept
+        });
+        told
     }
 
     /// Unpaired or switched off: every connection is told and closed.
@@ -1619,6 +1643,20 @@ mod tests {
         let (tx, rx) = mpsc::channel(64);
         let (id, _) = hub.subscribe_with(tx, 1_000, caps);
         (id, rx)
+    }
+
+    #[test]
+    fn only_phones_that_negotiated_relay_hear_of_a_new_access_key() {
+        let (hub, _) = hub();
+        let (_, mut with) = sub_with(&hub, Caps { relay: true, ..Caps::default() });
+        let (_, mut without) = sub_with(&hub, Caps::default());
+        drain(&mut with);
+        drain(&mut without);
+        let access = "C".repeat(43);
+        assert_eq!(hub.send_relay_access(&access), 1);
+        let told = drain(&mut with);
+        assert_eq!(told, vec![serde_json::json!({ "type": "relayAccess", "access": access })]);
+        assert!(drain(&mut without).is_empty(), "a phone that did not ask is never sent it");
     }
 
     #[test]

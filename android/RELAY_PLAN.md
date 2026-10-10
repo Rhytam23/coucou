@@ -271,7 +271,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | R0 | Spec and vectors **(done)** | `docs/RELAY_LINK.md` (wire, access key, handshake, frame, limits, rotation) and `android/relay/test-vectors.json` + generator `android/relay/tools/gen-vectors.mjs` | generator self-checks (RFC 5869 vector, no (key, nonce) twice), CI `--check`, an independent Python re-computation; the vectors are used by R2 on both sides |
 | R1 | Relay service **(done)** | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
 | R2 | Secure channel core **(done)** | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
-| R3 | PC client | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
+| R3 | PC client **(done)** | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
 | R4 | Android client | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
 | R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
 | R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
@@ -358,3 +358,26 @@ Nothing published, no release, no store listing, no PR to upstream; commits end 
 `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; pushes only to `android`; the Android app stays English only;
 new PC strings get the nine translations; `change log.md` stays local; secrets in the keystores; no telemetry; the agent is never blocked;
 no permission is ever approved without an explicit click and the phone's screen-lock check.
+
+### Findings while building R3
+
+- The WebSocket framing is `tokio-tungstenite` 0.26 with **no TLS feature** (D1): TLS is the `tokio-rustls`/`ring` already in the
+  tree, with the web roots (`webpki-roots`) that `reqwest` already pulled in, so no second crypto provider (aws-lc) is added. New
+  direct dependencies: `tokio-tungstenite`, `webpki-roots`, `futures-util` (sink trait only); `tokio` gained `macros`.
+- The relay client is one task (`phone_link/relay_client.rs`). It reuses the LAN server's conversation code unchanged: decrypted
+  lines go into an in-memory pipe whose other end is `server::run_with`, exactly the function the TLS path uses, so fingerprints,
+  120 s offers, decide-once, per-feature switches and the token check are the same code, not a copy. A test sends a wrong token
+  and a wrong fingerprint through the relay and gets the same refusals as on the LAN.
+- **Admission.** Everything arriving through the relay is one source (`192.0.2.255`, a documentation address that is never
+  routable) with one slot at a time. A newer `init` replaces the previous conversation, so a flood of `init` frames cannot take
+  more than one slot; 3 bad handshake frames silence `init` for 10 s.
+- Secrets: the access key, the room and K are in the OS keystore (`phone-relay-access/-room/-key`), `Credentials` and the pairing
+  key print as `(..)`, the module has no logging at all (a test reads its source), and the Settings window can only write the
+  access key (the status it gets back says whether one is stored).
+- "Pair again" now also makes a new room and a new K, then reconnects, so a phone holding the old ones is cut off at the relay as
+  well as at the PC.
+- `relay` capability: offered to a phone that asks for it only while the relay switch is on; when the access key is replaced, the
+  phones that negotiated it are sent `relayAccess` inside the encrypted channel (an older phone is never sent it).
+- A test that replays a recorded frame, flips a frame and sends frames sealed under old session keys shows each one ends the
+  conversation and gives the slot back.
+- Not tested here: a real Cloudflare relay (R5 runs the real Worker under `wrangler dev`) and a real phone (R4).

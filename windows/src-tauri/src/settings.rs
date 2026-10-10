@@ -91,6 +91,12 @@ pub struct Settings {
     pub phone_usage: bool,
     /// The service pills whose cards the phone may see, by pill id (cap `services`). None by default; owned by Rust like the other phone switches.
     pub phone_services: Vec<String>,
+    /// Reach the phone through the user's own relay when it is not on this network (phone_link/relay_client.rs).
+    /// Off by default; owned by Rust like the other phone switches. The access key, the room and the pairing key live
+    /// in the OS keystore, never here.
+    pub phone_relay: bool,
+    /// The relay's address (`wss://…`), empty until the user enters it. Not a secret. Owned by Rust.
+    pub phone_relay_url: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -154,6 +160,8 @@ impl Default for Settings {
             phone_diffs: false,
             phone_usage: false,
             phone_services: Vec::new(),
+            phone_relay: false,
+            phone_relay_url: String::new(),
         }
     }
 }
@@ -438,7 +446,9 @@ mod tests {
   "phoneAnswers": true,
   "phoneDiffs": true,
   "phoneUsage": true,
-  "phoneServices": ["integration_stripe"]
+  "phoneServices": ["integration_stripe"],
+  "phoneRelay": true,
+  "phoneRelayUrl": "wss://relay.example.workers.dev"
 }"##;
 
     fn custom() -> Value {
@@ -605,6 +615,17 @@ mod tests {
         assert!(!parse(&custom_with("phoneUsage", None)).unwrap().phone_usage);
         assert!(parse(&custom_with("phoneUsage", Some(serde_json::json!(true)))).unwrap().phone_usage);
         assert!(!parse(&custom_with("phoneUsage", Some(serde_json::json!("yes")))).unwrap().phone_usage, "a wrong type does not switch it on");
+    }
+
+    #[test]
+    fn a_file_from_before_the_relay_keeps_it_off_and_empty() {
+        assert!(!Settings::default().phone_relay);
+        assert!(Settings::default().phone_relay_url.is_empty());
+        let old = parse(&custom_with("phoneRelay", None)).unwrap();
+        assert!(!old.phone_relay);
+        assert!(parse(&custom_with("phoneRelay", Some(serde_json::json!(true)))).unwrap().phone_relay);
+        assert!(!parse(&custom_with("phoneRelay", Some(serde_json::json!("yes")))).unwrap().phone_relay, "a wrong type does not switch it on");
+        assert!(parse(&custom_with("phoneRelayUrl", Some(serde_json::json!(5)))).unwrap().phone_relay_url.is_empty());
     }
 
     #[test]
@@ -933,6 +954,8 @@ mod tests {
                 "phoneDiffs",
                 "phoneUsage",
                 "phoneServices",
+                "phoneRelay",
+                "phoneRelayUrl",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

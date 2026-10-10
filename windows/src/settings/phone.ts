@@ -1,7 +1,7 @@
 // Settings → Android phone: the switch for the phone link and the code that
 // pairs a phone with this computer. Off until the user turns it on.
 
-import { Bridge, type PhoneChatStatus, type PhoneLinkPairing, type PhoneLinkStatus } from "../core/bridge";
+import { Bridge, type PhoneChatStatus, type PhoneLinkPairing, type PhoneLinkStatus, type PhoneRelayState, type PhoneRelayStatus } from "../core/bridge";
 import { modelId, modelsOf, toggleModel, usableProviders } from "../core/phone-chat";
 import { PROVIDERS, type ProviderDef } from "../core/providers";
 import type { Settings } from "../core/state";
@@ -21,10 +21,20 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
   };
 
   /** The code itself, which lets a phone in: shown only when asked for. */
-  const reveal = async (status: PhoneLinkStatus, newCode: boolean) => {
+  const reveal = async (status: PhoneLinkStatus | null, newCode: boolean) => {
     try {
       const pairing = newCode ? await Bridge.phoneLinkNewPairing() : await Bridge.phoneLinkPairing();
       pairingBox.replaceChildren(...pairingRows(pairing, () => void reveal(status, true)));
+    } catch (err) {
+      showError(String(err));
+    }
+  };
+
+  /** After the relay settings change, a code that is on screen would be stale: show the current one. */
+  const refreshPairing = async () => {
+    if (pairingBox.childElementCount === 0) return;
+    try {
+      pairingBox.replaceChildren(...pairingRows(await Bridge.phoneLinkPairing(), () => void reveal(null, true)));
     } catch (err) {
       showError(String(err));
     }
@@ -48,6 +58,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
       h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
       h("div", { class: "hint", text: t("Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.") }),
+      relayBlock(makeToggle, () => void refreshPairing()),
       detailsBlock(makeToggle),
       answersBlock(makeToggle),
       diffsBlock(makeToggle),
@@ -94,6 +105,96 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
     detail,
   );
   return section;
+}
+
+/** What the status line says about the relay. */
+export function relayStateText(state: PhoneRelayState): string {
+  switch (state) {
+    case "connecting": return t("Reaching the relay…");
+    case "waiting": return t("Connected to the relay, waiting for the phone.");
+    case "linked": return t("The phone is connected through the relay.");
+    case "accessRefused": return t("The relay refused the access key.");
+    case "unreachable": return t("The relay cannot be reached. Trying again.");
+    case "roomTaken": return t("This pairing is in use somewhere else. Press Pair again.");
+    case "tooMany": return t("The relay is limiting connections from here. Trying again later.");
+    default: return t("Off");
+  }
+}
+
+/**
+ * "Away from home Wi-Fi": reach the phone through a relay the user deployed on their own account. Off until the user
+ * enters the address and the access key and turns it on. The access key is write-only: it goes to the system keystore
+ * and the window never gets it back. Rust re-reads the switch for every connection.
+ */
+function relayBlock(makeToggle: Toggle, changed: () => void): HTMLElement {
+  const note = h("div", { class: "hint" });
+  const state = h("div", { class: "hint" });
+  const address = h("input", { type: "text", placeholder: "wss://", style: "width:100%", autocomplete: "off", spellcheck: "false" }) as HTMLInputElement;
+  const access = h("input", { type: "password", style: "width:100%", autocomplete: "off", spellcheck: "false" }) as HTMLInputElement;
+  let current: PhoneRelayStatus = { enabled: false, url: "", hasAccess: false, state: "off" };
+
+  const show = (status: PhoneRelayStatus | null) => {
+    if (!status) return;
+    current = status;
+    switchEl.classList.toggle("on", status.enabled);
+    switchEl.setAttribute("aria-pressed", String(status.enabled));
+    if (document.activeElement !== address) address.value = status.url;
+    access.placeholder = status.hasAccess ? "••••••••" : "";
+    state.textContent = status.enabled ? relayStateText(status.state) : "";
+  };
+  const fail = (err: unknown) => {
+    note.textContent = String(err);
+    switchEl.classList.remove("on");
+    switchEl.setAttribute("aria-pressed", "false");
+  };
+  const apply = async (enabled: boolean) => {
+    note.textContent = "";
+    try {
+      show(await Bridge.phoneRelaySet(enabled, address.value));
+      changed();
+    } catch (err) {
+      fail(err);
+    }
+  };
+  const switchEl = makeToggle(false, (next) => void apply(next));
+  const saveAddress = h("button", { text: t("Save address") });
+  saveAddress.addEventListener("click", () => void apply(current.enabled));
+  const saveKey = h("button", { text: t("Save key") });
+  saveKey.addEventListener("click", () => {
+    void (async () => {
+      note.textContent = "";
+      try {
+        const next = await Bridge.phoneRelaySetAccess(access.value);
+        access.value = ""; // never kept on the page
+        show(next);
+        changed();
+      } catch (err) {
+        note.textContent = String(err);
+      }
+    })();
+  });
+
+  void Bridge.phoneRelayStatus().then(show);
+  // Kept up to date while the window is open; nothing runs while it is hidden.
+  const watch = window.setInterval(() => {
+    if (!state.isConnected) return window.clearInterval(watch);
+    if (document.visibilityState !== "visible") return;
+    void Bridge.phoneRelayStatus().then(show);
+  }, 5000);
+
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Away from home Wi-Fi") }), switchEl),
+    h("div", { class: "hint", text: t("Reach this computer from your phone on mobile data or another network, through a relay you deployed yourself. Everything is encrypted end to end: the relay only forwards data it cannot read. Off by default.") }),
+    h("div", { class: "row" }, h("label", { text: t("Relay address") })),
+    h("div", { class: "row" }, address, saveAddress),
+    h("div", { class: "row" }, h("label", { text: t("Relay access key") })),
+    h("div", { class: "row" }, access, saveKey),
+    h("div", { class: "hint", text: t("Paste the access key you set when you deployed the relay. It is kept in the system keystore and never shown again.") }),
+    state,
+    note,
+  );
 }
 
 /**
@@ -403,6 +504,7 @@ function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[
     qr,
     h("div", { class: "row" }, link, copy),
     copied,
+    ...(pairing.relay ? [h("div", { class: "hint", text: t("This code also carries the access key and the end-to-end key for the relay {host}. Pair again makes a new key and a new room.", { host: pairing.relay }) })] : []),
     h("div", { class: "row" }, repair, h("span", { class: "hint", text: t("The phone that was paired is disconnected and needs the new code.") })),
   ];
 }

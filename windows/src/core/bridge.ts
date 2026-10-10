@@ -41,6 +41,18 @@ export interface PhoneLinkStatus {
   name: string;
   clients: number;
   error: string | null;
+  /** The relay connection ("Away from home Wi-Fi"). */
+  relayState: PhoneRelayState;
+}
+
+export type PhoneRelayState = "off" | "connecting" | "waiting" | "linked" | "accessRefused" | "unreachable" | "roomTaken" | "tooMany";
+
+/** The relay switch and address. The access key is write-only: only whether one is stored comes back. */
+export interface PhoneRelayStatus {
+  enabled: boolean;
+  url: string;
+  hasAccess: boolean;
+  state: PhoneRelayState;
 }
 
 /** Session details for the phone: the switch (off by default). */
@@ -61,6 +73,8 @@ export interface PhoneLinkPairing {
   host: string;
   port: number;
   name: string;
+  /** The relay's host when this link also carries the relay fields. */
+  relay: string | null;
 }
 
 /** One session as the phone sees it; Rust stamps `updatedAt`. */
@@ -292,6 +306,11 @@ export const Bridge = {
   /** None by default; only from the ticks in Settings. Phones are reconnected so they learn about it. */
   phoneServicesSet: (services: string[]) => callOrThrow<PhoneServicesStatus>("phone_services_set", { services }),
   phoneLinkPublishServices: (services: PhoneLinkService[]) => call<void>("phone_link_publish_services", { services }),
+  phoneRelayStatus: () => call<PhoneRelayStatus>("phone_relay_status"),
+  /** Off by default; needs a valid wss:// address and a stored access key. */
+  phoneRelaySet: (enabled: boolean, url: string) => callOrThrow<PhoneRelayStatus>("phone_relay_set", { enabled, url }),
+  /** Write-only: stored in the OS keystore, never sent back. An empty value clears it. */
+  phoneRelaySetAccess: (access: string) => callOrThrow<PhoneRelayStatus>("phone_relay_set_access", { access }),
   phoneUsageStatus: () => call<PhoneUsageStatus>("phone_usage_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneUsageSetEnabled: (enabled: boolean) => callOrThrow<PhoneUsageStatus>("phone_usage_set_enabled", { enabled }),

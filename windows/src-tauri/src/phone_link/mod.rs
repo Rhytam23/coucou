@@ -21,6 +21,7 @@ mod hub;
 #[cfg(test)]
 mod interop;
 mod pairing;
+mod relay_client;
 mod relay_crypto;
 mod server;
 #[cfg(test)]
@@ -105,6 +106,9 @@ impl server::Features for TauriFeatures {
     fn usage(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_usage
     }
+    fn relay(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_relay
+    }
     fn services(&self) -> Vec<String> {
         // Only ids the link knows, whatever the file held.
         let ticked = self.app.state::<Shared>().settings.lock().unwrap().phone_services.clone();
@@ -122,6 +126,8 @@ pub struct PhoneLink {
     advertiser: discovery::Advertiser,
     running: Mutex<Option<Running>>,
     error: Mutex<Option<String>>,
+    /// The connection to the user's relay (relay_client.rs): exists only while the link runs AND the relay switch is on.
+    relay: Mutex<Option<relay_client::Handle>>,
 }
 
 impl PhoneLink {
@@ -134,7 +140,36 @@ impl PhoneLink {
             advertiser: discovery::Advertiser::new(Arc::new(discovery::MdnsPublisher::new())),
             running: Mutex::new(None),
             error: Mutex::new(None),
+            relay: Mutex::new(None),
         }
+    }
+
+    /// (Re)starts the relay connection from the settings and the keystore, or stops it. Never fails the link: a
+    /// problem is only a status the user can read in Settings.
+    fn sync_relay(&self) {
+        if let Some(old) = self.relay.lock().unwrap().take() {
+            old.stop();
+        }
+        let Some(shared) = self.running.lock().unwrap().as_ref().map(|r| r.shared.clone()) else { return };
+        let (on, url) = {
+            let s = self.app.state::<Shared>();
+            let s = s.settings.lock().unwrap();
+            (s.phone_relay, s.phone_relay_url.clone())
+        };
+        if !on {
+            return;
+        }
+        let Ok(target) = relay_client::Target::parse(&url) else {
+            log::line("phone link: relay address not valid, not connecting");
+            return;
+        };
+        let Ok(creds) = relay_client::credentials(&*self.store) else {
+            log::line("phone link: relay needs an access key, not connecting");
+            return;
+        };
+        let handle = tauri::async_runtime::block_on(async move { relay_client::start(shared, target, creds) });
+        log::line("phone link: connecting to the relay");
+        *self.relay.lock().unwrap() = Some(handle);
     }
 
     /// Starts listening. Fails without side effects if the keystore is missing:
@@ -155,6 +190,8 @@ impl PhoneLink {
                 }
                 *running = Some(r);
                 *self.error.lock().unwrap() = None;
+                drop(running);
+                self.sync_relay();
                 Ok(())
             }
             Err(e) => {
@@ -189,6 +226,9 @@ impl PhoneLink {
     }
 
     pub fn stop(&self) {
+        if let Some(relay) = self.relay.lock().unwrap().take() {
+            relay.stop();
+        }
         self.advertiser.stop();
         if let Some(r) = self.running.lock().unwrap().take() {
             r.handle.stop();
@@ -210,6 +250,8 @@ pub struct Status {
     pub name: String,
     pub clients: usize,
     pub error: Option<String>,
+    /// The relay connection ("Away from home Wi-Fi"); `off` when it is not switched on.
+    pub relay_state: relay_client::State,
 }
 
 #[derive(Serialize)]
@@ -220,6 +262,8 @@ pub struct Pairing {
     pub host: String,
     pub port: u16,
     pub name: String,
+    /// The relay's address when the link also carries the relay fields; the phone shows it as the host.
+    pub relay: Option<String>,
 }
 
 fn status_of(link: &PhoneLink, enabled: bool) -> Status {
@@ -232,6 +276,7 @@ fn status_of(link: &PhoneLink, enabled: bool) -> Status {
         name: pairing::computer_name(),
         clients: link.hub.clients(),
         error: link.error.lock().unwrap().clone(),
+        relay_state: link.relay.lock().unwrap().as_ref().map_or(relay_client::State::Off, |h| h.state()),
     }
 }
 
@@ -275,16 +320,31 @@ pub fn phone_link_pairing(window: WebviewWindow, link: State<PhoneLink>) -> Resu
     }
     let running = link.running.lock().unwrap();
     let r = running.as_ref().ok_or("the phone link is off")?;
-    pairing_of(r)
+    pairing_of(&link, r)
 }
 
-fn pairing_of(r: &Running) -> Result<Pairing, String> {
+fn pairing_of(link: &PhoneLink, r: &Running) -> Result<Pairing, String> {
     let host = pairing::lan_address().map(|ip| ip.to_string()).ok_or("no local network address found")?;
     let name = r.shared.name.clone();
     let token = r.shared.token.lock().unwrap().clone();
-    let link = pairing::pairing_link(&host, r.port, &r.identity.fingerprint, &token, &name);
-    let qr_svg = pairing::qr_svg(&link).unwrap_or_default();
-    Ok(Pairing { link, qr_svg, host, port: r.port, name })
+    let (on, url) = {
+        let s = link.app.state::<Shared>();
+        let s = s.settings.lock().unwrap();
+        (s.phone_relay, s.phone_relay_url.clone())
+    };
+    // The relay fields go in only when the switch is on and everything for it is there.
+    let relay = if on { relay_client::Target::parse(&url).ok().and_then(|t| relay_client::credentials(&*link.store).ok().map(|c| (t, c))) } else { None };
+    let (link_text, relay_host) = match &relay {
+        Some((target, creds)) => {
+            let shown = target.display();
+            let key = creds.key.to_base64url();
+            let fields = pairing::RelayLink { url: &shown, room: &creds.room, key: &key, access: &creds.access };
+            (pairing::pairing_link_with_relay(&host, r.port, &r.identity.fingerprint, &token, &name, &fields), Some(target.host.clone()))
+        }
+        None => (pairing::pairing_link(&host, r.port, &r.identity.fingerprint, &token, &name), None),
+    };
+    let qr_svg = pairing::qr_svg(&link_text).unwrap_or_default();
+    Ok(Pairing { link: link_text, qr_svg, host, port: r.port, name, relay: relay_host })
 }
 
 /// A new pairing code: the phone that had the old one is disconnected and must
@@ -298,9 +358,112 @@ pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> 
     let r = running.as_ref().ok_or("the phone link is off")?;
     let token = pairing::new_token(&*link.store)?;
     *r.shared.token.lock().unwrap() = token;
+    // "Pair again" also makes a new room and a new K: a phone that held the old ones can no longer reach this computer
+    // through the relay, whatever it still remembers.
+    relay_client::new_pairing(&*link.store)?;
     link.hub.kick_all("auth", "unpaired");
     log::line("phone link: new pairing code, phones disconnected");
-    pairing_of(r)
+    let result = pairing_of(&link, r);
+    drop(running);
+    link.sync_relay();
+    result
+}
+
+// ── Away from home Wi-Fi: the relay (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelayStatus {
+    pub enabled: bool,
+    /// The relay's address as entered (not a secret).
+    pub url: String,
+    /// An access key is stored. The key itself is never sent back to the window.
+    pub has_access: bool,
+    pub state: relay_client::State,
+}
+
+fn relay_status_of(link: &PhoneLink, shared: &Shared) -> RelayStatus {
+    let s = shared.settings.lock().unwrap();
+    RelayStatus {
+        enabled: s.phone_relay,
+        url: s.phone_relay_url.clone(),
+        has_access: relay_client::access_key(&*link.store).is_some(),
+        state: link.relay.lock().unwrap().as_ref().map_or(relay_client::State::Off, |h| h.state()),
+    }
+}
+
+#[tauri::command]
+pub fn phone_relay_status(link: State<PhoneLink>, shared: State<Shared>) -> RelayStatus {
+    relay_status_of(&link, &shared)
+}
+
+/// The relay switch and its address. Off by default and never on without a valid address and an access key.
+/// Turning it on or changing the address reconnects; the phones already paired over the LAN keep working.
+#[tauri::command]
+pub fn phone_relay_set(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+    url: String,
+) -> Result<RelayStatus, String> {
+    only_settings(&window)?;
+    let url = url.trim().to_string();
+    let clean = if url.is_empty() { String::new() } else { relay_client::Target::parse(&url).map_err(String::from)?.display() };
+    if enabled {
+        if clean.is_empty() {
+            return Err("Enter the relay address first".into());
+        }
+        if relay_client::access_key(&*link.store).is_none() {
+            return Err("Enter the relay's access key first".into());
+        }
+    }
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_relay = enabled;
+        current.phone_relay_url = clean;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.sync_relay();
+    log::line(format!("phone link: relay {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(relay_status_of(&link, &shared))
+}
+
+/// The relay's access key, write-only: stored in the OS keystore and never sent back to the window. Empty clears it
+/// (and switches the relay off, since it cannot connect without one).
+#[tauri::command]
+pub fn phone_relay_set_access(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    access: String,
+) -> Result<RelayStatus, String> {
+    only_settings(&window)?;
+    relay_client::set_access_key(&*link.store, &access)?;
+    if relay_client::access_key(&*link.store).is_none() {
+        let updated = {
+            let mut current = shared.settings.lock().unwrap();
+            current.phone_relay = false;
+            if let Err(err) = settings::save(&current) {
+                log::line(format!("could not save settings: {err}"));
+            }
+            current.clone()
+        };
+        let _ = app.emit("settings-changed", updated);
+    }
+    // Phones paired for the relay follow the new key by themselves (LAN or relay); others re-scan.
+    if let Some(access) = relay_client::access_key(&*link.store) {
+        let told = link.hub.send_relay_access(&access);
+        log::line(format!("phone link: relay access key changed, {told} phone(s) told"));
+    }
+    link.sync_relay();
+    Ok(relay_status_of(&link, &shared))
 }
 
 // ── Session details for the phone: the switch (Settings → Android phone) ──

@@ -1634,3 +1634,59 @@ mod services_tests {
         });
     }
 }
+
+mod relay_cap_tests {
+    use super::*;
+    use crate::phone_link::server::Features;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Switch(AtomicBool);
+    impl Features for Switch {
+        fn details(&self) -> bool {
+            false
+        }
+        fn relay(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    async fn welcome_for(rig: &Rig, caps: Option<Value>) -> (Client, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        (c, welcome)
+    }
+
+    #[test]
+    fn relay_is_offered_only_while_the_switch_is_on_and_the_phone_asked() {
+        block_on(async {
+            let on = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (_c, welcome) = welcome_for(&on, Some(json!(["relay"]))).await;
+            assert_eq!(welcome["caps"], json!(["relay"]));
+            let (_c, welcome) = welcome_for(&on, None).await;
+            assert!(welcome.get("caps").is_none(), "an older phone is never offered it");
+            let off = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(false)))).await;
+            let (_c, welcome) = welcome_for(&off, Some(json!(["relay"]))).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+        });
+    }
+
+    #[test]
+    fn a_rotated_access_key_reaches_a_phone_that_negotiated_relay() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (mut c, _) = welcome_for(&rig, Some(json!(["relay"]))).await;
+            let (mut other, _) = welcome_for(&rig, None).await;
+            let access = "D".repeat(43);
+            assert_eq!(rig.hub.send_relay_access(&access), 1);
+            let m = c.expect("relayAccess").await;
+            assert_eq!(m["access"], access);
+            other.send(json!({ "type": "ping" })).await;
+            other.expect("pong").await; // it only ever sees ordinary traffic
+        });
+    }
+}
