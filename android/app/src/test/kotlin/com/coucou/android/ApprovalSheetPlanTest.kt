@@ -32,7 +32,5 @@ class ApprovalSheetPlanTest {
 
     @Test fun earlyTapsAreIgnoredLikeOnTheIsland() {
         assertEquals(OverlayPolicy.TAP_GUARD_MS.toLong(), ApprovalSheetPlan.GUARD_MS)
-        assertFalse(ApprovalSheetPlan.tapsAccepted(1_000, 1_599))
-        assertTrue(ApprovalSheetPlan.tapsAccepted(1_000, 1_600))
     }
 }

@@ -1,6 +1,5 @@
 package com.coucou.android.core
 
-import com.coucou.android.mochi.BotState
 
 /**
  * When the small pill drops from the top of the screen, like the notch on the computer: it stays
@@ -9,15 +8,6 @@ import com.coucou.android.mochi.BotState
  * it is answered.
  */
 object OverlayPolicy {
-    private val FLASH = setOf(BotState.FINISHED, BotState.ERROR, BotState.QUESTION, BotState.RATELIMIT)
-
-    /**
-     * Only a change into one of those states wakes it. The same state sent again does not, and
-     * neither does the first picture after connecting (previous == null): sessions that finished
-     * long ago must not drop the pill every time the phone reconnects.
-     */
-    fun shouldFlash(previous: BotState?, now: BotState): Boolean = previous != null && now in FLASH && previous != now
-
     /** The pill is for when you are in another app; inside Coucou the screen already shows it. */
     fun shouldShow(enabled: Boolean, permitted: Boolean, appInForeground: Boolean): Boolean =
         blocker(enabled, permitted, appInForeground) == null

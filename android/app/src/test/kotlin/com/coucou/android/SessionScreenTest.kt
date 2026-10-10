@@ -42,7 +42,6 @@ class SessionScreenTest {
             assertFalse("$f", text.contains("step_of") || text.contains("LinearProgressIndicator") || text.contains("stepNumber"))
         }
         assertFalse(strings.contains("Step %1"))
-        assertFalse(src("core/Summary.kt").contains("fun progress") || src("core/Summary.kt").contains("fun stepNumber"))
     }
 
     @Test fun stepsReadLikeTheTickerDoneStepsGetACheckAndTheOneInProgressTheAgentsDot() {

@@ -19,6 +19,4 @@ object ApprovalSheetPlan {
 
     /** "Wants to run a command": what kind of action it is, never the command itself. */
     fun action(tool: String): String = ToolLabels.action(tool)
-
-    fun tapsAccepted(shownAtMs: Long, nowMs: Long): Boolean = nowMs - shownAtMs >= GUARD_MS
 }
