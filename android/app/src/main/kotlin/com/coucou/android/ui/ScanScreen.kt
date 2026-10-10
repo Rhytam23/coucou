@@ -19,6 +19,21 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.coucou.android.core.IconKind
+import com.coucou.android.core.IslandSurface
+import com.coucou.android.core.Spacing
+import com.coucou.android.core.Tokens
+import com.coucou.android.core.TypeScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,11 +43,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -106,8 +117,19 @@ fun ScanScreen(onBack: () -> Unit, onText: (String) -> Boolean) {
         granted, asked, canExplain = context.activity()?.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) == true,
     )
 
-    Column(Modifier.fillMaxSize().padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-        ScreenTitle(stringResource(R.string.scan_title), onBack)
+    val backLabel = stringResource(R.string.action_back)
+    // A camera screen: black in both themes, edge to edge, with light text.
+    Column(
+        Modifier.fillMaxSize().background(Color(IslandSurface.BLACK)).windowInsetsPadding(WindowInsets.statusBars).padding(horizontal = Gutter),
+        verticalArrangement = Arrangement.spacedBy(Gap),
+    ) {
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(Spacing.MIN_TOUCH.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onBack).semantics { contentDescription = backLabel },
+                contentAlignment = Alignment.Center,
+            ) { CoucouIcon(IconKind.BACK, tint = Color(IslandSurface.TEXT), size = 24.dp) }
+            Text(stringResource(R.string.scan_title), style = TypeScale.TITLE.style(Color(IslandSurface.TEXT)), maxLines = 1)
+        }
         when {
             state == ScanPermission.State.GRANTED && !cameraFailed -> {
                 Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(14.dp))) {
@@ -123,38 +145,24 @@ fun ScanScreen(onBack: () -> Unit, onText: (String) -> Boolean) {
                     Viewfinder()
                 }
                 Text(
-                    stringResource(if (wrong) R.string.scan_not_pairing else R.string.scan_hint), Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center,
-                    color = if (wrong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    stringResource(if (wrong) R.string.scan_not_pairing else R.string.scan_hint), Modifier.fillMaxWidth().padding(bottom = Gap),
+                    style = TypeScale.BODY.style(if (wrong) Color(Tokens.DARK.danger) else Color(IslandSurface.TEXT_DIM)).copy(textAlign = TextAlign.Center),
                 )
             }
             state == ScanPermission.State.GRANTED -> Message(stringResource(R.string.scan_camera_error), onBack)
             state == ScanPermission.State.ASK -> {
-                CoucouCard {
-                    Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                        Text(stringResource(R.string.scan_why), style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                            Text(stringResource(R.string.scan_allow), maxLines = 1)
-                        }
-                    }
-                }
-                TextButton(onClick = onBack, Modifier.fillMaxWidth()) { Text(stringResource(R.string.scan_paste_instead), maxLines = 1) }
+                Text(stringResource(R.string.scan_why), Modifier.padding(top = Gap), style = TypeScale.BODY.style(Color(IslandSurface.TEXT)))
+                PillButton(stringResource(R.string.scan_allow), { launcher.launch(Manifest.permission.CAMERA) }, Modifier.fillMaxWidth(), PillKind.PRIMARY, onDark = true)
+                PillButton(stringResource(R.string.scan_paste_instead), onBack, Modifier.fillMaxWidth(), onDark = true)
             }
             else -> {
-                CoucouCard {
-                    Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                        Text(stringResource(R.string.scan_blocked), style = MaterialTheme.typography.bodyMedium)
-                        Button(
-                            onClick = {
-                                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
-                            },
-                            Modifier.fillMaxWidth().height(48.dp), shape = CircleShape,
-                        ) { Text(stringResource(R.string.scan_open_settings), maxLines = 1) }
-                        OutlinedButton(onClick = onBack, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                            Text(stringResource(R.string.scan_paste_instead), maxLines = 1)
-                        }
-                    }
-                }
+                Text(stringResource(R.string.scan_blocked), Modifier.padding(top = Gap), style = TypeScale.BODY.style(Color(IslandSurface.TEXT)))
+                PillButton(
+                    stringResource(R.string.scan_open_settings),
+                    { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))) },
+                    Modifier.fillMaxWidth(), PillKind.PRIMARY, onDark = true,
+                )
+                PillButton(stringResource(R.string.scan_paste_instead), onBack, Modifier.fillMaxWidth(), onDark = true)
             }
         }
     }
@@ -162,20 +170,14 @@ fun ScanScreen(onBack: () -> Unit, onText: (String) -> Boolean) {
 
 @Composable
 private fun Message(text: String, onBack: () -> Unit) {
-    CoucouCard {
-        Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-            Text(text, style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = onBack, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                Text(stringResource(R.string.scan_paste_instead), maxLines = 1)
-            }
-        }
-    }
+    Text(text, Modifier.padding(top = Gap), style = TypeScale.BODY.style(Color(IslandSurface.TEXT)))
+    PillButton(stringResource(R.string.scan_paste_instead), onBack, Modifier.fillMaxWidth(), onDark = true)
 }
 
 /** A dimmed frame with a clear square in the middle, where the code should be. */
 @Composable
 private fun Viewfinder() {
-    val accent = MaterialTheme.colorScheme.primary
+    val accent = Color.White
     Canvas(Modifier.fillMaxSize()) {
         val side = size.minDimension * 0.7f
         val left = (size.width - side) / 2f

@@ -23,6 +23,13 @@
     <string name="action_unpair">Disconnect this computer</string>
     <string name="demo_leave">Leave demo mode</string>
     <string name="gallery">Mochi gallery</string>
+    <string name="pair_paste_short">Paste the link</string>
+    <string name="pairing_headline">Connect to your computer</string>
+    <string name="pairing_help">On your computer open Coucou, then Settings, Android phone, and scan the code it shows.</string>
+    <string name="pairing_footer">Unofficial port of Coucou by Louis Raillé.</string>
+    <string name="pairing_about">About</string>
+    <string name="paste_title">Paste the pairing link</string>
+    <string name="paste_hint">Copy it from Coucou on your computer (Settings, Android phone).</string>
     <string name="approval_later">Not now</string>
     <string name="approval_wants">Wants to %1$s</string>
     <string name="approval_caution">Allow only if you asked for this.</string>

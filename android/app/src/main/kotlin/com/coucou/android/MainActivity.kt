@@ -95,6 +95,8 @@ import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentRows
 import com.coucou.android.ui.ApprovalSheet
+import com.coucou.android.ui.MessagePanel
+import com.coucou.android.ui.PairingScreen
 import com.coucou.android.ui.QuestionSheet
 import com.coucou.android.ui.AskBar
 import com.coucou.android.ui.HeroCard
@@ -138,9 +140,9 @@ class MainActivity : ComponentActivity() {
                 // Home's hero is black in both themes, so its status bar icons stay light there; elsewhere they follow the theme.
                 val view = LocalView.current
                 val darkTheme = isSystemInDarkTheme()
-                SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && screen != Screen.HOME }
+                SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && !(screen == Screen.SCAN || screen == Screen.HOME && model.mode != Mode.NONE) }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Box(Modifier.fillMaxSize().windowInsetsPadding(if (screen == Screen.HOME) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom) else WindowInsets.safeDrawing)) {
+                    Box(Modifier.fillMaxSize().windowInsetsPadding(if (screen == Screen.HOME || screen == Screen.SCAN) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom) else WindowInsets.safeDrawing)) {
                         val tabs = Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())
                         // The computer stopped offering chat while it was open: back to Home, never a screen with no tab.
                         LaunchedEffect(tabs, screen) { Nav.resolve(screen, tabs).let { if (it != screen) screen = it } }
@@ -164,7 +166,7 @@ class MainActivity : ComponentActivity() {
                                 onGallery = { screen = Screen.GALLERY }, onOverlay = ::setOverlay,
                             )
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
-                            Screen.HOME -> Home(
+                            Screen.HOME -> if (model.mode == Mode.NONE) PairingScreen(model, onScan = { screen = Screen.SCAN }, onAbout = { screen = Screen.SETTINGS }) else Home(
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN }, onReview = { closedApproval = null }, onQuestion = { questionPill = it },
@@ -291,8 +293,7 @@ private fun Home(
     engine.bodyColor = focus?.let { HomePanel.colorHex(it) }?.let { HomePanel.rgb(it) }
 
     val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO, hasApproval = model.approvals.isNotEmpty())
-    // Items, in order: the hero, [message], [pairing card], then the other agents, ask, recent.
-    val pairIndex = 1 + (if (model.message != null) 1 else 0)
+    // Items, in order: the hero, [message], then the other agents, ask, recent.
     val others = HomePanel.others(model.sessions, focus)
     LazyColumn(
         state = listState,
@@ -308,7 +309,7 @@ private fun Home(
                 onQuestion = if (focus != null && focus.state == BotState.QUESTION) ({ onQuestion(focus.pillId) }) else null,
                 onLink = {
                     when (pair) {
-                        HomePanel.Link.PAIR -> scope.launch { listState.animateScrollToItem(pairIndex) }
+                        HomePanel.Link.PAIR -> onScan() // not reachable on Home (no computer shows the pairing screen), harmless
                         HomePanel.Link.APPROVAL -> onReview()
                         HomePanel.Link.NONE -> {}
                     }
@@ -316,17 +317,9 @@ private fun Home(
             )
         }
         model.message?.let { msg ->
-            item {
-                CoucouCard(Modifier.padding(horizontal = Gutter)) {
-                    Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(msg, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { model.message = null }) { Text(stringResource(R.string.action_close)) }
-                    }
-                }
-            }
+            item { Box(Modifier.padding(horizontal = Gutter)) { MessagePanel(msg) { model.message = null } } }
         }
 
-        if (model.mode == Mode.NONE) item { Box(Modifier.padding(horizontal = Gutter)) { PairCard(model, onScan) } }
 
         if (others.isNotEmpty()) {
             item {
@@ -361,42 +354,6 @@ private fun Home(
 }
 
 private const val HOME_KEY = "home"
-
-@Composable
-private fun PairCard(model: AppModel, onScan: () -> Unit) {
-    var text by remember { mutableStateOf("") }
-    val clipboard = LocalClipboardManager.current
-    val notALink = stringResource(R.string.msg_bad_link)
-    fun pairWith(link: String) {
-        if (PairingPayload.parse(link) != null) model.pair(link) else model.message = notALink
-    }
-    CoucouCard {
-        Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
-            Text(stringResource(R.string.pair_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(stringResource(R.string.pair_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onScan, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                Text(stringResource(R.string.scan_button), maxLines = 1)
-            }
-            OutlinedTextField(
-                text, { text = it }, Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.pair_paste)) }, singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-            )
-            OutlinedButton(onClick = { pairWith(text) }, Modifier.fillMaxWidth().height(48.dp), shape = CircleShape) {
-                Text(stringResource(R.string.pair_button), maxLines = 1)
-            }
-            OutlinedButton(
-                onClick = {
-                    val pasted = clipboard.getText()?.text.orEmpty().trim()
-                    text = pasted
-                    if (pasted.isNotEmpty()) pairWith(pasted)
-                },
-                Modifier.fillMaxWidth().height(48.dp), shape = CircleShape,
-            ) { Text(stringResource(R.string.pair_clipboard), maxLines = 1, overflow = TextOverflow.Ellipsis) }
-            TextButton(onClick = { model.startDemo() }) { Text(stringResource(R.string.demo_try)) }
-        }
-    }
-}
 
 @Composable
 private fun OverlayHint(onOverlay: (Boolean) -> Unit) {

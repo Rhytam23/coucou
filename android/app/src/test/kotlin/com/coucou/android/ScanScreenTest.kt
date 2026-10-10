@@ -92,9 +92,13 @@ class ScanScreenTest {
         assertTrue(File("../../.github/workflows/phone-link.yml").readText().contains("mlkit"))
     }
 
-    @Test fun theScanButtonIsOnThePairingCardAndThePasteFieldStays() {
-        val main = src("MainActivity.kt")
-        val card = main.substringAfter("private fun PairCard").substringBefore("private fun OverlayHint")
-        assertTrue(card.contains("R.string.scan_button") && card.contains("R.string.pair_paste") && card.contains("R.string.pair_clipboard"))
+    @Test fun theScanButtonIsTheMainActionOfThePairingScreenAndPastingStays() {
+        val ui = src("ui/PairingScreen.kt")
+        assertTrue(ui.indexOf("R.string.scan_button") < ui.indexOf("R.string.pair_paste_short"))
+        assertTrue(ui.contains("PillKind.PRIMARY") && ui.contains("R.string.demo_try"))
+        assertTrue("paste lives in a sheet, with the clipboard shortcut", ui.contains("PasteSheet(") && ui.contains("R.string.pair_clipboard"))
+        // a pasted link is checked by the same parser before anything is paired
+        assertTrue(ui.contains("if (PairingPayload.parse(link) != null) { model.pair(link)"))
+        assertTrue(src("MainActivity.kt").contains("if (model.mode == Mode.NONE) PairingScreen("))
     }
 }
