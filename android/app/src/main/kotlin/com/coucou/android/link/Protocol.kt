@@ -18,7 +18,7 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs", "usage")
+    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs", "usage", "services")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
@@ -30,6 +30,11 @@ object Protocol {
     const val CAP_DIFFS = "diffs"
     /** How much of the Claude and Codex plans is used, and when they reset. */
     const val CAP_USAGE = "usage"
+    /** Read-only cards of the services the user ticked on the computer (Stripe, GitHub...). */
+    const val CAP_SERVICES = "services"
+    const val MAX_SERVICES = 7
+    const val MAX_SERVICE_ITEMS = 3
+    const val MAX_SERVICE_TEXT = 80
     const val MAX_FILES = 20
     const val MAX_FILE_NAME_CHARS = 80
     /** The computer sends at most this many lines of one file, each cut at [MAX_DIFF_LINE_CHARS], in parts of at most [PART_LINES]. */
@@ -59,6 +64,12 @@ data class PlanUsage(
 
 /** Both plans; null for one the computer does not know. */
 data class UsageSnapshot(val claude: PlanUsage?, val codex: PlanUsage?)
+
+/** One line of a service card. */
+data class ServiceLine(val label: String, val detail: String)
+
+/** What one service's pill shows: a headline, why, up to three lines. Read-only. */
+data class ServiceCard(val id: String, val title: String, val headline: String, val reason: String?, val items: List<ServiceLine>)
 
 /** A file an agent changed. [name] is a file name, never a path. */
 data class FileChange(val id: Long, val name: String, val added: Int, val removed: Int, val tooLarge: Boolean = false, val isNew: Boolean = false)
@@ -110,6 +121,8 @@ sealed interface ServerMsg {
     data class Question(val request: QuestionRequest) : ServerMsg
     /** What Mochi wears on the computer: "auto" or an outfit, exactly one of [com.coucou.android.mochi.outfit.Wardrobe.SELECTIONS]. */
     data class Prefs(val outfit: String) : ServerMsg
+    /** The service cards the user allowed; an empty list takes them away. */
+    data class Services(val cards: List<ServiceCard>) : ServerMsg
     /** The plan usage; both null means the computer has nothing to say any more. */
     data class Usage(val usage: UsageSnapshot) : ServerMsg
     /** One part of a file's diff; [gone]: the computer no longer has it; [truncated]: there were more lines than it sends. */
@@ -190,6 +203,7 @@ object Wire {
                 "question" -> question(o)?.let { ServerMsg.Question(it) }
                 // A value this build does not know is dropped rather than guessed: the phone keeps what it had.
                 "diff" -> diff(o)
+                "services" -> ServerMsg.Services(services(o.getJSONArray("services")))
                 "usage" -> ServerMsg.Usage(UsageSnapshot(plan(o.optJSONObject("claude")), plan(o.optJSONObject("codex"))))
                 "prefs" -> o.optString("outfit", "").takeIf { it in Wardrobe.SELECTIONS }?.let { ServerMsg.Prefs(it) }
                 "pong" -> ServerMsg.Pong
@@ -221,6 +235,34 @@ object Wire {
         color = o.optString("color", "").takeIf { isColor(it) },
         files = files(o.optJSONArray("files")),
     )
+
+    private val SERVICE_IDS = setOf(
+        "integration_stripe", "integration_github", "integration_vercel", "integration_n8n",
+        "integration_resend", "integration_notion", "integration_calcom",
+    )
+
+    private fun oneLine(s: String, max: Int) = s.filter { !it.isISOControl() }.trim().take(max)
+
+    /** Cards of the services this app knows, each cut to size; anything else is skipped. */
+    private fun services(a: JSONArray): List<ServiceCard> {
+        val seen = HashSet<String>()
+        return (0 until a.length()).mapNotNull { i ->
+            val o = a.optJSONObject(i) ?: return@mapNotNull null
+            val id = o.optString("id", "")
+            if (id !in SERVICE_IDS || !seen.add(id)) return@mapNotNull null
+            val items = o.optJSONArray("items")?.let { arr ->
+                (0 until arr.length()).mapNotNull { j ->
+                    val it = arr.optJSONObject(j) ?: return@mapNotNull null
+                    val label = oneLine(it.optString("label", ""), Protocol.MAX_SERVICE_TEXT)
+                    if (label.isEmpty()) null else ServiceLine(label, oneLine(it.optString("detail", ""), Protocol.MAX_SERVICE_TEXT))
+                }.take(Protocol.MAX_SERVICE_ITEMS)
+            }.orEmpty()
+            ServiceCard(
+                id, oneLine(o.optString("title", ""), Protocol.MAX_SERVICE_TEXT), oneLine(o.optString("headline", ""), Protocol.MAX_SERVICE_TEXT),
+                oneLine(o.optString("reason", ""), Protocol.MAX_SERVICE_TEXT).ifBlank { null }, items,
+            )
+        }.take(Protocol.MAX_SERVICES)
+    }
 
     private fun window(o: JSONObject?): PlanWindow? {
         if (o == null || !o.has("pct") || !o.has("resetsAt")) return null

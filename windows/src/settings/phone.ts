@@ -52,6 +52,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       answersBlock(makeToggle),
       diffsBlock(makeToggle),
       usageBlock(makeToggle),
+      servicesBlock(),
       chatBlock(makeToggle, settings),
     );
   };
@@ -156,6 +157,51 @@ function answersBlock(makeToggle: Toggle): HTMLElement {
     {},
     h("div", { class: "row" }, h("label", { text: t("Let the phone answer Claude Code's questions") }), switchEl),
     h("div", { class: "hint", text: t("The phone shows each question with its options. Every answer is confirmed with the phone's fingerprint or screen lock.") }),
+    note,
+  );
+}
+
+/** The service pills the phone may show, with the names the pills carry (brand names, not translated). */
+const PHONE_SERVICES: [string, string][] = [
+  ["integration_stripe", "Stripe"], ["integration_github", "GitHub"], ["integration_vercel", "Vercel"],
+  ["integration_n8n", "n8n"], ["integration_resend", "Resend"], ["integration_notion", "Notion"], ["integration_calcom", "Cal.com"],
+];
+
+/**
+ * Service cards on the phone, read-only, one tick per service and none ticked until the user does it: what each card
+ * says is a headline and three short lines, never an address, a link or a secret. Rust re-reads the ticks for every
+ * connection and sends a phone only the services ticked here.
+ */
+function servicesBlock(): HTMLElement {
+  const note = h("div", { class: "hint" });
+  let ticked: string[] = [];
+  const boxes = PHONE_SERVICES.map(([id, name]) => {
+    const box = h("input", { type: "checkbox" }) as HTMLInputElement;
+    box.addEventListener("change", () => {
+      void (async () => {
+        note.textContent = "";
+        const next = box.checked ? [...new Set([...ticked, id])] : ticked.filter((x) => x !== id);
+        try {
+          ticked = (await Bridge.phoneServicesSet(next)).services;
+        } catch (err) {
+          box.checked = ticked.includes(id);
+          note.textContent = String(err);
+        }
+      })();
+    });
+    return { id, box, row: h("div", { class: "row" }, h("label", {}, box, h("span", { text: ` ${name}` }))) };
+  });
+  void Bridge.phoneServicesStatus().then((status) => {
+    if (!status) return;
+    ticked = status.services;
+    for (const b of boxes) b.box.checked = ticked.includes(b.id);
+  });
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Show these services on the phone") })),
+    h("div", { class: "hint", text: t("Each tick lets your paired phone see that service's card: a headline and up to three short lines, read-only. Nothing is shown until you tick it. No addresses, subjects, links or keys are ever sent.") }),
+    ...boxes.map((b) => b.row),
     note,
   );
 }

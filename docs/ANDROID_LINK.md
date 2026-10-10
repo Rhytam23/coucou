@@ -179,6 +179,35 @@ same again if it is sent more. The line counts toward the 56 KiB budget of a `se
 - Deviation from the plan: the plan said "600 lines in total"; the computer keeps 200 lines per file and the 20-in-10-seconds rate
   instead, which bounds the same thing (at most 4 000 lines in 10 s) without per-connection bookkeeping.
 
+## Service cards (optional capability `services`)
+
+Read-only cards of the island's service pills (Stripe, GitHub, Vercel, n8n, Resend, Notion, Cal.com). **One tick per service**
+in Settings > Android phone on the computer, none ticked by default; a phone that sends `caps: ["services"]` is offered
+`services` in `welcome.caps` only if at least one service is ticked (re-read for every connection; a change reconnects the phones).
+Each phone is sent only the services ticked, and nothing is sent for the others, not even their names.
+
+```json
+{"type":"services","services":[{"id":"integration_stripe","title":"Stripe","headline":"12.50 EUR","reason":"Payments",
+  "items":[{"label":"Payment","detail":"+9.00 · 2m"}]}]}
+```
+
+Sent after the first `sessions` when there is something to show, and again when the cards of **that phone's** services change.
+An empty `services` list takes the cards away. Limits, kept by the computer and checked again by the phone: only the seven ids above
+(once each), `title`/`headline`/`reason`/`label`/`detail` one line of at most 24/40/80/60/60 characters (80 on the phone), at most
+three `items`. What each card says (and what it never says):
+
+| Service | Headline | Lines | Never sent |
+|---|---|---|---|
+| Stripe | the balance | the last three payments: paid or failed, the amount, how long ago | descriptions, customers |
+| GitHub | total stars | the number of repositories | repository names, links |
+| Vercel | latest deployment ready or failed | project name, ready or failed, how long ago | links, branches |
+| Resend | total emails | delivered or not, how long ago | addresses, subjects |
+| Notion | number of recent pages | the page titles and how long ago | links, content |
+| Cal.com | the next call's date and time | titles and times | attendees, links |
+| n8n | the last workflow's result | its name | the error text |
+
+Nothing in a card can be acted on, and nothing goes back: there are no actions on any service from the phone.
+
 ## Plan usage (optional capability `usage`)
 
 A phone that sends `caps: ["usage"]` in its `hello`, while the user has turned on "Show my plan usage on the phone" on the

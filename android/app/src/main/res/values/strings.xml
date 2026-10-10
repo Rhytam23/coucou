@@ -227,4 +227,5 @@
     <string name="usage_resets_week">Resets %1$s</string>
     <string name="usage_credits">%1$d free resets available</string>
     <string name="usage_desc">%1$s, %2$s: %3$d percent used</string>
+    <string name="services_title">Services</string>
 </resources>

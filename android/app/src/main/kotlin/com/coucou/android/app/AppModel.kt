@@ -172,6 +172,8 @@ class AppModel(private val context: Context) : LinkListener {
     var diffsOffered by mutableStateOf(false); private set
     /** The Claude and Codex plan usage the computer sent (its switch is on); null: nothing to show. */
     var usage by mutableStateOf<com.coucou.android.link.UsageSnapshot?>(null); private set
+    /** The read-only service cards the user allowed on the computer; empty: none. */
+    var services by mutableStateOf<List<com.coucou.android.link.ServiceCard>>(emptyList()); private set
 
     /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
     private var chatForced = false
@@ -445,6 +447,7 @@ class AppModel(private val context: Context) : LinkListener {
     private fun stopLink() {
         closeDiff()
         usage = null
+        services = emptyList()
         finder.stop()
         netWatch.stop()
         currentPairing = null
@@ -518,12 +521,20 @@ class AppModel(private val context: Context) : LinkListener {
             detailsOffered = Protocol.CAP_DETAILS in caps
             diffsOffered = Protocol.CAP_DIFFS in caps
             if (Protocol.CAP_USAGE !in caps) usage = null
+            if (Protocol.CAP_SERVICES !in caps) services = emptyList()
         }
     }
 
     override fun onUsage(usage: com.coucou.android.link.UsageSnapshot) {
         main.post { this.usage = usage.takeIf { it.claude != null || it.codex != null } }
     }
+
+    override fun onServices(cards: List<com.coucou.android.link.ServiceCard>) {
+        main.post { services = cards }
+    }
+
+    /** Debug: samples, as if the computer had sent them. */
+    internal fun applyServices(cards: List<com.coucou.android.link.ServiceCard>) { services = cards }
 
     /** Debug: a sample, as if the computer had sent it. */
     internal fun applyUsage(usage: com.coucou.android.link.UsageSnapshot?) { this.usage = usage }

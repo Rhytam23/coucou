@@ -89,6 +89,8 @@ pub struct Settings {
     pub phone_diffs: bool,
     /// Show the Claude and Codex plan usage on the phone (cap `usage`). Off by default; owned by Rust like the other phone switches.
     pub phone_usage: bool,
+    /// The service pills whose cards the phone may see, by pill id (cap `services`). None by default; owned by Rust like the other phone switches.
+    pub phone_services: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -151,6 +153,7 @@ impl Default for Settings {
             phone_answers: false,
             phone_diffs: false,
             phone_usage: false,
+            phone_services: Vec::new(),
         }
     }
 }
@@ -434,7 +437,8 @@ mod tests {
   "phoneDetails": true,
   "phoneAnswers": true,
   "phoneDiffs": true,
-  "phoneUsage": true
+  "phoneUsage": true,
+  "phoneServices": ["integration_stripe"]
 }"##;
 
     fn custom() -> Value {
@@ -601,6 +605,15 @@ mod tests {
         assert!(!parse(&custom_with("phoneUsage", None)).unwrap().phone_usage);
         assert!(parse(&custom_with("phoneUsage", Some(serde_json::json!(true)))).unwrap().phone_usage);
         assert!(!parse(&custom_with("phoneUsage", Some(serde_json::json!("yes")))).unwrap().phone_usage, "a wrong type does not switch it on");
+    }
+
+    #[test]
+    fn a_file_from_before_phone_services_shows_none() {
+        // Showing a service on the phone is never on by default; an older file is not consent.
+        assert!(Settings::default().phone_services.is_empty());
+        assert!(parse(&custom_with("phoneServices", None)).unwrap().phone_services.is_empty());
+        assert_eq!(parse(&custom_with("phoneServices", Some(serde_json::json!(["integration_stripe"])))).unwrap().phone_services, vec!["integration_stripe".to_string()]);
+        assert!(parse(&custom_with("phoneServices", Some(serde_json::json!("integration_stripe")))).unwrap().phone_services.is_empty(), "a wrong type shows none");
     }
 
     #[test]
@@ -919,6 +932,7 @@ mod tests {
                 "phoneAnswers",
                 "phoneDiffs",
                 "phoneUsage",
+                "phoneServices",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

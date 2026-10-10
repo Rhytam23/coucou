@@ -110,6 +110,7 @@ import com.coucou.android.ui.MessagePanel
 import com.coucou.android.ui.PairingScreen
 import com.coucou.android.ui.DiffSheet
 import com.coucou.android.ui.QuestionSheet
+import com.coucou.android.ui.ServicesPanel
 import com.coucou.android.ui.UsagePanel
 import com.coucou.android.ui.WardrobeScreen
 import com.coucou.android.ui.HeroCard
@@ -385,6 +386,7 @@ private fun Home(
         }
 
         if (model.usage != null) item { Box(Modifier.padding(horizontal = Gutter)) { UsagePanel(model.usage) } }
+        if (model.services.isNotEmpty()) item { Box(Modifier.padding(horizontal = Gutter)) { ServicesPanel(model.services) } }
         item { Box(Modifier.padding(horizontal = Gutter)) { RecentPanel(model.decisions, onHistory) } }
 
         // Only when the switch is on but Android still refuses: the one thing Home must say about it.

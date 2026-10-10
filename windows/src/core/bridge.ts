@@ -122,6 +122,20 @@ export interface PhoneLinkUsage {
   codex: PhoneLinkPlan | null;
 }
 
+/** What one service pill says, for a phone whose user allowed it (Rust cuts every text to size). */
+export interface PhoneLinkService {
+  id: string;
+  title: string;
+  headline: string;
+  reason?: string;
+  items: { label: string; detail: string }[];
+}
+
+export interface PhoneServicesStatus {
+  /** The services allowed for the phone. */
+  services: string[];
+}
+
 export interface PhoneUsageStatus {
   enabled: boolean;
 }
@@ -274,6 +288,10 @@ export const Bridge = {
   phoneDiffsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDiffsStatus>("phone_diffs_set_enabled", { enabled }),
   /** The answer to a phone's request for a file's diff (the "phone-link-getdiff" event); `conn` says which phone. */
   phoneLinkSendDiff: (conn: number, diff: PhoneLinkDiff) => call<void>("phone_link_send_diff", { conn, diff }),
+  phoneServicesStatus: () => call<PhoneServicesStatus>("phone_services_status"),
+  /** None by default; only from the ticks in Settings. Phones are reconnected so they learn about it. */
+  phoneServicesSet: (services: string[]) => callOrThrow<PhoneServicesStatus>("phone_services_set", { services }),
+  phoneLinkPublishServices: (services: PhoneLinkService[]) => call<void>("phone_link_publish_services", { services }),
   phoneUsageStatus: () => call<PhoneUsageStatus>("phone_usage_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneUsageSetEnabled: (enabled: boolean) => callOrThrow<PhoneUsageStatus>("phone_usage_set_enabled", { enabled }),

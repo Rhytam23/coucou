@@ -228,7 +228,8 @@
     "usage_resets_m": "Resets in %1$d min",
     "usage_resets_week": "Resets %1$s",
     "usage_credits": "%1$d free resets available",
-    "usage_desc": "%1$s, %2$s: %3$d percent used"
+    "usage_desc": "%1$s, %2$s: %3$d percent used",
+    "services_title": "Services"
   },
   "_untranslatable": [
     "app_name",

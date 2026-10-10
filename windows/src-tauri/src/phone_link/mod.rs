@@ -103,6 +103,11 @@ impl server::Features for TauriFeatures {
     fn usage(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_usage
     }
+    fn services(&self) -> Vec<String> {
+        // Only ids the link knows, whatever the file held.
+        let ticked = self.app.state::<Shared>().settings.lock().unwrap().phone_services.clone();
+        hub::SERVICE_IDS.iter().filter(|id| ticked.iter().any(|t| t == *id)).map(|id| id.to_string()).collect()
+    }
 }
 
 pub struct PhoneLink {
@@ -446,6 +451,56 @@ pub fn phone_usage_set_enabled(
     log::line(format!("phone link: plan usage on the phone {}", if enabled { "on" } else { "off" }));
     let _ = app.emit("settings-changed", updated);
     Ok(UsageStatus { enabled })
+}
+
+// ── Service cards on the phone: one tick per service (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ServicesStatus {
+    /// The services allowed for the phone.
+    pub services: Vec<String>,
+}
+
+#[tauri::command]
+pub fn phone_services_status(shared: State<Shared>) -> ServicesStatus {
+    let ticked = shared.settings.lock().unwrap().phone_services.clone();
+    ServicesStatus { services: hub::SERVICE_IDS.iter().filter(|id| ticked.iter().any(|t| t == *id)).map(|id| id.to_string()).collect() }
+}
+
+/// "Show these services on the phone". None by default, read-only. A change disconnects the phones once so they
+/// reconnect and are told (or not) about the capability.
+#[tauri::command]
+pub fn phone_services_set(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    services: Vec<String>,
+) -> Result<ServicesStatus, String> {
+    only_settings(&window)?;
+    let allowed: Vec<String> = hub::SERVICE_IDS.iter().filter(|id| services.iter().any(|s| s == *id)).map(|id| id.to_string()).collect();
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_services = allowed.clone();
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "services setting changed");
+    log::line(format!("phone link: {} service(s) on the phone", allowed.len()));
+    let _ = app.emit("settings-changed", updated);
+    Ok(ServicesStatus { services: allowed })
+}
+
+/// What the island's service pills show, for phones whose user allowed those services.
+#[tauri::command]
+pub fn phone_link_publish_services(link: State<PhoneLink>, services: Vec<hub::ServiceIn>) {
+    if link.running.lock().unwrap().is_none() {
+        return;
+    }
+    link.hub.publish_services(services);
 }
 
 /// The plan usage the island shows, for phones that have `usage`.

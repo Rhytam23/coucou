@@ -58,6 +58,10 @@ pub trait Features: Send + Sync {
     fn usage(&self) -> bool {
         false
     }
+    /// The services the user allowed for the phone (their ids); empty: none.
+    fn services(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Nothing extra: how the link behaved before capabilities existed.
@@ -237,6 +241,7 @@ where
     let prefs = asked("prefs");
     let diffs = asked("diffs") && shared.features.diffs();
     let usage = asked("usage") && shared.features.usage();
+    let services: Vec<String> = if asked("services") { shared.features.services() } else { Vec::new() };
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
         offered.push("chat");
@@ -256,12 +261,15 @@ where
     if usage {
         offered.push("usage");
     }
+    if !services.is_empty() {
+        offered.push("services");
+    }
     let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
     if !offered.is_empty() {
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs, usage });
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs, usage, services });
 
     // 2. the conversation
     loop {

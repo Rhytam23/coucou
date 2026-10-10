@@ -46,6 +46,18 @@ const PART_LINES: usize = 100;
 /// A phone may ask for this many diffs in 10 seconds.
 const DIFF_ASKS_PER_10S: usize = 20;
 
+/// Service cards (cap `services`): read-only snapshots of what the island's service pills show, one switch per
+/// service. These are the only ids the link will ever carry.
+pub const SERVICE_IDS: [&str; 7] = [
+    "integration_stripe", "integration_github", "integration_vercel", "integration_n8n",
+    "integration_resend", "integration_notion", "integration_calcom",
+];
+const MAX_SERVICE_ITEMS: usize = 3;
+const MAX_SERVICE_TITLE_CHARS: usize = 24;
+const MAX_SERVICE_HEADLINE_CHARS: usize = 40;
+const MAX_SERVICE_REASON_CHARS: usize = 80;
+const MAX_SERVICE_ITEM_CHARS: usize = 60;
+
 /// Questions (cap `answers`): a question that does not fit these limits is left to the island, never cut,
 /// because the answer must carry the exact text and labels back to the agent.
 pub const MAX_QUESTIONS: usize = 4;
@@ -155,6 +167,52 @@ pub const OUTFIT_CHOICES: [&str; 13] = [
     "bow", "scarf", "witchHat", "pumpkin", "santaHat", "bunnyEars",
 ];
 
+fn clean_services(cards: Vec<ServiceIn>) -> Vec<ServiceIn> {
+    let mut out: Vec<ServiceIn> = Vec::new();
+    for c in cards {
+        if !SERVICE_IDS.contains(&c.id.as_str()) || out.iter().any(|o| o.id == c.id) {
+            continue;
+        }
+        let one_line = |s: &str, max: usize| -> String { clip(&s.chars().filter(|c| !c.is_control()).collect::<String>(), max).trim().to_string() };
+        out.push(ServiceIn {
+            id: c.id,
+            title: one_line(&c.title, MAX_SERVICE_TITLE_CHARS),
+            headline: one_line(&c.headline, MAX_SERVICE_HEADLINE_CHARS),
+            reason: c.reason.as_deref().map(|r| one_line(r, MAX_SERVICE_REASON_CHARS)).filter(|r| !r.is_empty()),
+            items: c
+                .items
+                .iter()
+                .map(|i| ServiceItemIn { label: one_line(&i.label, MAX_SERVICE_ITEM_CHARS), detail: one_line(&i.detail, MAX_SERVICE_ITEM_CHARS) })
+                .filter(|i| !i.label.is_empty())
+                .take(MAX_SERVICE_ITEMS)
+                .collect(),
+        });
+    }
+    out
+}
+
+/// The `services` line for a phone whose user allowed `allowed`; None when none of the cards is allowed.
+fn services_line(cards: &[ServiceIn], allowed: &[String]) -> Option<Arc<str>> {
+    let list: Vec<serde_json::Value> = cards
+        .iter()
+        .filter(|c| allowed.iter().any(|a| *a == c.id))
+        .map(|c| {
+            let mut v = json!({
+                "id": c.id, "title": c.title, "headline": c.headline,
+                "items": c.items.iter().map(|i| json!({ "label": i.label, "detail": i.detail })).collect::<Vec<_>>(),
+            });
+            if let Some(r) = &c.reason {
+                v["reason"] = json!(r);
+            }
+            v
+        })
+        .collect();
+    if list.is_empty() {
+        return None;
+    }
+    Some(json!({ "type": "services", "services": list }).to_string().into())
+}
+
 fn window_json(w: &WindowIn) -> Option<serde_json::Value> {
     if !w.used_pct.is_finite() || w.resets_at == 0 {
         return None;
@@ -237,6 +295,25 @@ pub struct PlanIn {
 pub struct UsageIn {
     pub claude: Option<PlanIn>,
     pub codex: Option<PlanIn>,
+}
+
+/// One line of a service card.
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(default)]
+pub struct ServiceItemIn {
+    pub label: String,
+    pub detail: String,
+}
+
+/// What one service pill shows, as the island summarises it: a headline, why (optional), up to 3 lines.
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(default)]
+pub struct ServiceIn {
+    pub id: String,
+    pub title: String,
+    pub headline: String,
+    pub reason: Option<String>,
+    pub items: Vec<ServiceItemIn>,
 }
 
 /// One option of a question, as the island has it.
@@ -338,18 +415,22 @@ struct Sub {
     diffs: bool,
     /// The phone asked for `usage` and the user's switch was on when it connected.
     usage: bool,
+    /// The services this phone may see (the user's ticks when it connected); empty: none.
+    services: Vec<String>,
     /// When this phone asked for a diff lately (ms), to keep it from flooding the island.
     diff_asks: Vec<u64>,
 }
 
 /// What a connection may have been offered.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Caps {
     pub details: bool,
     pub answers: bool,
     pub prefs: bool,
     pub diffs: bool,
     pub usage: bool,
+    /// The services the user allowed for the phone (empty: the capability is not offered).
+    pub services: Vec<String>,
 }
 
 #[derive(Default)]
@@ -361,6 +442,8 @@ struct Inner {
     outfit: Option<&'static str>,
     /// The last `usage` line (None: the island has nothing to say).
     usage: Option<Arc<str>>,
+    /// The service cards the island has, cleaned (all of them: each phone gets only the ones its user allowed).
+    services: Vec<ServiceIn>,
     subs: Vec<Sub>,
     next_sub: u64,
 }
@@ -464,7 +547,7 @@ impl Hub {
 
     /// Like [`subscribe`], for a phone that may also have been offered `answers` and `prefs`.
     pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, caps: Caps) -> (u64, Arc<AtomicBool>) {
-        let Caps { details, answers, prefs, diffs, usage } = caps;
+        let Caps { details, answers, prefs, diffs, usage, services } = caps;
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -484,13 +567,18 @@ impl Hub {
                 let _ = tx.try_send(Out::Line(prefs_line(o).into()));
             }
         }
+        if !services.is_empty() {
+            if let Some(line) = services_line(&inner.services, &services) {
+                let _ = tx.try_send(Out::Line(line));
+            }
+        }
         if usage {
             if let Some(line) = &inner.usage {
                 let _ = tx.try_send(Out::Line(line.clone()));
             }
         }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, usage, diff_asks: Vec::new() });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, usage, services, diff_asks: Vec::new() });
         (id, evicted)
     }
 
@@ -541,6 +629,35 @@ impl Hub {
 }
 
 impl Hub {
+    /// What the island's service pills show. Each phone is sent only the services its user allowed, and a phone
+    /// whose own cards did not change is sent nothing.
+    pub fn publish_services(&self, cards: Vec<ServiceIn>) {
+        let cleaned = clean_services(cards);
+        let mut inner = self.inner.lock().unwrap();
+        if cleaned == inner.services {
+            return;
+        }
+        let old = std::mem::replace(&mut inner.services, cleaned);
+        let new = inner.services.clone();
+        inner.subs.retain(|s| {
+            if s.services.is_empty() {
+                return true;
+            }
+            let before = services_line(&old, &s.services);
+            let after = services_line(&new, &s.services);
+            if before == after {
+                return true;
+            }
+            // Nothing left to show: an empty list takes the cards away.
+            let line = after.unwrap_or_else(|| json!({ "type": "services", "services": [] }).to_string().into());
+            let kept = s.tx.try_send(Out::Line(line)).is_ok();
+            if !kept {
+                s.evicted.store(true, Ordering::SeqCst);
+            }
+            kept
+        });
+    }
+
     /// The plan usage the island shows (percentages and reset times, nothing else). Only phones that have `usage`
     /// hear of it, and a new one at once; two identical pictures are sent once.
     pub fn publish_usage(&self, usage: UsageIn) {
@@ -1653,7 +1770,7 @@ mod tests {
     fn a_phone_with_usage_gets_rounded_percentages_and_only_those() {
         let (hub, _) = hub();
         let (_, mut rx) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
-        let (_, mut other) = sub_with(&hub, Caps { details: true, diffs: true, answers: true, prefs: true, usage: false });
+        let (_, mut other) = sub_with(&hub, Caps { details: true, diffs: true, answers: true, prefs: true, ..Caps::default() });
         drain(&mut rx);
         drain(&mut other);
         hub.publish_usage(usage_in());
@@ -1699,5 +1816,87 @@ mod tests {
         assert_eq!(drain(&mut late), vec![serde_json::json!({ "type": "usage" })]);
         let (_, mut after) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
         assert!(drain(&mut after).iter().all(|l| l["type"] != "usage"), "after a clear a new phone is told nothing");
+    }
+    // ── service cards (cap `services`) ──────────────────────────────────────────────
+
+    fn card(id: &str, headline: &str, items: &[(&str, &str)]) -> ServiceIn {
+        ServiceIn {
+            id: id.into(),
+            title: id.trim_start_matches("integration_").into(),
+            headline: headline.into(),
+            reason: None,
+            items: items.iter().map(|(l, d)| ServiceItemIn { label: (*l).into(), detail: (*d).into() }).collect(),
+        }
+    }
+
+    fn allowed(ids: &[&str]) -> Caps {
+        Caps { services: ids.iter().map(|s| s.to_string()).collect(), ..Caps::default() }
+    }
+
+    #[test]
+    fn a_phone_is_sent_only_the_services_its_user_allowed() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, allowed(&["integration_stripe"]));
+        let (_, mut none) = sub_with(&hub, Caps::default());
+        drain(&mut rx);
+        drain(&mut none);
+        hub.publish_services(vec![card("integration_stripe", "12.50 EUR", &[("Payment", "+9.00")]), card("integration_notion", "3 pages", &[("Secret plan", "1h")])]);
+        let got = drain(&mut rx);
+        assert_eq!(got.len(), 1);
+        let list = got[0]["services"].as_array().unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0]["id"], "integration_stripe");
+        assert!(!got[0].to_string().contains("Secret plan"), "{}", got[0]);
+        assert!(drain(&mut none).is_empty());
+    }
+
+    #[test]
+    fn a_new_phone_is_brought_up_to_date_and_a_change_elsewhere_is_not_sent_to_it() {
+        let (hub, _) = hub();
+        hub.publish_services(vec![card("integration_stripe", "1", &[]), card("integration_github", "2 stars", &[])]);
+        let (_, mut rx) = sub_with(&hub, allowed(&["integration_stripe"]));
+        assert!(drain(&mut rx).iter().any(|l| l["type"] == "services"));
+        // GitHub changes; this phone only has Stripe: it hears nothing.
+        hub.publish_services(vec![card("integration_stripe", "1", &[]), card("integration_github", "3 stars", &[])]);
+        assert!(drain(&mut rx).is_empty());
+        hub.publish_services(vec![card("integration_stripe", "2", &[]), card("integration_github", "3 stars", &[])]);
+        assert_eq!(drain(&mut rx).len(), 1);
+    }
+
+    #[test]
+    fn when_the_allowed_service_goes_away_the_list_is_emptied() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, allowed(&["integration_stripe"]));
+        hub.publish_services(vec![card("integration_stripe", "1", &[])]);
+        drain(&mut rx);
+        hub.publish_services(vec![]);
+        assert_eq!(drain(&mut rx), vec![serde_json::json!({ "type": "services", "services": [] })]);
+    }
+
+    #[test]
+    fn unknown_ids_are_dropped_and_texts_are_cut_to_one_short_line() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, allowed(&["integration_stripe", "integration_evil"]));
+        drain(&mut rx);
+        let long = "x".repeat(300);
+        hub.publish_services(vec![
+            card("integration_evil", "no", &[]),
+            ServiceIn { reason: Some(format!("a\nb {long}")), ..card("integration_stripe", &format!("{long}\n"), &[("a", "1"), ("b", "2"), ("c", "3"), ("d", "4"), ("", "empty label")]) },
+            card("integration_stripe", "a duplicate", &[]),
+        ]);
+        let v = &drain(&mut rx)[0]["services"][0];
+        assert_eq!(v["headline"].as_str().unwrap().chars().count(), 40);
+        assert!(v["reason"].as_str().unwrap().chars().count() <= 80 && !v["reason"].as_str().unwrap().contains('\n'));
+        assert_eq!(v["items"].as_array().unwrap().len(), 3);
+        assert_eq!(drain(&mut rx).len(), 0);
+        assert!(!hub.inner.lock().unwrap().services.iter().any(|s| s.id == "integration_evil"));
+    }
+
+    #[test]
+    fn the_service_ids_are_those_of_the_pill_catalog() {
+        let ts = include_str!("../../../src/core/pills.ts");
+        for id in SERVICE_IDS {
+            assert!(ts.contains(&format!("\"{id}\"")), "{id}");
+        }
     }
 }

@@ -1481,3 +1481,66 @@ mod usage_tests {
         });
     }
 }
+
+mod services_tests {
+    use super::*;
+    use crate::phone_link::hub::{ServiceIn, ServiceItemIn};
+    use crate::phone_link::server::Features;
+    use std::sync::Mutex as StdMutex;
+
+    struct Ticks(StdMutex<Vec<String>>);
+    impl Features for Ticks {
+        fn details(&self) -> bool {
+            false
+        }
+        fn services(&self) -> Vec<String> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    async fn phone(rig: &Rig, caps: Option<Value>) -> (Client, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        (c, welcome)
+    }
+
+    fn cards() -> Vec<ServiceIn> {
+        vec![
+            ServiceIn { id: "integration_stripe".into(), title: "Stripe".into(), headline: "12.50 EUR".into(), reason: None, items: vec![ServiceItemIn { label: "Payment".into(), detail: "+9.00".into() }] },
+            ServiceIn { id: "integration_notion".into(), title: "Notion".into(), headline: "2".into(), reason: None, items: vec![ServiceItemIn { label: "Private page".into(), detail: "1m".into() }] },
+        ]
+    }
+
+    #[test]
+    fn services_are_offered_only_when_the_phone_asked_and_something_is_ticked() {
+        block_on(async {
+            let ticked = Rig::start_full(None, Arc::new(Ticks(StdMutex::new(vec!["integration_stripe".into()])))).await;
+            let (_c, welcome) = phone(&ticked, Some(json!(["services"]))).await;
+            assert_eq!(welcome["caps"], json!(["services"]));
+            let (_c, welcome) = phone(&ticked, None).await;
+            assert!(welcome.get("caps").is_none());
+            let none = Rig::start_full(None, Arc::new(Ticks(StdMutex::new(vec![])))).await;
+            let (_c, welcome) = phone(&none, Some(json!(["services"]))).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+        });
+    }
+
+    #[test]
+    fn the_phone_gets_the_ticked_services_only() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Ticks(StdMutex::new(vec!["integration_stripe".into()])))).await;
+            rig.hub.publish_services(cards());
+            let (mut c, _) = phone(&rig, Some(json!(["services"]))).await;
+            c.expect("sessions").await;
+            let m = c.expect("services").await;
+            assert_eq!(m["services"].as_array().unwrap().len(), 1);
+            assert_eq!(m["services"][0]["id"], "integration_stripe");
+            assert!(!m.to_string().contains("Private page"));
+        });
+    }
+}

@@ -3668,6 +3668,61 @@
    "pt-BR": "O celular mostra quanto dos seus planos do Claude e do Codex foi usado e quando eles reiniciam: as mesmas porcentagens das pílulas aqui, nada mais.",
    "ru": "Телефон показывает, какая часть ваших тарифов Claude и Codex использована и когда они сбросятся: те же проценты, что и на плашках здесь, и ничего больше.",
    "id": "Ponsel menampilkan seberapa banyak paket Claude dan Codex Anda terpakai dan kapan direset: persentase yang sama dengan pil di sini, tidak ada yang lain."
+  },
+  "Payment failed": {
+   "zh-Hans": "付款失败",
+   "hi": "भुगतान विफल",
+   "es": "Pago fallido",
+   "ar": "فشل الدفع",
+   "fr": "Paiement échoué",
+   "bn": "পেমেন্ট ব্যর্থ",
+   "pt-BR": "Pagamento falhou",
+   "ru": "Платёж не прошёл",
+   "id": "Pembayaran gagal"
+  },
+  "Delivered": {
+   "zh-Hans": "已送达",
+   "hi": "पहुँचाया गया",
+   "es": "Entregado",
+   "ar": "تم التسليم",
+   "fr": "Remis",
+   "bn": "পৌঁছেছে",
+   "pt-BR": "Entregue",
+   "ru": "Доставлено",
+   "id": "Terkirim"
+  },
+  "Not delivered": {
+   "zh-Hans": "未送达",
+   "hi": "नहीं पहुँचा",
+   "es": "No entregado",
+   "ar": "لم يتم التسليم",
+   "fr": "Non remis",
+   "bn": "পৌঁছায়নি",
+   "pt-BR": "Não entregue",
+   "ru": "Не доставлено",
+   "id": "Tidak terkirim"
+  },
+  "Show these services on the phone": {
+   "zh-Hans": "在手机上显示这些服务",
+   "hi": "इन सेवाओं को फ़ोन पर दिखाएँ",
+   "es": "Mostrar estos servicios en el teléfono",
+   "ar": "عرض هذه الخدمات على الهاتف",
+   "fr": "Afficher ces services sur le téléphone",
+   "bn": "এই সার্ভিসগুলো ফোনে দেখান",
+   "pt-BR": "Mostrar estes serviços no celular",
+   "ru": "Показывать эти сервисы на телефоне",
+   "id": "Tampilkan layanan ini di ponsel"
+  },
+  "Each tick lets your paired phone see that service's card: a headline and up to three short lines, read-only. Nothing is shown until you tick it. No addresses, subjects, links or keys are ever sent.": {
+   "zh-Hans": "勾选后，已配对的手机即可查看该服务的卡片：一个标题和最多三行简短内容，只读。未勾选前不会显示任何内容。绝不会发送地址、主题、链接或密钥。",
+   "hi": "टिक करने पर आपका जोड़ा गया फ़ोन उस सेवा का कार्ड देख सकता है: एक शीर्षक और अधिकतम तीन छोटी पंक्तियाँ, केवल पढ़ने के लिए। टिक करने तक कुछ नहीं दिखता। पते, विषय, लिंक या कुंजियाँ कभी नहीं भेजी जातीं।",
+   "es": "Cada marca permite que tu teléfono emparejado vea la tarjeta de ese servicio: un titular y hasta tres líneas breves, solo lectura. No se muestra nada hasta que lo marques. Nunca se envían direcciones, asuntos, enlaces ni claves.",
+   "ar": "كل علامة تتيح لهاتفك المقترن رؤية بطاقة تلك الخدمة: عنوان وحتى ثلاثة أسطر قصيرة للقراءة فقط. لا يُعرض شيء حتى تضع العلامة. لا تُرسل أبدًا العناوين أو الموضوعات أو الروابط أو المفاتيح.",
+   "fr": "Chaque case permet à votre téléphone associé de voir la carte de ce service : un titre et jusqu'à trois courtes lignes, en lecture seule. Rien n'est montré tant que vous ne cochez pas. Aucune adresse, aucun objet, aucun lien ni aucune clé n'est jamais envoyé.",
+   "bn": "প্রতিটি টিকে আপনার যুক্ত করা ফোন ওই সার্ভিসের কার্ড দেখতে পারে: একটি শিরোনাম ও সর্বোচ্চ তিনটি ছোট লাইন, শুধু পড়ার জন্য। টিক না দেওয়া পর্যন্ত কিছুই দেখানো হয় না। ঠিকানা, বিষয়, লিঙ্ক বা কী কখনও পাঠানো হয় না।",
+   "pt-BR": "Cada marcação permite que seu celular pareado veja o cartão desse serviço: um título e até três linhas curtas, somente leitura. Nada aparece até você marcar. Endereços, assuntos, links ou chaves nunca são enviados.",
+   "ru": "Каждая отметка позволяет подключённому телефону видеть карточку сервиса: заголовок и до трёх коротких строк, только для чтения. Пока вы не отметите, ничего не показывается. Адреса, темы писем, ссылки и ключи не отправляются никогда.",
+   "id": "Setiap centang memungkinkan ponsel Anda yang terhubung melihat kartu layanan itu: satu judul dan hingga tiga baris pendek, hanya-baca. Tidak ada yang ditampilkan sebelum Anda mencentangnya. Alamat, subjek, tautan, atau kunci tidak pernah dikirim."
   }
  }
 }

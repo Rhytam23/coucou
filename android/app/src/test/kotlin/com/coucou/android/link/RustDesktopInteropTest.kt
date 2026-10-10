@@ -100,6 +100,8 @@ class RustDesktopInteropTest {
         override fun onCaps(caps: Set<String>) { this.caps.add(caps - Protocol.CAP_PREFS); allCaps.add(caps) }
         val allCaps = LinkedBlockingQueue<Set<String>>()
         val prefs = LinkedBlockingQueue<String>()
+        val serviceCards = LinkedBlockingQueue<List<ServiceCard>>()
+        override fun onServices(cards: List<ServiceCard>) { serviceCards.add(cards) }
         val usages = LinkedBlockingQueue<UsageSnapshot>()
         override fun onUsage(usage: UsageSnapshot) { usages.add(usage) }
         val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
@@ -222,6 +224,38 @@ class RustDesktopInteropTest {
             assertNotNull(rec.welcome.poll(15, TimeUnit.SECONDS))
             command("repair brand-new-token-0123456789")
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── Service cards (cap services) ────────────────────────────────────────────────
+
+    @Test fun theRealServerSendsOnlyTheServicesTheUserTicked() {
+        val info = startDesktop()
+        command("services stripe")
+        command("servicecards")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(setOf("services"), rec.caps.poll(15, TimeUnit.SECONDS))
+            val cards = rec.serviceCards.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(listOf("integration_stripe"), cards.map { it.id })
+            assertTrue("the Notion card was not ticked: its text must not arrive", cards.none { c -> c.items.any { it.label == "Private page" } })
+            assertNull(rec.serviceCards.poll(1, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withNothingTickedTheRealServerOffersNoServices() {
+        val info = startDesktop()
+        command("servicecards")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            assertNull(rec.serviceCards.poll(2, TimeUnit.SECONDS))
         } finally {
             client.stop()
         }

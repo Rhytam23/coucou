@@ -12,6 +12,7 @@ import type { PlanUsage, CodexPlanUsage } from "../core/plan";
 import { State } from "../core/state";
 import { parseOutfit } from "../mochi/wardrobe";
 import { dropPendingCard } from "./hooks";
+import { serviceCards } from "./phone-services";
 import type { Island } from "./island";
 
 /** Changes arrive in bursts (a tool call is several events); one picture per burst. */
@@ -142,6 +143,8 @@ export function registerPhoneLink(island: Island): () => void {
   let lastOutfit = "";
   /** The plan usage last sent, as JSON; "" before anything was. */
   let lastUsage = "";
+  /** The service cards last sent, as JSON; "" before anything was. */
+  let lastServices = "";
   let timer: number | null = null;
 
   const publish = () => {
@@ -149,6 +152,7 @@ export function registerPhoneLink(island: Island): () => void {
     publishQuestion();
     publishOutfit();
     publishUsage();
+    publishServices();
     const snapshot = linkSnapshot();
     const key = JSON.stringify(snapshot);
     if (key === last) return;
@@ -178,6 +182,14 @@ export function registerPhoneLink(island: Island): () => void {
     void Bridge.phoneLinkPublishUsage(usage);
   };
 
+  const publishServices = () => {
+    const cards = serviceCards();
+    const key = JSON.stringify(cards);
+    if (key === lastServices) return;
+    lastServices = key;
+    void Bridge.phoneLinkPublishServices(cards);
+  };
+
   const schedule = () => {
     if (!running || timer != null) return;
     timer = window.setTimeout(publish, DEBOUNCE_MS);
@@ -192,6 +204,7 @@ export function registerPhoneLink(island: Island): () => void {
     lastQuestion = "";
     lastOutfit = "";
     lastUsage = "";
+    lastServices = "";
     if (running) schedule();
     else if (timer != null) {
       window.clearTimeout(timer);

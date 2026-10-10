@@ -54,6 +54,8 @@ class DevDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val serviceCards = LinkedBlockingQueue<List<ServiceCard>>()
+        override fun onServices(cards: List<ServiceCard>) { serviceCards.add(cards) }
         val usages = LinkedBlockingQueue<UsageSnapshot>()
         override fun onUsage(usage: UsageSnapshot) { usages.add(usage) }
         val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
@@ -156,6 +158,21 @@ class DevDesktopInteropTest {
             assertEquals(2, seen.count { it.startsWith("ANSWER refused") })
             assertTrue(seen.any { it.startsWith("ANSWER accepted") })
             assertTrue("the picked labels must not be logged", seen.none { it.contains("Build") || it.contains("develop") })
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun theServiceCardsComeWithTheSwitchOnTheNodeDesktop() {
+        val info = startDesktop("--services")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("services"), rec.caps.poll(10, TimeUnit.SECONDS))
+            val cards = rec.serviceCards.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(listOf("integration_stripe", "integration_notion"), cards.map { it.id })
+            assertEquals("Roadmap", cards[1].items[0].label)
         } finally {
             client.stop()
         }

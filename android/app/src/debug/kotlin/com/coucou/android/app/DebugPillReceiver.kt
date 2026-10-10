@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff | usage
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff | usage | services
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -32,6 +32,8 @@ import com.coucou.android.mochi.BotState
  *
  * `usage` shows the Plan usage panel on Home as if the computer had sent it: `--es level low|mid|high`
  * (the colour of the bars) or `--es level none` to take it away.
+ *
+ * `services` shows the Services cards on Home as if the computer had sent them (`--es set none` takes them away).
  *
  * `diff` shows an agent that changed files (Home > the agent > Files changed): tap a file to open the sheet of its lines
  * (no computer needed). `--es size big` makes the changes longer than the 200 lines the computer sends, to see the note.
@@ -134,6 +136,22 @@ class DebugPillReceiver : BroadcastReceiver() {
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
+            }
+            "services" -> {
+                if (intent.getStringExtra("set") == "none") model.applyServices(emptyList())
+                else model.applyServices(
+                    listOf(
+                        com.coucou.android.link.ServiceCard(
+                            "integration_stripe", "Stripe", "12.50 EUR", "Payments",
+                            listOf(com.coucou.android.link.ServiceLine("Payment", "+9.00 · 2m"), com.coucou.android.link.ServiceLine("Payment failed", "+1.00 · 3h")),
+                        ),
+                        com.coucou.android.link.ServiceCard("integration_github", "GitHub", "1.5k Total stars", "Overview", listOf(com.coucou.android.link.ServiceLine("Repositories", "12"))),
+                        com.coucou.android.link.ServiceCard(
+                            "integration_calcom", "Cal.com", "10/10 14:30", "Schedule",
+                            listOf(com.coucou.android.link.ServiceLine("Intro call", "10/10 14:30"), com.coucou.android.link.ServiceLine("A meeting with a very long title that has to be cut", "11/10 09:00")),
+                        ),
+                    ),
+                )
             }
             "usage" -> {
                 val level = intent.getStringExtra("level") ?: "mid"
