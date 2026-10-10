@@ -82,4 +82,30 @@ class SheetsTest {
         assertTrue(q.contains("ApprovalSheetPlan.GUARD_MS"))
         assertTrue(q.contains("enabled = armed && QuestionFlow.complete"))
     }
+    // ── the file-change sheet ──────────────────────────────────────────────────────
+
+    private val diffSheet get() = src("ui/DiffSheet.kt")
+
+    @Test fun theLinesOfAFileAreNeverLoggedStoredOrKeptAcrossRecreation() {
+        assertFalse(diffSheet.contains("Log."))
+        assertFalse(diffSheet.contains("rememberSaveable"))
+        val model = src("app/AppModel.kt")
+        val diffPart = model.substringAfter("A file's change (cap `diffs`)").substringBefore("override fun onApprovalResolved")
+        assertFalse(diffPart.contains("Log."))
+        assertFalse(diffPart.contains("kv.put") || diffPart.contains("store."))
+        assertTrue("closing the sheet forgets the lines", diffPart.contains("fun closeDiff()") && diffPart.contains("DiffState.Idle"))
+    }
+
+    @Test fun anAddedOrRemovedLineIsMarkedAndNotOnlyColoured() {
+        assertTrue(diffSheet.contains("'+' -> \"+\"") && diffSheet.contains("'-' -> \"−\""))
+    }
+
+    @Test fun unlinkingTheComputerClosesTheSheet() {
+        val model = src("app/AppModel.kt")
+        assertTrue(model.substringAfter("private fun stopLink()").take(120).contains("closeDiff()"))
+    }
+
+    @Test fun theSheetSaysWhenItCouldNotLoadOrWasCutOrIsTooLarge() {
+        for (s in listOf("file_failed", "file_gone", "file_too_large", "file_truncated", "file_loading")) assertTrue(s, diffSheet.contains("R.string.$s"))
+    }
 }

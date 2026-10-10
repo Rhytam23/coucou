@@ -18,7 +18,7 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details", "answers", "prefs")
+    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
@@ -26,6 +26,15 @@ object Protocol {
     const val CAP_ANSWERS = "answers"
     /** What Mochi wears on the computer (no switch there: it is no secret). */
     const val CAP_PREFS = "prefs"
+    /** The files an agent changed (a list on each session) and, when asked for one, its lines. */
+    const val CAP_DIFFS = "diffs"
+    const val MAX_FILES = 20
+    const val MAX_FILE_NAME_CHARS = 80
+    /** The computer sends at most this many lines of one file, each cut at [MAX_DIFF_LINE_CHARS], in parts of at most [PART_LINES]. */
+    const val MAX_DIFF_LINES = 200
+    const val MAX_DIFF_LINE_CHARS = 400
+    const val PART_LINES = 100
+    const val MAX_DIFF_PARTS = 4
     const val MAX_QUESTIONS = 4
     const val MAX_OPTIONS = 8
     const val MAX_STEPS = 20
@@ -37,6 +46,12 @@ object Protocol {
 
 /** A model the user allowed on the computer for the phone. [id] is "provider/model". */
 data class ChatModel(val id: String, val provider: String, val label: String)
+
+/** A file an agent changed. [name] is a file name, never a path. */
+data class FileChange(val id: Long, val name: String, val added: Int, val removed: Int, val tooLarge: Boolean = false, val isNew: Boolean = false)
+
+/** One line of a diff: [kind] is '+', '-', ' ' (context) or '@' (a hunk starts). */
+data class DiffRow(val kind: Char, val text: String)
 
 data class SessionInfo(
     val pillId: String,
@@ -53,6 +68,8 @@ data class SessionInfo(
     val project: String? = null,
     /** "#RRGGBB" or null. */
     val color: String? = null,
+    /** Only with the "diffs" capability (the user's switch on the computer). */
+    val files: List<FileChange> = emptyList(),
 )
 
 data class ApprovalRequest(
@@ -80,6 +97,11 @@ sealed interface ServerMsg {
     data class Question(val request: QuestionRequest) : ServerMsg
     /** What Mochi wears on the computer: "auto" or an outfit, exactly one of [com.coucou.android.mochi.outfit.Wardrobe.SELECTIONS]. */
     data class Prefs(val outfit: String) : ServerMsg
+    /** One part of a file's diff; [gone]: the computer no longer has it; [truncated]: there were more lines than it sends. */
+    data class Diff(
+        val pillId: String, val fileId: Long, val name: String, val added: Int, val removed: Int,
+        val tooLarge: Boolean, val gone: Boolean, val truncated: Boolean, val part: Int, val parts: Int, val lines: List<DiffRow>,
+    ) : ServerMsg
     data object Pong : ServerMsg
     data class ChatModels(val models: List<ChatModel>) : ServerMsg
     /** [text] is appended to the answer being written. */
@@ -99,6 +121,8 @@ sealed interface ClientMsg {
     data object Bye : ClientMsg
     /** [picks]: one list of labels per question, in order (exactly one for a single choice). */
     data class Answer(val fingerprint: String, val picks: List<List<String>>) : ClientMsg
+    /** The lines of one file the session list showed (cap `diffs`). */
+    data class GetDiff(val pillId: String, val fileId: Long) : ClientMsg
     data object ChatModels : ClientMsg
     data class ChatSend(val id: String, val model: String, val text: String) : ClientMsg
     data class ChatCancel(val id: String) : ClientMsg
@@ -121,6 +145,7 @@ object Wire {
             ClientMsg.Bye -> o.put("type", "bye")
             is ClientMsg.Answer -> o.put("type", "answer").put("fingerprint", m.fingerprint)
                 .put("picks", JSONArray(m.picks.map { JSONArray(it) }))
+            is ClientMsg.GetDiff -> o.put("type", "getDiff").put("pillId", m.pillId).put("fileId", m.fileId)
             ClientMsg.ChatModels -> o.put("type", "chatModels")
             is ClientMsg.ChatSend -> o.put("type", "chatSend").put("id", m.id).put("model", m.model).put("text", m.text)
             is ClientMsg.ChatCancel -> o.put("type", "chatCancel").put("id", m.id)
@@ -149,6 +174,7 @@ object Wire {
                 "approvalResolved" -> ServerMsg.ApprovalResolved(o.getString("fingerprint"))
                 "question" -> question(o)?.let { ServerMsg.Question(it) }
                 // A value this build does not know is dropped rather than guessed: the phone keeps what it had.
+                "diff" -> diff(o)
                 "prefs" -> o.optString("outfit", "").takeIf { it in Wardrobe.SELECTIONS }?.let { ServerMsg.Prefs(it) }
                 "pong" -> ServerMsg.Pong
                 "chatModels" -> ServerMsg.ChatModels(o.getJSONArray("models").objects().mapNotNull(::chatModel))
@@ -177,7 +203,48 @@ object Wire {
         finalLine = o.optString("finalLine", "").take(Protocol.MAX_STEP_CHARS).ifBlank { null },
         project = folderName(o.optString("project", "")),
         color = o.optString("color", "").takeIf { isColor(it) },
+        files = files(o.optJSONArray("files")),
     )
+
+    /** Files with an id and a name, as names only (even if a path were sent), at most [Protocol.MAX_FILES]. */
+    private fun files(a: JSONArray?): List<FileChange> {
+        if (a == null) return emptyList()
+        return (0 until a.length()).mapNotNull { i ->
+            val f = a.optJSONObject(i) ?: return@mapNotNull null
+            if (!f.has("id")) return@mapNotNull null
+            val id = f.optLong("id", -1)
+            val name = fileNameOf(f.optString("name", "")) ?: return@mapNotNull null
+            if (id < 0) return@mapNotNull null
+            FileChange(id, name, f.optInt("added", 0).coerceAtLeast(0), f.optInt("removed", 0).coerceAtLeast(0), f.optBoolean("tooLarge", false), f.optBoolean("isNew", false))
+        }.takeLast(Protocol.MAX_FILES)
+    }
+
+    /** The last segment of a path, without control characters and cut; null if nothing is left. */
+    fun fileNameOf(raw: String): String? {
+        val last = raw.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\').filter { !it.isISOControl() }.trim().take(Protocol.MAX_FILE_NAME_CHARS)
+        return last.takeIf { it.isNotEmpty() && it != "." && it != ".." }
+    }
+
+    /** A part of a diff, or null if it breaks the limits the computer keeps (so it cannot be a real one). */
+    private fun diff(o: JSONObject): ServerMsg.Diff? {
+        val parts = o.getInt("parts")
+        val part = o.getInt("part")
+        if (parts !in 1..Protocol.MAX_DIFF_PARTS || part !in 0 until parts) return null
+        val arr = o.getJSONArray("lines")
+        if (arr.length() > Protocol.PART_LINES) return null
+        val rows = (0 until arr.length()).map { i ->
+            val r = arr.getJSONArray(i)
+            val k = r.getString(0)
+            val kind = if (k.length == 1 && k[0] in "+-@") k[0] else ' '
+            DiffRow(kind, r.getString(1).take(Protocol.MAX_DIFF_LINE_CHARS))
+        }
+        return ServerMsg.Diff(
+            pillId = o.getString("pillId"), fileId = o.getLong("fileId"), name = fileNameOf(o.optString("name", "")).orEmpty(),
+            added = o.optInt("added", 0).coerceAtLeast(0), removed = o.optInt("removed", 0).coerceAtLeast(0),
+            tooLarge = o.optBoolean("tooLarge", false), gone = o.optBoolean("gone", false), truncated = o.optBoolean("truncated", false),
+            part = part, parts = parts, lines = rows,
+        )
+    }
 
     /**
      * A question as the computer offers it, or null if it breaks the limits (the computer would not send such a

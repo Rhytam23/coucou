@@ -90,6 +90,27 @@ fun SessionScreen(model: AppModel, pillId: String, onBack: () -> Unit) {
                 }
             }
         }
+        if (s.files.isNotEmpty()) {
+            item { SectionHeading(stringResource(R.string.files_heading)) }
+            item {
+                Panel {
+                    // Newest change first, like the steps.
+                    s.files.asReversed().forEachIndexed { i, f ->
+                        if (i > 0) RowDivider()
+                        ListRow(
+                            f.name, hint = if (f.isNew) stringResource(R.string.files_new) else null,
+                            onClick = { model.openDiff(s.pillId, f) },
+                            trailing = {
+                                Text(
+                                    stringResource(R.string.files_counts, f.added, f.removed), maxLines = 1,
+                                    style = TypeScale.SECONDARY.style(t.textDim.c()).copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+        }
         item { SectionHeading(stringResource(R.string.session_steps)) }
         val steps = HomePanel.stepsNewestFirst(s)
         if (steps.isEmpty()) {

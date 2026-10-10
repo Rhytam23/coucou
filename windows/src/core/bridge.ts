@@ -77,6 +77,34 @@ export interface PhoneLinkSession {
   /** A folder name, never a path. */
   project?: string;
   color?: string;
+  /** The files this session changed, for a phone that has `diffs` (Rust cuts them to a name and a count). */
+  files?: PhoneLinkFile[];
+}
+
+export interface PhoneLinkFile {
+  id: number;
+  /** A file name; Rust keeps only its last segment. */
+  name: string;
+  added: number;
+  removed: number;
+  tooLarge?: boolean;
+  isNew?: boolean;
+}
+
+/** One file's diff for the phone that asked: lines as [kind, text], kind "+", "-", " " or "@" (a hunk's first line). */
+export interface PhoneLinkDiff {
+  pillId: string;
+  fileId: number;
+  name: string;
+  added: number;
+  removed: number;
+  tooLarge: boolean;
+  gone: boolean;
+  lines: [string, string][];
+}
+
+export interface PhoneDiffsStatus {
+  enabled: boolean;
 }
 
 export interface PhoneLinkApproval {
@@ -218,6 +246,11 @@ export const Bridge = {
   phoneAnswersStatus: () => call<PhoneAnswersStatus>("phone_answers_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneAnswersSetEnabled: (enabled: boolean) => callOrThrow<PhoneAnswersStatus>("phone_answers_set_enabled", { enabled }),
+  phoneDiffsStatus: () => call<PhoneDiffsStatus>("phone_diffs_status"),
+  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
+  phoneDiffsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDiffsStatus>("phone_diffs_set_enabled", { enabled }),
+  /** The answer to a phone's request for a file's diff (the "phone-link-getdiff" event); `conn` says which phone. */
+  phoneLinkSendDiff: (conn: number, diff: PhoneLinkDiff) => call<void>("phone_link_send_diff", { conn, diff }),
   phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),

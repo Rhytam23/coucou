@@ -55,6 +55,11 @@ struct TauriHost {
 }
 
 impl Host for TauriHost {
+    fn get_diff(&self, sub_id: u64, pill_id: &str, file_id: u64) {
+        // The island has the diffs; it answers with phone_link_send_diff. Nothing about the file is logged.
+        let _ = self.app.emit_to(island::WINDOW_LABEL, "phone-link-getdiff", serde_json::json!({ "conn": sub_id, "pillId": pill_id, "fileId": file_id }));
+    }
+
     fn answer(&self, request_id: &str, answers: &serde_json::Map<String, serde_json::Value>) {
         log::line(format!("phone link: answered a question id={request_id}")); // never what was picked
         recap::forget_request(&self.app, request_id);
@@ -91,6 +96,9 @@ impl server::Features for TauriFeatures {
     }
     fn answers(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_answers
+    }
+    fn diffs(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_diffs
     }
 }
 
@@ -359,6 +367,53 @@ pub fn phone_answers_set_enabled(
     log::line(format!("phone link: answering questions {}", if enabled { "on" } else { "off" }));
     let _ = app.emit("settings-changed", updated);
     Ok(AnswersStatus { enabled })
+}
+
+// ── File changes on the phone: the switch (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffsStatus {
+    pub enabled: bool,
+}
+
+#[tauri::command]
+pub fn phone_diffs_status(shared: State<Shared>) -> DiffsStatus {
+    DiffsStatus { enabled: shared.settings.lock().unwrap().phone_diffs }
+}
+
+/// "Show the files an agent changed on the phone". Off by default. A change disconnects the phones once so they
+/// reconnect and are told (or not) about the capability.
+#[tauri::command]
+pub fn phone_diffs_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<DiffsStatus, String> {
+    only_settings(&window)?;
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_diffs = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "diffs setting changed");
+    log::line(format!("phone link: file changes on the phone {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(DiffsStatus { enabled })
+}
+
+/// The island's answer to a phone's request for a file's diff (event "phone-link-getdiff").
+#[tauri::command]
+pub fn phone_link_send_diff(link: State<PhoneLink>, conn: u64, diff: hub::DiffIn) {
+    if link.running.lock().unwrap().is_none() {
+        return;
+    }
+    link.hub.send_diff(conn, diff);
 }
 
 // ── Chat from the phone: the switch and the list of models (Settings → Android phone) ──

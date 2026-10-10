@@ -26,6 +26,8 @@ interface LinkListener {
     fun onQuestion(request: QuestionRequest) {}
     /** What Mochi wears on the computer: "auto" or an outfit (only with the `prefs` capability). */
     fun onPrefs(outfit: String) {}
+    /** A part of a file's diff the phone asked for (only with the `diffs` capability). */
+    fun onDiff(part: ServerMsg.Diff) {}
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
@@ -47,6 +49,9 @@ interface DesktopLink {
 
     /** Sends the picks for a question; false if the link is down or the computer did not offer `answers`. */
     fun answer(fingerprint: String, picks: List<List<String>>): Boolean = false
+
+    /** Asks for the lines of a file in a session's list; false if the link is down or the computer did not offer `diffs`. */
+    fun getDiff(pillId: String, fileId: Long): Boolean = false
 
     // Chat through the computer (docs/ANDROID_LINK.md). Not offered by the demo.
     fun chatModels() {}
@@ -104,6 +109,8 @@ class LinkClient(
     @Volatile private var answersOffered = false
     /** The computer's welcome offered `prefs` on this connection. */
     @Volatile private var prefsOffered = false
+    /** The computer's welcome offered `diffs` on this connection. */
+    @Volatile private var diffsOffered = false
     @Volatile private var socket: Socket? = null
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
@@ -173,6 +180,10 @@ class LinkClient(
         }
     }
 
+    /** Asks for the lines of a file of the session list. False if the computer did not offer `diffs` or the link is down. */
+    override fun getDiff(pillId: String, fileId: Long): Boolean =
+        diffsOffered && Protocol.CAP_DIFFS in caps && queue(ClientMsg.GetDiff(pillId, fileId))
+
     override fun answer(fingerprint: String, picks: List<List<String>>): Boolean =
         answersOffered && Protocol.CAP_ANSWERS in caps && queue(ClientMsg.Answer(fingerprint, picks))
 
@@ -215,6 +226,7 @@ class LinkClient(
                 out = null
                 answersOffered = false
                 prefsOffered = false
+                diffsOffered = false
                 runCatching { socket?.close() }
                 socket = null
                 approvals.clear()
@@ -255,6 +267,7 @@ class LinkClient(
                     listener.onWelcome(msg.desktopName, msg.os)
                     answersOffered = Protocol.CAP_ANSWERS in msg.caps
                     prefsOffered = Protocol.CAP_PREFS in msg.caps
+                    diffsOffered = Protocol.CAP_DIFFS in msg.caps
                     listener.onCaps(msg.caps)
                     // Told what it may use right away, so the Chat screen has its list when it opens.
                     if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
@@ -264,6 +277,8 @@ class LinkClient(
                 is ServerMsg.ApprovalResolved -> { approvals.resolve(msg.fingerprint); listener.onApprovalResolved(msg.fingerprint) }
                 // Only offered to a phone that asked and was offered `answers`; ignored from a computer that did not.
                 is ServerMsg.Question -> if (answersOffered && Protocol.CAP_ANSWERS in caps) listener.onQuestion(msg.request)
+                // Only after the phone asked for it, and only on a connection that was offered `diffs`.
+                is ServerMsg.Diff -> if (diffsOffered && Protocol.CAP_DIFFS in caps) listener.onDiff(msg)
                 is ServerMsg.Prefs -> if (prefsOffered && Protocol.CAP_PREFS in caps) listener.onPrefs(msg.outfit)
                 ServerMsg.Pong -> {}
                 is ServerMsg.ChatModels -> listener.onChatModels(msg.models)

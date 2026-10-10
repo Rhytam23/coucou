@@ -168,6 +168,8 @@ class AppModel(private val context: Context) : LinkListener {
 
     /** The computer offers session details (steps, last message, project folder, colour) to this phone. */
     var detailsOffered by mutableStateOf(false); private set
+    /** The computer lists the files an agent changed and can send their lines (its switch is on). */
+    var diffsOffered by mutableStateOf(false); private set
 
     /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
     private var chatForced = false
@@ -439,6 +441,7 @@ class AppModel(private val context: Context) : LinkListener {
     fun stopDemo() = stopLink()
 
     private fun stopLink() {
+        closeDiff()
         finder.stop()
         netWatch.stop()
         currentPairing = null
@@ -510,6 +513,7 @@ class AppModel(private val context: Context) : LinkListener {
         main.post {
             chatOffered = Protocol.CAP_CHAT in caps
             detailsOffered = Protocol.CAP_DETAILS in caps
+            diffsOffered = Protocol.CAP_DIFFS in caps
         }
     }
 
@@ -616,6 +620,50 @@ class AppModel(private val context: Context) : LinkListener {
         return sent
     }
 
+    // ── A file's change (cap `diffs`) ──────────────────────────────────────────────────
+
+    private val diffAssembler = com.coucou.android.core.DiffAssembler()
+    private val diffTimeout = Runnable {
+        (diffState as? com.coucou.android.core.DiffState.Loading)?.let { diffState = com.coucou.android.core.DiffState.Failed(it.name) }
+        diffAssembler.cancel()
+    }
+
+    /** What the file-change sheet shows; Idle closes it. The lines are held only while it is open. */
+    var diffState by mutableStateOf<com.coucou.android.core.DiffState>(com.coucou.android.core.DiffState.Idle); private set
+
+    /** Debug: serve this sample for any file instead of asking a computer. */
+    internal var debugDiff: ((com.coucou.android.link.FileChange) -> com.coucou.android.core.FileDiffView)? = null
+    internal fun setDebugDiff(provider: ((com.coucou.android.link.FileChange) -> com.coucou.android.core.FileDiffView)?) { debugDiff = provider }
+
+    /** Opens the sheet for a file of a session's list and asks the computer for its lines. */
+    fun openDiff(pillId: String, file: com.coucou.android.link.FileChange) {
+        val local = debugDiff
+        if (local != null && link == null) {
+            diffState = com.coucou.android.core.DiffState.Ready(local(file))
+            return
+        }
+        diffState = com.coucou.android.core.DiffState.Loading(pillId, file.id, file.name)
+        diffAssembler.expect(pillId, file.id)
+        main.removeCallbacks(diffTimeout)
+        if (link?.getDiff(pillId, file.id) == true) main.postDelayed(diffTimeout, DIFF_WAIT_MS)
+        else diffState = com.coucou.android.core.DiffState.Failed(file.name)
+    }
+
+    /** Closes the sheet and forgets the lines. */
+    fun closeDiff() {
+        main.removeCallbacks(diffTimeout)
+        diffAssembler.cancel()
+        diffState = com.coucou.android.core.DiffState.Idle
+    }
+
+    override fun onDiff(part: com.coucou.android.link.ServerMsg.Diff) {
+        main.post {
+            val done = diffAssembler.accept(part) ?: return@post
+            main.removeCallbacks(diffTimeout)
+            if (diffState is com.coucou.android.core.DiffState.Loading) diffState = com.coucou.android.core.DiffState.Ready(done)
+        }
+    }
+
     override fun onApprovalResolved(fingerprint: String) {
         main.post {
             removeQuestion(fingerprint)
@@ -637,6 +685,8 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private companion object {
+        /** How long the sheet waits for the lines of a file before saying it could not load them. */
+        const val DIFF_WAIT_MS = 10_000L
         val NEWSWORTHY = setOf(BotState.QUESTION, BotState.ERROR, BotState.FINISHED, BotState.RATELIMIT)
     }
 }

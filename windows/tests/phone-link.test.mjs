@@ -298,3 +298,50 @@ test("the outfit is published when the link comes up and whenever the wardrobe c
   tick(250);
   assert.equal(p().at(-1).outfit, "auto");
 });
+
+test("a session lists the files it changed by name and counts, never a path", async () => {
+  const { fromEdit } = await import("../src/core/diff.ts");
+  State.appendSessionDiff(CLAUDE, fromEdit("a\nb\n", "a\nc\n", "/home/me/secret/proj/src/app.ts"));
+  const claude = linkSnapshot().sessions.find((s) => s.pillId === CLAUDE);
+  assert.equal(claude.files.length, 1);
+  assert.equal(claude.files[0].name, "app.ts");
+  assert.equal(claude.files[0].added, 1);
+  assert.equal(claude.files[0].removed, 1);
+  assert.ok(!JSON.stringify(claude.files).includes("secret"));
+  assert.ok(!JSON.stringify(claude.files).includes("lines"), "the lines are sent only when asked for");
+});
+
+test("at most twenty files are listed, the newest", async () => {
+  const { fromEdit } = await import("../src/core/diff.ts");
+  for (let i = 0; i < 30; i++) State.appendSessionDiff(CLAUDE, fromEdit("a\n", "b\n", `/p/f${i}.ts`));
+  const files = linkSnapshot().sessions.find((s) => s.pillId === CLAUDE).files;
+  assert.equal(files.length, 20);
+  assert.equal(files.at(-1).name, "f29.ts");
+});
+
+test("a diff is answered as lines with hunk headers, and a missing one as gone", async () => {
+  const { fromEdit } = await import("../src/core/diff.ts");
+  const { linkDiff } = await import("../src/island/phone-link.ts");
+  const id = State.appendSessionDiff(CLAUDE, fromEdit("one\ntwo\nthree\n", "one\n2\nthree\n", "C:\\Users\\me\\x\\note.md"));
+  const d = linkDiff(CLAUDE, id);
+  assert.equal(d.gone, false);
+  assert.equal(d.name, "note.md");
+  assert.equal(d.lines[0][0], "@");
+  assert.deepEqual(d.lines.filter((l) => l[0] === "-" || l[0] === "+"), [["-", "two"], ["+", "2"]]);
+  assert.equal(linkDiff(CLAUDE, 999999).gone, true);
+  assert.equal(linkDiff("nobody", id).gone, true);
+});
+
+test("a phone's request is answered to that phone only, and not while the link is off", async () => {
+  const { fromEdit } = await import("../src/core/diff.ts");
+  const id = State.appendSessionDiff(CLAUDE, fromEdit("a\n", "b\n", "/x/y.ts"));
+  dispose = registerPhoneLink(island);
+  await settle();
+  tick(250);
+  emit("phone-link-getdiff", { conn: 5, pillId: CLAUDE, fileId: id });
+  await settle();
+  const sentDiffs = sent("phone_link_send_diff");
+  assert.equal(sentDiffs.length, 1);
+  assert.equal(sentDiffs[0].conn, 5);
+  assert.equal(sentDiffs[0].diff.fileId, id);
+});

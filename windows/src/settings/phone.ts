@@ -50,6 +50,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       h("div", { class: "hint", text: t("Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.") }),
       detailsBlock(makeToggle),
       answersBlock(makeToggle),
+      diffsBlock(makeToggle),
       chatBlock(makeToggle, settings),
     );
   };
@@ -154,6 +155,38 @@ function answersBlock(makeToggle: Toggle): HTMLElement {
     {},
     h("div", { class: "row" }, h("label", { text: t("Let the phone answer Claude Code's questions") }), switchEl),
     h("div", { class: "hint", text: t("The phone shows each question with its options. Every answer is confirmed with the phone's fingerprint or screen lock.") }),
+    note,
+  );
+}
+
+/**
+ * The files an agent changed, on the phone: off until the user turns it on. The list (names and counts) rides on the
+ * session; the lines of a file are sent only when the phone asks for that file. Rust re-reads this for every connection.
+ */
+function diffsBlock(makeToggle: Toggle): HTMLElement {
+  const note = h("div", { class: "hint" });
+  const switchEl = makeToggle(false, (next) => {
+    void (async () => {
+      note.textContent = "";
+      try {
+        await Bridge.phoneDiffsSetEnabled(next);
+      } catch (err) {
+        switchEl.classList.remove("on");
+        switchEl.setAttribute("aria-pressed", "false");
+        note.textContent = String(err);
+      }
+    })();
+  });
+  void Bridge.phoneDiffsStatus().then((status) => {
+    if (!status) return;
+    switchEl.classList.toggle("on", status.enabled);
+    switchEl.setAttribute("aria-pressed", String(status.enabled));
+  });
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Show the files an agent changed on the phone") }), switchEl),
+    h("div", { class: "hint", text: t("The phone lists the files each agent changed and, when you tap one, shows what changed in it (200 lines at most, long lines cut). File names and lines go only to your paired phone, over the pinned encrypted link, and only when it asks.") }),
     note,
   );
 }

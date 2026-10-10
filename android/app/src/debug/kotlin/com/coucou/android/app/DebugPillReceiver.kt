@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -29,6 +29,9 @@ import com.coucou.android.mochi.BotState
  * `outfit` dresses Mochi without a computer: `--es value beanie` is what the computer would say (auto, none,
  * partyHat, beanie, crown, sunglasses, roundGlasses, bow, scarf, witchHat, pumpkin, santaHat, bunnyEars) and
  * `--es local crown` is the phone's own choice from Settings > Mochi's wardrobe (`--es local computer` follows the computer).
+ *
+ * `diff` shows an agent that changed files (Home > the agent > Files changed): tap a file to open the sheet of its lines
+ * (no computer needed). `--es size big` makes the changes longer than the 200 lines the computer sends, to see the note.
  *
  * `history` adds three sample decisions to Settings > History (no agent needed).
  * With the app in the background, finished / error / question / ratelimit also post a quiet notice
@@ -128,6 +131,37 @@ class DebugPillReceiver : BroadcastReceiver() {
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
+            }
+            "diff" -> {
+                val big = intent.getStringExtra("size") == "big"
+                model.onCaps(setOf("details", "diffs"))
+                model.onSessions(
+                    listOf(
+                        SessionInfo(
+                            "integration_claude", "Claude Code", BotState.WORKING, "Editing files", 2, 5, now,
+                            steps = listOf("Read · README.md", "Edit · src/app.ts"), project = "coucou", color = "#2DD4BF",
+                            files = listOf(
+                                com.coucou.android.link.FileChange(1, "app.ts", 3, 1),
+                                com.coucou.android.link.FileChange(2, "notes.md", 12, 0, isNew = true),
+                                com.coucou.android.link.FileChange(3, "huge-generated-file.json", 5400, 0, tooLarge = true),
+                            ),
+                        ),
+                    ),
+                )
+                model.setDebugDiff { f ->
+                    val rows = when {
+                        f.tooLarge -> emptyList()
+                        big -> (0 until 200).map { i -> com.coucou.android.link.DiffRow(if (i % 7 == 0) '+' else if (i % 7 == 1) '-' else ' ', "line $i of a long file") }
+                        else -> listOf(
+                            com.coucou.android.link.DiffRow('@', "@@ 10"),
+                            com.coucou.android.link.DiffRow(' ', "function greet(name: string) {"),
+                            com.coucou.android.link.DiffRow('-', "  return 'Hello ' + name;"),
+                            com.coucou.android.link.DiffRow('+', "  return `Hello, \${name}!`;"),
+                            com.coucou.android.link.DiffRow(' ', "}"),
+                        )
+                    }
+                    com.coucou.android.core.FileDiffView("integration_claude", f.id, f.name, f.added, f.removed, f.tooLarge, false, big, rows)
+                }
             }
             "outfit" -> {
                 intent.getStringExtra("value")?.let { model.applyComputerOutfit(it) }

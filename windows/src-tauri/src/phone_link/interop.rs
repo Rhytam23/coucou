@@ -22,13 +22,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::chat::{BoxFuture, ChatBackend, ChatConfig, ChatFail, ChatLink, ModelOption};
-use super::hub::{ApprovalIn, Host, Hub, SessionIn};
+use super::hub::{ApprovalIn, DiffIn, FileIn, Host, Hub, SessionIn};
 use super::server::Features;
 use super::pairing::{self, tests::MemStore};
 use super::server;
 
 struct Printing;
 impl Host for Printing {
+    fn get_diff(&self, sub_id: u64, pill_id: &str, file_id: u64) {
+        // The Kotlin test hears this and answers with the command `diff <conn> <file>`.
+        println!("GETDIFF {sub_id} {pill_id} {file_id}");
+    }
+
     fn decide(&self, request_id: &str, allow: bool) {
         println!("DECISION {} {request_id}", if allow { "allow" } else { "deny" });
     }
@@ -36,10 +41,14 @@ impl Host for Printing {
 
 struct Switches {
     details: AtomicBool,
+    diffs: AtomicBool,
 }
 impl Features for Switches {
     fn details(&self) -> bool {
         self.details.load(Ordering::SeqCst)
+    }
+    fn diffs(&self) -> bool {
+        self.diffs.load(Ordering::SeqCst)
     }
 }
 
@@ -102,7 +111,7 @@ fn interop_server() {
         let token = std::env::var("COUCOU_INTEROP_TOKEN").unwrap_or_else(|_| "interop-token-0123456789abcdef".into());
         let hub = Hub::new(Arc::new(Printing));
         let fake = Arc::new(FakeChat { on: AtomicBool::new(false) });
-        let switches = Arc::new(Switches { details: AtomicBool::new(false) });
+        let switches = Arc::new(Switches { details: AtomicBool::new(false), diffs: AtomicBool::new(false) });
         let shared = server::Shared::with_features(
             hub.clone(), token.clone(), "Rust desktop".into(), Some(ChatLink::new(fake.clone())), switches.clone(),
         );
@@ -136,6 +145,8 @@ fn interop_server() {
                             // a full path, to prove only the folder's name leaves the computer
                             project: Some("/home/someone/private/proj".into()),
                             color: Some("#2DD4BF".into()),
+                            // a full path: only the file's name leaves the computer
+                            files: vec![FileIn { id: 7, name: "/home/someone/private/proj/src/app.ts".into(), added: 3, removed: 1, ..Default::default() }],
                         },
                         SessionIn { pill_id: "agent_gemini".into(), agent: "Gemini CLI".into(), state: "sleeping".into(), ..Default::default() },
                     ],
@@ -153,6 +164,13 @@ fn interop_server() {
                     hub.kick_all("auth", "unpaired");
                 }
                 (Some("chat"), Some(state), _) => fake.on.store(state == "on", Ordering::SeqCst),
+                (Some("diffs"), Some(state), _) => switches.diffs.store(state == "on", Ordering::SeqCst),
+                (Some("diff"), Some(conn), Some(lines)) => {
+                    // `lines` is how many sample lines to send (to try the limits and the parts).
+                    let n: usize = lines.parse().unwrap_or(3);
+                    let rows = (0..n).map(|i| (if i % 3 == 0 { "+" } else if i % 3 == 1 { "-" } else { " " }.to_string(), format!("line {i} of the file"))).collect();
+                    hub.send_diff(conn.parse().unwrap_or(0), DiffIn { pill_id: "integration_claude".into(), file_id: 7, name: "/private/dir/app.ts".into(), added: 3, removed: 1, lines: rows, ..Default::default() });
+                }
                 (Some("outfit"), Some(value), _) => hub.publish_outfit(value),
                 (Some("details"), Some(state), _) => switches.details.store(state == "on", Ordering::SeqCst),
                 (Some("quit"), _, _) => break,

@@ -85,6 +85,8 @@ pub struct Settings {
     pub phone_details: bool,
     /// Let the phone answer the questions Claude Code asks (cap `answers`). Off by default; owned by Rust like the other phone switches.
     pub phone_answers: bool,
+    /// Show the files an agent changed on the phone, and their diffs on request (cap `diffs`). Off by default; owned by Rust like the other phone switches.
+    pub phone_diffs: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -145,6 +147,7 @@ impl Default for Settings {
             phone_chat_models: Vec::new(),
             phone_details: false,
             phone_answers: false,
+            phone_diffs: false,
         }
     }
 }
@@ -426,7 +429,8 @@ mod tests {
   "phoneChat": true,
   "phoneChatModels": ["openai/gpt-x"],
   "phoneDetails": true,
-  "phoneAnswers": true
+  "phoneAnswers": true,
+  "phoneDiffs": true
 }"##;
 
     fn custom() -> Value {
@@ -576,6 +580,15 @@ mod tests {
         assert!(!parse(&custom_with("phoneAnswers", None)).unwrap().phone_answers);
         assert!(parse(&custom_with("phoneAnswers", Some(serde_json::json!(true)))).unwrap().phone_answers);
         assert!(!parse(&custom_with("phoneAnswers", Some(serde_json::json!("yes")))).unwrap().phone_answers, "a wrong type does not switch it on");
+    }
+
+    #[test]
+    fn a_file_from_before_phone_diffs_keeps_it_off() {
+        // Showing what an agent changed on the phone is never on by default; an older file is not consent.
+        assert!(!Settings::default().phone_diffs);
+        assert!(!parse(&custom_with("phoneDiffs", None)).unwrap().phone_diffs);
+        assert!(parse(&custom_with("phoneDiffs", Some(serde_json::json!(true)))).unwrap().phone_diffs);
+        assert!(!parse(&custom_with("phoneDiffs", Some(serde_json::json!("yes")))).unwrap().phone_diffs, "a wrong type does not switch it on");
     }
 
     #[test]
@@ -892,6 +905,7 @@ mod tests {
                 "phoneChatModels",
                 "phoneDetails",
                 "phoneAnswers",
+                "phoneDiffs",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

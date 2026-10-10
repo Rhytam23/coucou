@@ -2,7 +2,7 @@
 // A pretend Coucou desktop for developing and testing the Android app without the real one.
 // Speaks docs/ANDROID_LINK.md (v1): TLS with a self-signed certificate, newline-delimited JSON.
 //
-//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details] [--answers]
+//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details] [--answers] [--diffs]
 //
 // --details offers the "details" capability: the sessions then carry steps, finalLine, project (a folder
 // name) and color, like the real desktop with "Show session details on the phone" turned on. A phone that
@@ -11,6 +11,11 @@
 // --answers offers the "answers" capability: the scripted run then asks a FAKE question (two questions,
 // one single choice and one multi-select) and accepts an `answer` message, checked like the real desktop
 // (exact labels, one pick for a single choice, 1..n different picks for a multi-select).
+//
+// --diffs offers the "diffs" capability: Claude Code's session lists three files (file 1 a small change, file 2 a
+// long one of 250 lines that is cut to 200 and sent in two parts, file 3 too large to show) and `getDiff` is answered
+// like the real desktop does (kinds + - space @, 400 characters a line, parts of 100). Asking for any other file
+// is answered `gone`.
 //
 // --fake-chat offers the "chat" capability with a FAKE provider, so the phone's Chat screen can be tried
 // without a key and without spending anything. Models: fake/echo, fake/other. Special messages:
@@ -69,6 +74,27 @@ const DETAILS = {
   agent_codex: { steps: ["Search · the code", "Read · lib.rs"], project: "api-server", color: "#E879F9" },
   agent_gemini: { steps: [], project: "notes", color: "#8AB4F8" },
 };
+const FILES = {
+  integration_claude: [
+    { id: 1, name: "app.ts", added: 2, removed: 1 },
+    { id: 2, name: "long-file.ts", added: 125, removed: 125 },
+    { id: 3, name: "generated.json", added: 5400, removed: 0, tooLarge: true },
+  ],
+};
+const withFiles = (list) => list.map((s) => (FILES[s.pillId] ? { ...s, files: FILES[s.pillId] } : s));
+function fakeDiff(pillId, fileId) {
+  const f = (FILES[pillId] ?? []).find((x) => x.id === fileId);
+  if (!f) return [{ gone: true, name: "", added: 0, removed: 0, tooLarge: false, lines: [] }];
+  let rows = [];
+  if (f.tooLarge) rows = [];
+  else if (fileId === 2) rows = Array.from({ length: 250 }, (_, i) => [i === 0 ? "@" : i % 3 === 0 ? "+" : i % 3 === 1 ? "-" : " ", `row ${i} ` + "x".repeat(i === 5 ? 600 : 10)]);
+  else rows = [["@", "@@ 10"], [" ", "function greet(name) {"], ["-", "  return 'Hello ' + name;"], ["+", "  return `Hello, ${name}!`;"], [" ", "}"]];
+  const truncated = rows.length > 200;
+  rows = rows.slice(0, 200).map(([k, s]) => [k, s.slice(0, 400)]);
+  const chunks = [];
+  for (let i = 0; i < Math.max(1, rows.length); i += 100) chunks.push(rows.slice(i, i + 100));
+  return chunks.map((lines) => ({ gone: false, name: f.name, added: f.added, removed: f.removed, tooLarge: !!f.tooLarge, truncated, lines }));
+}
 const withDetails = (list, state) =>
   list.map((s) => {
     const d = DETAILS[s.pillId] ?? {};
@@ -143,8 +169,9 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
   let chat = false; // negotiated in the hello
   let details = false;
   let answers = false;
+  let diffs = false;
   let asked = null; // { fingerprint, questions }
-  const sessionsMsg = (list) => ({ type: "sessions", sessions: details ? withDetails(list) : list });
+  const sessionsMsg = (list) => ({ type: "sessions", sessions: diffs ? withFiles(details ? withDetails(list) : list) : details ? withDetails(list) : list });
   let run = null; // { id, timer }
   const chatError = (id, reason) => send({ type: "chatError", id, reason, message: CHAT_REASONS[reason] ?? "Something went wrong on the computer." });
   const stopRun = () => { if (run) { clearTimeout(run.timer); clearInterval(run.timer); run = null; } };
@@ -231,7 +258,8 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       chat = flag("fake-chat") && Array.isArray(m.caps) && m.caps.includes("chat");
       details = flag("details") && Array.isArray(m.caps) && m.caps.includes("details");
       answers = flag("answers") && Array.isArray(m.caps) && m.caps.includes("answers");
-      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : []), ...(answers ? ["answers"] : [])];
+      diffs = flag("diffs") && Array.isArray(m.caps) && m.caps.includes("diffs");
+      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : []), ...(answers ? ["answers"] : []), ...(diffs ? ["diffs"] : [])];
       send({ type: "welcome", v: V, desktop: NAME, os: process.platform, ...(offered.length ? { caps: offered } : {}) });
       advance();
       timer = setInterval(advance, STEP_MS);
@@ -248,6 +276,13 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       }
       case "chatReset": {
         if (chat) { if (run) { const id = run.id; stopRun(); chatError(id, "canceled"); } log("CHAT reset"); }
+        return;
+      }
+      case "getDiff": {
+        if (!diffs || typeof m.pillId !== "string" || !m.pillId || !Number.isInteger(m.fileId)) return;
+        log(`GETDIFF ${m.pillId} ${m.fileId}`);
+        const parts = fakeDiff(m.pillId, m.fileId);
+        parts.forEach((p, i) => send({ type: "diff", pillId: m.pillId, fileId: m.fileId, part: i, parts: parts.length, ...p }));
         return;
       }
       case "answer": {

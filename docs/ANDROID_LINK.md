@@ -151,6 +151,34 @@ phone never hears of a question and cannot answer one (its `answer` messages are
   logged about what was picked, on either side.
 - A permission request is still sent to every phone as an `approval`, unchanged.
 
+## File changes (optional capability `diffs`)
+
+A phone that sends `caps: ["diffs"]` in its `hello`, while the user has turned on "Show the files an agent changed on the
+phone" on the computer (off by default, a switch of its own; re-read for every connection), is offered `diffs` in `welcome.caps`.
+Any other phone gets the v1 `sessions` line and cannot ask for a diff (its `getDiff` messages are ignored).
+
+**The list.** With `diffs`, a session may carry `files`, at most 20 (the newest), each `{id, name, added, removed}` plus
+`tooLarge: true` (the change is too large to show line by line: counts only) and `isNew: true` (a file that was written whole).
+`name` is the **file name only**: the computer keeps the last segment of the path, cut at 80 characters, and the phone does the
+same again if it is sent more. The line counts toward the 56 KiB budget of a `sessions` line like the details do.
+
+**The lines, on request only.**
+
+| Direction | `type` | fields |
+|---|---|---|
+| phone to computer | `getDiff` | `pillId`, `fileId` (an `id` from the list) |
+| computer to phone | `diff` | `pillId`, `fileId`, `name`, `added`, `removed`, `tooLarge`, `gone`, `truncated`, `part`, `parts`, `lines` |
+
+- `lines` are `[kind, text]`: kind `+` (added), `-` (removed), ` ` (context) or `@` (a hunk starts; the text is `@@ <line>`).
+  An unknown kind is read as context.
+- At most **200 lines** per file, each cut at **400 characters**, sent in **parts of 100 lines** (`part` from 0 to `parts - 1`, at
+  most 2 parts), so no line of the link nears 64 KiB. `truncated: true` says there were more than 200. A diff the island no
+  longer has is answered with `gone: true` and no lines (one part); a change that was `tooLarge` has no lines either.
+- The answer goes to the phone that asked, and only if it still has `diffs`. A phone may ask for at most 20 diffs in 10 seconds.
+- The phone holds the lines in memory while its sheet is open and forgets them when it closes; nothing is stored or logged.
+- Deviation from the plan: the plan said "600 lines in total"; the computer keeps 200 lines per file and the 20-in-10-seconds rate
+  instead, which bounds the same thing (at most 4 000 lines in 10 s) without per-connection bookkeeping.
+
 ## Mochi's outfit (optional capability `prefs`)
 
 A phone that sends `caps: ["prefs"]` in its `hello` is offered `prefs` in `welcome.caps` (no switch on the computer: what

@@ -50,6 +50,10 @@ pub trait Features: Send + Sync {
     fn answers(&self) -> bool {
         false
     }
+    /// File changes: the list of files of a session, and a file's diff on request.
+    fn diffs(&self) -> bool {
+        false
+    }
 }
 
 /// Nothing extra: how the link behaved before capabilities existed.
@@ -227,6 +231,7 @@ where
     let answers = asked("answers") && shared.features.answers();
     // The outfit is no secret and says nothing about the user's work: offered whenever the phone asks.
     let prefs = asked("prefs");
+    let diffs = asked("diffs") && shared.features.diffs();
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
         offered.push("chat");
@@ -240,12 +245,15 @@ where
     if prefs {
         offered.push("prefs");
     }
+    if diffs {
+        offered.push("diffs");
+    }
     let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
     if !offered.is_empty() {
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), details, answers, prefs);
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs });
 
     // 2. the conversation
     loop {
@@ -280,6 +288,13 @@ where
                 let fingerprint = msg["fingerprint"].as_str().unwrap_or("");
                 if let Some(picks) = parse_picks(&msg["picks"]) {
                     let _ = shared.hub.answer(fingerprint, &picks, (shared.clock)());
+                }
+            }
+            Some("getDiff") if diffs => {
+                // Which file of which session; what it holds is the island's (hub.rs checks the rate and the limits).
+                let pill = msg["pillId"].as_str().unwrap_or("");
+                if let (false, true, Some(file)) = (pill.is_empty(), pill.len() <= 64, msg["fileId"].as_u64()) {
+                    shared.hub.request_diff(id, pill, file, (shared.clock)());
                 }
             }
             Some("bye") => break,

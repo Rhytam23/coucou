@@ -6,8 +6,8 @@
 // Rust (which answers the waiting hook) and only the card on the island is
 // closed here. While the link is off nothing is computed and no timer runs.
 
-import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
-import { parseDiffStep } from "../core/diff";
+import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkDiff, type PhoneLinkFile, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
+import { fileName, parseDiffStep, type FileDiff } from "../core/diff";
 import { State } from "../core/state";
 import { parseOutfit } from "../mochi/wardrobe";
 import { dropPendingCard } from "./hooks";
@@ -44,6 +44,29 @@ function stepText(step: string): string {
   return diff ? diff.filename : step;
 }
 
+/** The files a session changed, newest last, by name and counts only (the lines are sent when a phone asks). */
+export function linkFiles(pillId: string): PhoneLinkFile[] {
+  return (State.sessionDiffs.get(pillId) ?? []).slice(-20).map((d) => {
+    const f: PhoneLinkFile = { id: d.id, name: fileName(d.path), added: d.added, removed: d.removed };
+    if (d.tooLarge) f.tooLarge = true;
+    if (d.isNewFile) f.isNew = true;
+    return f;
+  });
+}
+
+/** One file's diff as lines of [kind, text]: "@" opens each hunk. A diff that was too large has counts only. */
+export function linkDiff(pillId: string, fileId: number): PhoneLinkDiff {
+  const d: FileDiff | null = State.findDiff(pillId, fileId);
+  const empty = { pillId, fileId, name: "", added: 0, removed: 0, tooLarge: false, lines: [] as [string, string][] };
+  if (!d) return { ...empty, gone: true };
+  const lines: [string, string][] = [];
+  for (const h of d.hunks) {
+    lines.push(["@", `@@ ${h.newStart}`]);
+    for (const l of h.lines) lines.push([l.kind === "added" ? "+" : l.kind === "removed" ? "-" : " ", l.text]);
+  }
+  return { pillId, fileId, name: fileName(d.path), added: d.added, removed: d.removed, tooLarge: d.tooLarge, gone: false, lines };
+}
+
 /** The agents' sessions — not the services — and the request the phone may answer. */
 export function linkSnapshot(): LinkSnapshot {
   const sessions: PhoneLinkSession[] = State.tasks
@@ -65,6 +88,7 @@ export function linkSnapshot(): LinkSnapshot {
         finalLine: t.finalLine || undefined,
         project: folderName(t.sessionCwd),
         color: t.color,
+        files: linkFiles(t.id),
       };
     });
 
@@ -152,6 +176,11 @@ export function registerPhoneLink(island: Island): () => void {
   // The phone answered: Rust has already told the agent; the card goes.
   void onEvent<string>("phone-link-decided", (requestId) => {
     if (State.pendingApproval?.requestId === requestId) dropPendingCard(island);
+  });
+  // A phone asked for a file's diff: the answer goes to that phone only (Rust cuts it to the limits).
+  void onEvent<{ conn: number; pillId: string; fileId: number }>("phone-link-getdiff", (ask) => {
+    if (!running || typeof ask?.conn !== "number") return;
+    void Bridge.phoneLinkSendDiff(ask.conn, linkDiff(String(ask.pillId), Number(ask.fileId)));
   });
   void refresh();
   return () => {

@@ -28,8 +28,11 @@ fn block_on<F: Future>(f: F) -> F::Output {
 }
 
 #[derive(Default)]
-struct Recorder(Mutex<Vec<(String, bool)>>, Mutex<Vec<(String, Value)>>);
+struct Recorder(Mutex<Vec<(String, bool)>>, Mutex<Vec<(String, Value)>>, Mutex<Vec<(u64, String, u64)>>);
 impl Host for Recorder {
+    fn get_diff(&self, sub_id: u64, pill_id: &str, file_id: u64) {
+        self.2.lock().unwrap().push((sub_id, pill_id.to_string(), file_id));
+    }
     fn decide(&self, request_id: &str, allow: bool) {
         self.0.lock().unwrap().push((request_id.to_string(), allow));
     }
@@ -955,6 +958,7 @@ mod details_tests {
             final_line: Some("Fixed the bug".into()),
             project: Some("/home/me/secret-folder/coucou".into()),
             color: Some("#2DD4BF".into()),
+            ..Default::default()
         }
     }
 
@@ -1303,6 +1307,118 @@ mod prefs_tests {
                 seen.push(t);
             }
             assert_eq!(seen, vec!["sessions".to_string()]);
+        });
+    }
+}
+
+mod diffs_tests {
+    use super::*;
+    use crate::phone_link::hub::{DiffIn, FileIn, SessionIn};
+    use crate::phone_link::server::Features;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Switch(AtomicBool);
+    impl Features for Switch {
+        fn details(&self) -> bool {
+            false
+        }
+        fn diffs(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    async fn phone(rig: &Rig, caps: Option<Value>) -> (Client, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        (c, welcome)
+    }
+
+    fn working() -> SessionIn {
+        SessionIn {
+            pill_id: "integration_claude".into(),
+            state: "working".into(),
+            files: vec![FileIn { id: 7, name: "/home/me/secret/app.ts".into(), added: 3, removed: 1, ..FileIn::default() }],
+            ..SessionIn::default()
+        }
+    }
+
+    #[test]
+    fn diffs_are_offered_only_while_the_switch_is_on_and_the_phone_asked() {
+        block_on(async {
+            let on = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (_c, welcome) = phone(&on, Some(json!(["diffs"]))).await;
+            assert_eq!(welcome["caps"], json!(["diffs"]));
+            let (_c, welcome) = phone(&on, None).await;
+            assert!(welcome.get("caps").is_none());
+            let off = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(false)))).await;
+            let (_c, welcome) = phone(&off, Some(json!(["diffs"]))).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+        });
+    }
+
+    #[test]
+    fn a_phone_asks_for_a_file_and_gets_it_and_nobody_else_does() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (mut c, _) = phone(&rig, Some(json!(["diffs"]))).await;
+            let (mut other, _) = phone(&rig, Some(json!(["diffs"]))).await;
+            c.expect("sessions").await;
+            other.expect("sessions").await;
+            rig.hub.publish(vec![working()], None, server::now_ms());
+            let list = c.expect("sessions").await;
+            assert_eq!(list["sessions"][0]["files"][0]["name"], "app.ts");
+            c.send(json!({ "type": "getDiff", "pillId": "integration_claude", "fileId": 7 })).await;
+            let conn = loop {
+                if let Some(first) = rig.host.2.lock().unwrap().first().cloned() {
+                    break first;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            };
+            assert_eq!((conn.1.as_str(), conn.2), ("integration_claude", 7));
+            rig.hub.send_diff(conn.0, DiffIn { pill_id: conn.1.clone(), file_id: 7, name: "app.ts".into(), added: 3, removed: 1, lines: vec![("+".into(), "let x = 1;".into())], ..DiffIn::default() });
+            let diff = c.expect("diff").await;
+            assert_eq!(diff["lines"][0], json!(["+", "let x = 1;"]));
+            // the other phone hears nothing of it
+            other.send(json!({ "type": "ping" })).await;
+            assert_eq!(other.recv().await.unwrap()["type"], "sessions");
+            assert_eq!(other.recv().await.unwrap()["type"], "pong");
+        });
+    }
+
+    #[test]
+    fn a_malformed_request_or_one_without_the_capability_never_reaches_the_island() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (mut c, _) = phone(&rig, Some(json!(["diffs"]))).await;
+            let (mut plain, _) = phone(&rig, None).await;
+            for bad in [
+                json!({ "type": "getDiff" }),
+                json!({ "type": "getDiff", "pillId": "", "fileId": 1 }),
+                json!({ "type": "getDiff", "pillId": "x", "fileId": "1" }),
+                json!({ "type": "getDiff", "pillId": "x", "fileId": -1 }),
+                json!({ "type": "getDiff", "pillId": "x".repeat(65), "fileId": 1 }),
+            ] {
+                c.send(bad).await;
+            }
+            plain.send(json!({ "type": "getDiff", "pillId": "integration_claude", "fileId": 7 })).await;
+            c.send(json!({ "type": "ping" })).await;
+            loop {
+                if c.recv().await.unwrap()["type"] == "pong" {
+                    break;
+                }
+            }
+            plain.send(json!({ "type": "ping" })).await;
+            loop {
+                if plain.recv().await.unwrap()["type"] == "pong" {
+                    break;
+                }
+            }
+            assert!(rig.host.2.lock().unwrap().is_empty());
         });
     }
 }

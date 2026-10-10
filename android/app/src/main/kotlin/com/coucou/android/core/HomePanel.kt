@@ -36,7 +36,7 @@ object HomePanel {
     }
 
     /** There is something to open: steps, a last message or a project name (only with the "details" capability). */
-    fun hasDetails(s: SessionInfo): Boolean = s.steps.isNotEmpty() || !s.finalLine.isNullOrBlank() || s.project != null
+    fun hasDetails(s: SessionInfo): Boolean = s.steps.isNotEmpty() || !s.finalLine.isNullOrBlank() || s.project != null || s.files.isNotEmpty()
 
     /** The colour of an agent: the one the user gave its pill on the computer, else the catalog's. */
     fun colorHex(s: SessionInfo): String? = s.color ?: Pills.byId(s.pillId)?.colorHex

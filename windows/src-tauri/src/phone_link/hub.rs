@@ -35,6 +35,17 @@ const MAX_PROJECT_CHARS: usize = 64;
 /// (16 sessions of 20 steps of 200 characters would be 64 KB of text alone).
 pub const DETAILS_LINE_BUDGET: usize = 56 * 1024;
 
+/// File changes (cap `diffs`): the list of files of a session, and a file's lines on request.
+pub const MAX_FILES: usize = 20;
+const MAX_FILE_NAME_CHARS: usize = 80;
+/// One file's diff: at most this many lines, each cut at MAX_DIFF_LINE_CHARS, sent in parts of PART_LINES so
+/// no line of the link nears the 64 KiB limit.
+pub const MAX_DIFF_LINES: usize = 200;
+const MAX_DIFF_LINE_CHARS: usize = 400;
+const PART_LINES: usize = 100;
+/// A phone may ask for this many diffs in 10 seconds.
+const DIFF_ASKS_PER_10S: usize = 20;
+
 /// Questions (cap `answers`): a question that does not fit these limits is left to the island, never cut,
 /// because the answer must carry the exact text and labels back to the agent.
 pub const MAX_QUESTIONS: usize = 4;
@@ -55,7 +66,37 @@ pub trait Host: Send + Sync {
     fn decide(&self, request_id: &str, allow: bool);
     /// A phone answered a question Claude Code asked: each question's text mapped to the label picked (a list of
     /// labels for a multi-select), the shape AskUserQuestion takes. Only called for the question still pending.
+    /// A phone (connection `sub_id`) asked for a file's diff: the island answers through [`Hub::send_diff`].
+    fn get_diff(&self, _sub_id: u64, _pill_id: &str, _file_id: u64) {}
+
     fn answer(&self, _request_id: &str, _answers: &serde_json::Map<String, serde_json::Value>) {}
+}
+
+/// One file a session changed, as the island has it. Only its name (never a path) is kept.
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FileIn {
+    pub id: u64,
+    pub name: String,
+    pub added: u32,
+    pub removed: u32,
+    pub too_large: bool,
+    pub is_new: bool,
+}
+
+/// One file's diff, as the island answers a phone's request: lines as [kind, text], kind one of "+", "-", " ", "@".
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DiffIn {
+    pub pill_id: String,
+    pub file_id: u64,
+    pub name: String,
+    pub added: u32,
+    pub removed: u32,
+    pub too_large: bool,
+    /// The island no longer has this diff.
+    pub gone: bool,
+    pub lines: Vec<(String, String)>,
 }
 
 /// One agent session, as the island reports it.
@@ -74,6 +115,8 @@ pub struct SessionIn {
     /// The folder the session runs in; only its last segment is ever kept.
     pub project: Option<String>,
     pub color: Option<String>,
+    /// The files this session changed; sent only to phones that asked for and were offered `diffs`.
+    pub files: Vec<FileIn>,
 }
 
 impl Default for SessionIn {
@@ -89,6 +132,7 @@ impl Default for SessionIn {
             final_line: None,
             project: None,
             color: None,
+            files: Vec::new(),
         }
     }
 }
@@ -170,6 +214,8 @@ struct Session {
     project: Option<String>,
     #[serde(skip)]
     color: Option<String>,
+    #[serde(skip)]
+    files: Vec<FileIn>,
 }
 
 impl Session {
@@ -208,6 +254,19 @@ struct Sub {
     answers: bool,
     /// The phone asked for `prefs` (the outfit Mochi wears on the computer).
     prefs: bool,
+    /// The phone asked for `diffs` and the user's switch was on when it connected.
+    diffs: bool,
+    /// When this phone asked for a diff lately (ms), to keep it from flooding the island.
+    diff_asks: Vec<u64>,
+}
+
+/// What a connection may have been offered.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Caps {
+    pub details: bool,
+    pub answers: bool,
+    pub prefs: bool,
+    pub diffs: bool,
 }
 
 #[derive(Default)]
@@ -265,6 +324,7 @@ impl Hub {
                     final_line: s.final_line.as_deref().map(|l| clip(l, MAX_TEXT_CHARS)).filter(|l| !l.trim().is_empty()),
                     project: s.project.as_deref().and_then(project_name),
                     color: s.color.filter(|c| is_color(c)),
+                    files: clean_files(&s.files),
                 };
                 if let Some(old) = inner.sessions.iter().find(|o| o.pill_id == fresh.pill_id) {
                     if old.same_content(&fresh) {
@@ -314,16 +374,17 @@ impl Hub {
     /// up to date: the sessions, then the request still waiting, if any.
     #[cfg(test)]
     pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64, details: bool) -> (u64, Arc<AtomicBool>) {
-        self.subscribe_with(tx, now, details, false, false)
+        self.subscribe_with(tx, now, Caps { details, ..Caps::default() })
     }
 
     /// Like [`subscribe`], for a phone that may also have been offered `answers` and `prefs`.
-    pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, details: bool, answers: bool, prefs: bool) -> (u64, Arc<AtomicBool>) {
+    pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, caps: Caps) -> (u64, Arc<AtomicBool>) {
+        let Caps { details, answers, prefs, diffs } = caps;
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
         inner.next_sub += 1;
-        let first = if details { detailed_line(&inner.sessions) } else { sessions_line(&inner.sessions) };
+        let first = session_line(&inner.sessions, details, diffs);
         let _ = tx.try_send(Out::Line(first.into()));
         if let Some(a) = &inner.approval {
             let _ = tx.try_send(Out::Line(approval_line(a).into()));
@@ -339,7 +400,7 @@ impl Hub {
             }
         }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, diff_asks: Vec::new() });
         (id, evicted)
     }
 
@@ -390,6 +451,58 @@ impl Hub {
 }
 
 impl Hub {
+    /// A phone asked for a file's diff. Passed on to the island only if the phone has `diffs` and is not asking too often.
+    pub fn request_diff(&self, sub_id: u64, pill_id: &str, file_id: u64, now: u64) {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            let Some(sub) = inner.subs.iter_mut().find(|s| s.id == sub_id && s.diffs) else { return };
+            sub.diff_asks.retain(|t| now.saturating_sub(*t) < 10_000);
+            if sub.diff_asks.len() >= DIFF_ASKS_PER_10S {
+                return;
+            }
+            sub.diff_asks.push(now);
+        }
+        // Outside the lock: the host asks the island.
+        self.host.get_diff(sub_id, pill_id, file_id);
+    }
+
+    /// The island's answer to [`request_diff`]: sent to that phone only (and only if it still has `diffs`), cut to
+    /// the limits whatever the island sent, in parts that each fit a line.
+    pub fn send_diff(&self, sub_id: u64, diff: DiffIn) {
+        let mut inner = self.inner.lock().unwrap();
+        let Some(sub) = inner.subs.iter().find(|s| s.id == sub_id && s.diffs) else { return };
+        let truncated = diff.lines.len() > MAX_DIFF_LINES;
+        let rows: Vec<serde_json::Value> = diff
+            .lines
+            .iter()
+            .take(MAX_DIFF_LINES)
+            .map(|(k, text)| {
+                let kind = match k.as_str() {
+                    "+" | "-" | "@" => k.as_str(),
+                    _ => " ",
+                };
+                json!([kind, clip(text, MAX_DIFF_LINE_CHARS)])
+            })
+            .collect();
+        let parts: Vec<&[serde_json::Value]> = if rows.is_empty() { vec![&[][..]] } else { rows.chunks(PART_LINES).collect() };
+        let total = parts.len();
+        let name = clean_files(&[FileIn { name: diff.name.clone(), ..FileIn::default() }]).first().map(|f| f.name.clone()).unwrap_or_default();
+        let mut ok = true;
+        for (i, part) in parts.iter().enumerate() {
+            let line = json!({
+                "type": "diff", "pillId": clip(&diff.pill_id, 64), "fileId": diff.file_id, "name": name,
+                "added": diff.added, "removed": diff.removed, "tooLarge": diff.too_large, "gone": diff.gone,
+                "truncated": truncated, "part": i, "parts": total, "lines": part,
+            })
+            .to_string();
+            ok &= sub.tx.try_send(Out::Line(line.into())).is_ok();
+        }
+        if !ok {
+            sub.evicted.store(true, Ordering::SeqCst);
+            inner.subs.retain(|s| s.id != sub_id);
+        }
+    }
+
     /// What Mochi wears on the computer ("auto" or an outfit, see [`OUTFIT_CHOICES`]); anything else is ignored.
     /// Only phones that have `prefs` hear of it, and a new one at once.
     pub fn publish_outfit(&self, outfit: &str) {
@@ -569,25 +682,30 @@ fn sessions_line(sessions: &[Session]) -> String {
 /// The sessions with their details, for a phone that has the capability. Same fields as the v1 line plus
 /// `steps`, `finalLine`, `project` and `color` where there is something to say. Steps are dropped from the
 /// oldest first (and then from all sessions) until the line fits.
-fn detailed_line(sessions: &[Session]) -> String {
+fn detailed_line(sessions: &[Session], details: bool, diffs: bool) -> String {
     let mut keep = MAX_STEPS;
     loop {
         let list: Vec<serde_json::Value> = sessions
             .iter()
             .map(|s| {
                 let mut v = serde_json::to_value(s).unwrap_or_default();
-                let steps = &s.steps[s.steps.len().saturating_sub(keep)..];
-                if !steps.is_empty() {
-                    v["steps"] = json!(steps);
+                if details {
+                    let steps = &s.steps[s.steps.len().saturating_sub(keep)..];
+                    if !steps.is_empty() {
+                        v["steps"] = json!(steps);
+                    }
+                    if let Some(l) = &s.final_line {
+                        v["finalLine"] = json!(l);
+                    }
+                    if let Some(p) = &s.project {
+                        v["project"] = json!(p);
+                    }
+                    if let Some(c) = &s.color {
+                        v["color"] = json!(c);
+                    }
                 }
-                if let Some(l) = &s.final_line {
-                    v["finalLine"] = json!(l);
-                }
-                if let Some(p) = &s.project {
-                    v["project"] = json!(p);
-                }
-                if let Some(c) = &s.color {
-                    v["color"] = json!(c);
+                if diffs && !s.files.is_empty() {
+                    v["files"] = json!(s.files.iter().map(file_json).collect::<Vec<_>>());
                 }
                 v
             })
@@ -600,21 +718,55 @@ fn detailed_line(sessions: &[Session]) -> String {
     }
 }
 
-/// Every phone gets the picture it asked for: the v1 line, or the one with details.
+fn file_json(f: &FileIn) -> serde_json::Value {
+    let mut v = json!({ "id": f.id, "name": f.name, "added": f.added, "removed": f.removed });
+    if f.too_large {
+        v["tooLarge"] = json!(true);
+    }
+    if f.is_new {
+        v["isNew"] = json!(true);
+    }
+    v
+}
+
+/// The `sessions` line a phone gets: the v1 line, or the one with what it was offered.
+fn session_line(sessions: &[Session], details: bool, diffs: bool) -> String {
+    if details || diffs {
+        detailed_line(sessions, details, diffs)
+    } else {
+        sessions_line(sessions)
+    }
+}
+
+/// Every phone gets the picture it asked for: the v1 line, or the one with details and/or file changes.
 fn broadcast_sessions(inner: &mut Inner) {
-    let basic: Arc<str> = sessions_line(&inner.sessions).into();
-    let detailed: Option<Arc<str>> = inner.subs.iter().any(|s| s.details).then(|| detailed_line(&inner.sessions).into());
+    let mut lines: std::collections::HashMap<(bool, bool), Arc<str>> = std::collections::HashMap::new();
+    let sessions = std::mem::take(&mut inner.sessions);
+    for s in &inner.subs {
+        lines.entry((s.details, s.diffs)).or_insert_with(|| session_line(&sessions, s.details, s.diffs).into());
+    }
+    inner.sessions = sessions;
     inner.subs.retain(|s| {
-        let line = match (&detailed, s.details) {
-            (Some(d), true) => d.clone(),
-            _ => basic.clone(),
-        };
+        let line = lines[&(s.details, s.diffs)].clone();
         let kept = s.tx.try_send(Out::Line(line)).is_ok();
         if !kept {
             s.evicted.store(true, Ordering::SeqCst);
         }
         kept
     });
+}
+
+/// At most MAX_FILES files with a name; only the file's name, cut, never a path.
+fn clean_files(files: &[FileIn]) -> Vec<FileIn> {
+    let kept: Vec<FileIn> = files
+        .iter()
+        .filter_map(|f| {
+            let last = f.name.trim_end_matches(['/', '\\']).rsplit(['/', '\\']).next().unwrap_or("").trim();
+            let name: String = last.chars().filter(|c| !c.is_control()).take(MAX_FILE_NAME_CHARS).collect();
+            (!name.is_empty()).then(|| FileIn { name, ..f.clone() })
+        })
+        .collect();
+    kept[kept.len().saturating_sub(MAX_FILES)..].to_vec()
 }
 
 /// The last MAX_STEPS non-empty steps, each cut to MAX_TEXT_CHARS.
@@ -682,10 +834,13 @@ mod tests {
     use std::sync::Mutex as StdMutex;
 
     #[derive(Default)]
-    struct Recorder(StdMutex<Vec<(String, bool)>>);
+    struct Recorder(StdMutex<Vec<(String, bool)>>, StdMutex<Vec<(u64, String, u64)>>);
     impl Host for Recorder {
         fn decide(&self, request_id: &str, allow: bool) {
             self.0.lock().unwrap().push((request_id.to_string(), allow));
+        }
+        fn get_diff(&self, sub_id: u64, pill_id: &str, file_id: u64) {
+            self.1.lock().unwrap().push((sub_id, pill_id.to_string(), file_id));
         }
     }
 
@@ -736,6 +891,7 @@ mod tests {
             final_line: Some("All done".into()),
             project: Some("/home/me/work/coucou".into()),
             color: Some("#2DD4BF".into()),
+            ..Default::default()
         }
     }
 
@@ -1112,7 +1268,7 @@ mod tests {
         let rec = Arc::new(AnswerRecorder::default());
         let hub = Hub::new(rec.clone());
         let (tx, rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000, false, true, false);
+        hub.subscribe_with(tx, 1_000, Caps { answers: true, ..Caps::default() });
         (hub, rec, rx)
     }
 
@@ -1166,7 +1322,7 @@ mod tests {
         let (hub, _rec, _rx) = qhub();
         hub.publish_question(Some(ask("r1")), 1_000);
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000 + APPROVAL_TTL_MS + 1, false, true, false);
+        hub.subscribe_with(tx, 1_000 + APPROVAL_TTL_MS + 1, Caps { answers: true, ..Caps::default() });
         assert!(drain(&mut rx).iter().all(|l| l["type"] != "question"));
     }
     // ── prefs (the outfit) ──────────────────────────────────────────────────────────
@@ -1176,7 +1332,7 @@ mod tests {
         let (hub, _) = hub();
         hub.publish_outfit("beanie");
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000, false, false, true);
+        hub.subscribe_with(tx, 1_000, Caps { prefs: true, ..Caps::default() });
         let first = drain(&mut rx);
         assert!(first.iter().any(|l| l["type"] == "prefs" && l["outfit"] == "beanie"), "{first:?}");
         hub.publish_outfit("crown");
@@ -1192,7 +1348,7 @@ mod tests {
         let (hub, _) = hub();
         hub.publish_outfit("scarf");
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000, true, true, false);
+        hub.subscribe_with(tx, 1_000, Caps { details: true, answers: true, ..Caps::default() });
         hub.publish_outfit("bow");
         assert!(drain(&mut rx).iter().all(|l| l["type"] != "prefs"));
     }
@@ -1201,7 +1357,7 @@ mod tests {
     fn only_the_known_wardrobe_values_are_sent() {
         let (hub, _) = hub();
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000, false, false, true);
+        hub.subscribe_with(tx, 1_000, Caps { prefs: true, ..Caps::default() });
         drain(&mut rx);
         for bad in ["", "topHat", "Beanie", "beanie ", "../../etc", "auto\nauto"] {
             hub.publish_outfit(bad);
@@ -1219,5 +1375,153 @@ mod tests {
         let body = ts.split("export const OUTFIT_SELECTIONS = [").nth(1).unwrap().split("] as const").next().unwrap();
         let ids: Vec<&str> = body.split('"').skip(1).step_by(2).collect();
         assert_eq!(ids, OUTFIT_CHOICES.to_vec());
+    }
+    // ── file changes (cap `diffs`) ──────────────────────────────────────────────────
+
+    fn with_files(files: Vec<FileIn>) -> SessionIn {
+        SessionIn { files, ..session("working") }
+    }
+
+    fn file(id: u64, name: &str) -> FileIn {
+        FileIn { id, name: name.into(), added: 2, removed: 1, ..FileIn::default() }
+    }
+
+    fn sub_with(hub: &Hub, caps: Caps) -> (u64, mpsc::Receiver<Out>) {
+        let (tx, rx) = mpsc::channel(64);
+        let (id, _) = hub.subscribe_with(tx, 1_000, caps);
+        (id, rx)
+    }
+
+    #[test]
+    fn the_list_of_files_goes_to_a_phone_with_diffs_and_to_nobody_else() {
+        let (hub, _) = hub();
+        let (_, mut plain) = sub_with(&hub, Caps::default());
+        let (_, mut details) = sub_with(&hub, Caps { details: true, ..Caps::default() });
+        let (_, mut diffs) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        drain(&mut plain);
+        drain(&mut details);
+        drain(&mut diffs);
+        hub.publish(vec![with_files(vec![file(3, "/home/me/private/proj/src/app.ts"), FileIn { too_large: true, is_new: true, ..file(4, "C:\\Users\\me\\notes.md") }])], None, 1_000);
+        let p = &drain(&mut plain)[0]["sessions"][0];
+        assert!(p.get("files").is_none(), "{p}");
+        assert!(drain(&mut details)[0]["sessions"][0].get("files").is_none());
+        let d = &drain(&mut diffs)[0]["sessions"][0];
+        assert_eq!(d["files"][0], serde_json::json!({ "id": 3, "name": "app.ts", "added": 2, "removed": 1 }));
+        assert_eq!(d["files"][1], serde_json::json!({ "id": 4, "name": "notes.md", "added": 2, "removed": 1, "tooLarge": true, "isNew": true }));
+        assert!(d.get("steps").is_none(), "diffs alone brings no details: {d}");
+        assert!(!d.to_string().contains("private") && !d.to_string().contains("Users"), "never a path: {d}");
+    }
+
+    #[test]
+    fn a_phone_with_both_gets_details_and_files_and_a_new_one_is_brought_up_to_date() {
+        let (hub, _) = hub();
+        hub.publish(vec![SessionIn { steps: vec!["Edit · a.rs".into()], ..with_files(vec![file(1, "a.rs")]) }], None, 1_000);
+        let (_, mut rx) = sub_with(&hub, Caps { details: true, diffs: true, ..Caps::default() });
+        let first = &drain(&mut rx)[0]["sessions"][0];
+        assert_eq!(first["files"][0]["name"], "a.rs");
+        assert_eq!(first["steps"][0], "Edit · a.rs");
+    }
+
+    #[test]
+    fn at_most_twenty_files_each_with_a_cut_name() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        drain(&mut rx);
+        let many: Vec<FileIn> = (0..30).map(|i| file(i, &format!("{}{i}.rs", "n".repeat(200)))).collect();
+        hub.publish(vec![with_files(many)], None, 1_000);
+        let files = drain(&mut rx)[0]["sessions"][0]["files"].as_array().unwrap().clone();
+        assert_eq!(files.len(), MAX_FILES);
+        assert_eq!(files[0]["id"], 10, "the newest ones are kept");
+        assert!(files.iter().all(|f| f["name"].as_str().unwrap().chars().count() <= 80));
+    }
+
+    #[test]
+    fn a_change_in_the_files_alone_is_sent() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        hub.publish(vec![with_files(vec![file(1, "a.rs")])], None, 1_000);
+        drain(&mut rx);
+        hub.publish(vec![with_files(vec![file(1, "a.rs"), file(2, "b.rs")])], None, 1_001);
+        assert_eq!(drain(&mut rx).len(), 1);
+    }
+
+    fn lines(n: usize) -> Vec<(String, String)> {
+        (0..n).map(|i| ((if i % 2 == 0 { "+" } else { "-" }).to_string(), format!("line {i}"))).collect()
+    }
+
+    fn diff_in(rows: Vec<(String, String)>) -> DiffIn {
+        DiffIn { pill_id: "integration_claude".into(), file_id: 3, name: "/x/y/app.ts".into(), added: 5, removed: 4, lines: rows, ..DiffIn::default() }
+    }
+
+    #[test]
+    fn a_diff_goes_to_the_phone_that_asked_cut_to_the_limits_in_parts() {
+        let (hub, _) = hub();
+        let (id, mut rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        let (_, mut other) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        drain(&mut rx);
+        drain(&mut other);
+        let mut rows = lines(250);
+        rows[0].1 = "x".repeat(900);
+        rows[1].0 = "weird".into();
+        hub.send_diff(id, diff_in(rows));
+        let parts = drain(&mut rx);
+        assert!(drain(&mut other).is_empty(), "only the phone that asked");
+        assert_eq!(parts.len(), 2);
+        assert_eq!((parts[0]["part"].as_u64(), parts[0]["parts"].as_u64()), (Some(0), Some(2)));
+        assert_eq!(parts[0]["lines"].as_array().unwrap().len(), 100);
+        assert_eq!(parts[1]["lines"].as_array().unwrap().len(), 100, "200 lines at most");
+        assert_eq!(parts[0]["truncated"], true);
+        assert_eq!(parts[0]["name"], "app.ts");
+        assert_eq!(parts[0]["lines"][0][1].as_str().unwrap().chars().count(), 400);
+        assert_eq!(parts[0]["lines"][1][0], " ", "an unknown kind is a context line");
+        assert!(parts.iter().all(|p| p.to_string().len() < 60 * 1024));
+    }
+
+    #[test]
+    fn a_small_diff_is_one_part_and_an_empty_one_still_answers() {
+        let (hub, _) = hub();
+        let (id, mut rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        drain(&mut rx);
+        hub.send_diff(id, diff_in(lines(3)));
+        let one = drain(&mut rx);
+        assert_eq!(one.len(), 1);
+        assert_eq!(one[0]["truncated"], false);
+        hub.send_diff(id, DiffIn { gone: true, ..diff_in(vec![]) });
+        let gone = drain(&mut rx);
+        assert_eq!(gone.len(), 1);
+        assert_eq!((gone[0]["gone"].clone(), gone[0]["parts"].clone()), (serde_json::json!(true), serde_json::json!(1)));
+    }
+
+    #[test]
+    fn a_phone_without_diffs_is_never_sent_one_and_cannot_ask() {
+        let (hub, host) = hub();
+        let (id, mut rx) = sub_with(&hub, Caps { details: true, answers: true, prefs: true, diffs: false });
+        drain(&mut rx);
+        hub.request_diff(id, "integration_claude", 3, 1_000);
+        assert!(host.1.lock().unwrap().is_empty());
+        hub.send_diff(id, diff_in(lines(3)));
+        assert!(drain(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn a_request_reaches_the_island_with_the_connection_and_is_rate_limited() {
+        let (hub, host) = hub();
+        let (id, _rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        for _ in 0..30 {
+            hub.request_diff(id, "integration_claude", 3, 5_000);
+        }
+        assert_eq!(host.1.lock().unwrap().len(), DIFF_ASKS_PER_10S);
+        assert_eq!(host.1.lock().unwrap()[0], (id, "integration_claude".to_string(), 3));
+        hub.request_diff(id, "integration_claude", 3, 16_000); // ten seconds later: asking is allowed again
+        assert_eq!(host.1.lock().unwrap().len(), DIFF_ASKS_PER_10S + 1);
+    }
+
+    #[test]
+    fn an_answer_for_a_phone_that_left_goes_nowhere() {
+        let (hub, _) = hub();
+        let (id, rx) = sub_with(&hub, Caps { diffs: true, ..Caps::default() });
+        hub.unsubscribe(id);
+        drop(rx);
+        hub.send_diff(id, diff_in(lines(3))); // must not panic
     }
 }

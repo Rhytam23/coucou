@@ -3624,6 +3624,28 @@
    "pt-BR": "Envia as últimas etapas (como aparecem na ilha, então podem incluir comandos), a linha final, o nome da pasta do projeto e a cor. Nunca um caminho.",
    "ru": "Отправляет последние шаги (как на острове, поэтому в них могут быть команды), последнюю строку, имя папки проекта и цвет. Никогда не путь.",
    "id": "Mengirim langkah terakhir (seperti tampil di pulau, jadi bisa berisi perintah), baris akhir, nama folder proyek, dan warna. Tidak pernah jalur."
+  },
+  "Show the files an agent changed on the phone": {
+   "zh-Hans": "在手机上显示智能体修改过的文件",
+   "hi": "फ़ोन पर वे फ़ाइलें दिखाएँ जिन्हें एजेंट ने बदला",
+   "es": "Mostrar en el teléfono los archivos que un agente ha cambiado",
+   "ar": "عرض الملفات التي غيّرها الوكيل على الهاتف",
+   "fr": "Afficher sur le téléphone les fichiers qu'un agent a modifiés",
+   "bn": "এজেন্ট যে ফাইলগুলো বদলেছে সেগুলো ফোনে দেখান",
+   "pt-BR": "Mostrar no celular os arquivos que um agente alterou",
+   "ru": "Показывать на телефоне файлы, изменённые агентом",
+   "id": "Tampilkan file yang diubah agen di ponsel"
+  },
+  "The phone lists the files each agent changed and, when you tap one, shows what changed in it (200 lines at most, long lines cut). File names and lines go only to your paired phone, over the pinned encrypted link, and only when it asks.": {
+   "zh-Hans": "手机会列出每个智能体修改过的文件，点按某个文件即可查看其中的改动（最多 200 行，过长的行会被截断）。文件名和内容只会在手机请求时，通过已固定证书的加密连接发送给已配对的手机。",
+   "hi": "फ़ोन हर एजेंट की बदली हुई फ़ाइलों की सूची दिखाता है और किसी फ़ाइल पर टैप करने पर उसमें हुए बदलाव दिखाता है (अधिकतम 200 पंक्तियाँ, लंबी पंक्तियाँ कटी हुई)। फ़ाइल के नाम और पंक्तियाँ केवल आपके जोड़े गए फ़ोन को, पिन किए गए एन्क्रिप्टेड लिंक से, और केवल उसके माँगने पर जाती हैं।",
+   "es": "El teléfono muestra la lista de archivos que cambió cada agente y, al tocar uno, lo que cambió en él (200 líneas como máximo, las líneas largas se recortan). Los nombres y las líneas solo llegan a tu teléfono emparejado, por el enlace cifrado y fijado, y solo cuando los pide.",
+   "ar": "يعرض الهاتف قائمة بالملفات التي غيّرها كل وكيل، وعند الضغط على ملف يعرض ما تغيّر فيه (200 سطر كحد أقصى، وتُقتطع الأسطر الطويلة). تُرسل أسماء الملفات والأسطر إلى هاتفك المقترن فقط، عبر الرابط المشفّر المثبّت، وعندما يطلبها فقط.",
+   "fr": "Le téléphone liste les fichiers modifiés par chaque agent et, si vous en touchez un, montre ce qui y a changé (200 lignes au plus, les longues lignes sont coupées). Les noms et les lignes ne vont qu'à votre téléphone associé, par le lien chiffré et épinglé, et seulement quand il les demande.",
+   "bn": "ফোন প্রতিটি এজেন্টের বদলানো ফাইলের তালিকা দেখায় এবং কোনো ফাইলে ট্যাপ করলে তাতে কী বদলেছে তা দেখায় (সর্বোচ্চ ২০০ লাইন, লম্বা লাইন কেটে দেওয়া হয়)। ফাইলের নাম ও লাইন শুধু আপনার যুক্ত করা ফোনে, পিন করা এনক্রিপ্টেড লিঙ্কে এবং ফোন চাইলেই যায়।",
+   "pt-BR": "O celular lista os arquivos que cada agente alterou e, ao tocar em um, mostra o que mudou nele (200 linhas no máximo, linhas longas são cortadas). Os nomes e as linhas vão só para o seu celular pareado, pelo link criptografado e fixado, e só quando ele pede.",
+   "ru": "Телефон показывает список файлов, изменённых каждым агентом, а при нажатии на файл — что в нём изменилось (не более 200 строк, длинные строки обрезаются). Имена файлов и строки отправляются только на ваш подключённый телефон, по защищённому зашифрованному каналу и только по его запросу.",
+   "id": "Ponsel menampilkan daftar file yang diubah tiap agen dan, saat Anda mengetuk salah satu, apa yang berubah di dalamnya (maksimal 200 baris, baris panjang dipotong). Nama file dan baris hanya dikirim ke ponsel Anda yang terhubung, lewat tautan terenkripsi yang disematkan, dan hanya saat ponsel memintanya."
   }
  }
 }

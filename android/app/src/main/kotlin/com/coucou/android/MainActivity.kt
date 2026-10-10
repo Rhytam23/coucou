@@ -108,6 +108,7 @@ import com.coucou.android.ui.DiscoveryHint
 import com.coucou.android.ui.ApprovalSheet
 import com.coucou.android.ui.MessagePanel
 import com.coucou.android.ui.PairingScreen
+import com.coucou.android.ui.DiffSheet
 import com.coucou.android.ui.QuestionSheet
 import com.coucou.android.ui.WardrobeScreen
 import com.coucou.android.ui.HeroCard
@@ -194,6 +195,7 @@ class MainActivity : ComponentActivity() {
                         val pending = ApprovalSheetPlan.next(model.approvals, closedApproval)
                         if (pending != null && screen != Screen.SCAN) ApprovalSheet(model, pending, onAllow = ::approve, onDismiss = { closedApproval = pending.fingerprint })
                         questionPill?.let { QuestionSheet(model, it, onDismiss = { questionPill = null }, onSend = ::sendAnswer) }
+                        DiffSheet(model)
                         // A scanned code or a link from the camera app: the user decides before anything is paired.
                         model.pairRequest?.let { PairConfirm(model, it) }
                     }

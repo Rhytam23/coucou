@@ -54,6 +54,8 @@ class DevDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
+        override fun onDiff(part: ServerMsg.Diff) { diffParts.add(part) }
         val questions = LinkedBlockingQueue<QuestionRequest>()
         override fun onQuestion(request: QuestionRequest) { questions.add(request) }
         val caps = LinkedBlockingQueue<Set<String>>()
@@ -152,6 +154,53 @@ class DevDesktopInteropTest {
             assertEquals(2, seen.count { it.startsWith("ANSWER refused") })
             assertTrue(seen.any { it.startsWith("ANSWER accepted") })
             assertTrue("the picked labels must not be logged", seen.none { it.contains("Build") || it.contains("develop") })
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun filesAreListedAndTheirLinesComeInPartsOnTheNodeDesktop() {
+        val info = startDesktop("--diffs")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("diffs"), rec.caps.poll(10, TimeUnit.SECONDS))
+            val files = generateSequence { rec.sessions.poll(10, TimeUnit.SECONDS) }.take(5).first { l -> l.any { it.files.isNotEmpty() } }
+                .first { it.files.isNotEmpty() }.files
+            assertEquals(listOf("app.ts", "long-file.ts", "generated.json"), files.map { it.name })
+            assertTrue(files[2].tooLarge)
+
+            assertTrue(client.getDiff("integration_claude", 1))
+            val small = rec.diffParts.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(5, small.lines.size)
+            assertEquals('@', small.lines[0].kind)
+
+            assertTrue(client.getDiff("integration_claude", 2))
+            val a = rec.diffParts.poll(10, TimeUnit.SECONDS)!!
+            val b = rec.diffParts.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(listOf(0 to 2, 1 to 2), listOf(a.part to a.parts, b.part to b.parts))
+            assertEquals(200, a.lines.size + b.lines.size)
+            assertTrue(a.truncated)
+            assertTrue("a long line is cut", (a.lines + b.lines).all { it.text.length <= Protocol.MAX_DIFF_LINE_CHARS })
+
+            assertTrue(client.getDiff("integration_claude", 99))
+            assertTrue(rec.diffParts.poll(10, TimeUnit.SECONDS)!!.gone)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withoutTheSwitchTheNodeDesktopListsNoFilesAndAnswersNoRequest() {
+        val info = startDesktop()
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertNotNull(rec.welcome.poll(10, TimeUnit.SECONDS))
+            assertTrue(!client.getDiff("integration_claude", 1))
+            assertNull(rec.diffParts.poll(2, TimeUnit.SECONDS))
+            assertTrue(generateSequence { rec.sessions.poll(1, TimeUnit.SECONDS) }.take(3).all { l -> l.all { it.files.isEmpty() } })
         } finally {
             client.stop()
         }

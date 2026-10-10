@@ -100,6 +100,8 @@ class RustDesktopInteropTest {
         override fun onCaps(caps: Set<String>) { this.caps.add(caps - Protocol.CAP_PREFS); allCaps.add(caps) }
         val allCaps = LinkedBlockingQueue<Set<String>>()
         val prefs = LinkedBlockingQueue<String>()
+        val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
+        override fun onDiff(part: ServerMsg.Diff) { diffParts.add(part) }
         override fun onPrefs(outfit: String) { prefs.add(outfit) }
         override fun onChatModels(models: List<ChatModel>) { chat.add("models:" + models.joinToString(",") { it.id }) }
         override fun onChatDelta(id: String, text: String) { chat.add("delta:$id:$text") }
@@ -218,6 +220,60 @@ class RustDesktopInteropTest {
             assertNotNull(rec.welcome.poll(15, TimeUnit.SECONDS))
             command("repair brand-new-token-0123456789")
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── File changes (cap diffs) ────────────────────────────────────────────────────
+
+    /** The connection number the desktop printed for a request, or null. */
+    private fun connOfRequest(seconds: Long): String? {
+        val deadline = System.currentTimeMillis() + seconds * 1000
+        while (System.currentTimeMillis() < deadline) {
+            val l = lines.poll(200, TimeUnit.MILLISECONDS) ?: continue
+            if (l.startsWith("GETDIFF ")) return l.split(" ")[1]
+        }
+        return null
+    }
+
+    @Test fun theRealServerListsFilesByNameAndSendsAFileOnRequestOnly() {
+        val info = startDesktop()
+        command("diffs on")
+        command("sessions")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(setOf("diffs"), rec.caps.poll(15, TimeUnit.SECONDS))
+            val s = generateSequence { rec.sessions.poll(10, TimeUnit.SECONDS) }.take(5).first { l -> l.any { it.files.isNotEmpty() } }
+            val file = s.first { it.files.isNotEmpty() }.files[0]
+            assertEquals("a full path went in; only the name comes out", "app.ts", file.name)
+            assertEquals(7L, file.id)
+            assertNull("nothing is sent before it is asked for", rec.diffParts.poll(1, TimeUnit.SECONDS))
+
+            assertTrue(client.getDiff("integration_claude", 7))
+            val conn = connOfRequest(10)
+            assertNotNull("the island was never asked", conn)
+            command("diff $conn 250")
+            val a = rec.diffParts.poll(10, TimeUnit.SECONDS)!!
+            val b = rec.diffParts.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(200, a.lines.size + b.lines.size)
+            assertTrue(a.truncated)
+            assertEquals("app.ts", a.name)
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withTheSwitchOffTheRealServerOffersNoFilesAndIgnoresTheRequest() {
+        val info = startDesktop()
+        command("sessions")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            assertTrue(!client.getDiff("integration_claude", 7))
+            assertTrue(generateSequence { rec.sessions.poll(2, TimeUnit.SECONDS) }.take(3).all { l -> l.all { it.files.isEmpty() } })
         } finally {
             client.stop()
         }

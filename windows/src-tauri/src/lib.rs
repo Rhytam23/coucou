@@ -98,6 +98,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         settings.phone_chat = current.phone_chat;
         settings.phone_details = current.phone_details;
         settings.phone_answers = current.phone_answers;
+        settings.phone_diffs = current.phone_diffs;
         settings.phone_chat_models = current.phone_chat_models.clone();
         *current = settings;
         (screen_changed, autostart_changed, shortcuts_changed)
@@ -729,6 +730,9 @@ pub fn run() {
             phone_link::phone_link_publish_prefs,
             phone_link::phone_answers_status,
             phone_link::phone_answers_set_enabled,
+            phone_link::phone_diffs_status,
+            phone_link::phone_diffs_set_enabled,
+            phone_link::phone_link_send_diff,
             phone_link::phone_details_status,
             phone_link::phone_details_set_enabled,
             phone_link::phone_chat_status,
