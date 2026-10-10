@@ -88,7 +88,7 @@ class RelayConnectorTest {
         override fun close() { closed = true; toRelay.close(); fromRelay.close() }
     }
 
-    private enum class Mode { NORMAL, REFUSE_401, CLOSE_JOIN_PROOF, SILENT, WRONG_ACCEPT_FIRST }
+    private enum class Mode { NORMAL, REFUSE_401, CLOSE_JOIN_PROOF, SILENT, WRONG_ACCEPT_FIRST, FAKE_COMPUTER }
 
     /** The relay (upgrade, frames) and the computer (end-to-end handshake) in one thread. */
     private inner class Fake(val mode: Mode = Mode.NORMAL) {
@@ -165,6 +165,12 @@ class RelayConnectorTest {
                         WsOpcode.BINARY -> if (payload.size > 1 && payload[1].toInt() == RelayCrypto.T_INIT) {
                             inits += payload
                             if (mode == Mode.SILENT) continue
+                            if (mode == Mode.FAKE_COMPUTER) {
+                                // Someone without K: a well-formed accept frame with a made-up nonce and MAC.
+                                val junk = ByteArray(48).also { java.security.SecureRandom().nextBytes(it) }
+                                sendBinary(byteArrayOf(RelayCrypto.VER.toByte(), RelayCrypto.T_ACCEPT.toByte(), 0, 0, 0, 0, 0, 0, 0, 0) + junk)
+                                continue
+                            }
                             if (mode == Mode.WRONG_ACCEPT_FIRST && !wrongSent) {
                                 wrongSent = true
                                 // An accept that answers some other init (a recorded one): the phone must ignore it.
@@ -229,8 +235,17 @@ class RelayConnectorTest {
         val c = connectorFor(f, answerMs = 700, resendMs = 150)
         try { c.connect(2_000); fail() } catch (_: IOException) {}
         assertEquals(RelayIssue.COMPUTER_AWAY, c.issue)
-        assertTrue("init was sent again with a fresh nonce", f.inits.size >= 3)
-        assertEquals("every init uses its own nonce", f.inits.size, f.inits.map { it.copyOfRange(10, 26).toList() }.toSet().size)
+        Thread.sleep(200) // the stand-in reads the last frames on its own thread
+        val sent = f.inits.toList()
+        assertTrue("init was sent again with a fresh nonce", sent.size >= 3)
+        assertEquals("every init uses its own nonce", sent.size, sent.map { it.copyOfRange(10, 26).toList() }.toSet().size)
+    }
+
+    @Test fun aFakeComputerWithoutTheKeyIsNeverTrusted() {
+        val f = Fake(Mode.FAKE_COMPUTER)
+        val c = connectorFor(f, answerMs = 600, resendMs = 150)
+        try { c.connect(2_000); fail("a made-up accept was accepted") } catch (_: IOException) {}
+        assertEquals(RelayIssue.COMPUTER_AWAY, c.issue)
     }
 
     @Test fun anAcceptThatAnswersAnOtherInitIsIgnored() {

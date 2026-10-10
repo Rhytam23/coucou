@@ -279,6 +279,25 @@ pub mod tests {
     }
 
     #[test]
+    fn the_longest_realistic_link_still_fits_what_the_phone_accepts_and_a_qr_code() {
+        // 48 accented characters in the name (9 characters each once percent-encoded) and a long relay host.
+        let name = "é".repeat(48);
+        let host = format!("{}.{}.workers.dev", "a".repeat(63), "b".repeat(63));
+        let relay = RelayLink {
+            url: &format!("wss://{host}:8443"),
+            room: &"A".repeat(22),
+            key: &"B".repeat(43),
+            access: &"C".repeat(43),
+        };
+        let link = pairing_link_with_relay("2001:db8:aaaa:bbbb:cccc:dddd:eeee:ffff", 47821, &"ab".repeat(32), &"t".repeat(128), &name, &relay);
+        assert!(link.len() < 2048, "the phone refuses a link of 2,048 characters or more (PairingScan.MAX_LINK): {}", link.len());
+        assert!(qr_svg(&link).is_some(), "and the QR code can hold it");
+        // The ordinary case is far shorter, so the code stays easy to scan.
+        let usual = pairing_link_with_relay("192.168.1.20", 47821, &"ab".repeat(32), &"t".repeat(32), "My PC", &RelayLink { url: "wss://coucou-link.me.workers.dev", room: &"A".repeat(22), key: &"B".repeat(43), access: &"C".repeat(43) });
+        assert!(usual.len() < 450, "{}", usual.len());
+    }
+
+    #[test]
     fn the_qr_is_an_svg_of_the_link() {
         let svg = qr_svg(&pairing_link("192.168.1.20", 47821, &"ab".repeat(32), &"t".repeat(32), "PC")).unwrap();
         assert!(svg.starts_with("<?xml") || svg.contains("<svg"));

@@ -12,7 +12,7 @@ import com.coucou.android.link.PairingPayload
 
 /**
  * Asked before a scanned code, or a link opened from the camera app, pairs anything. It names the computer and
- * its address on the network, never the secret in the link, and says when it replaces the current computer.
+ * its address on the network (and the relay's host when the link has one), never a secret in the link, and says when it replaces the current computer.
  */
 @Composable
 fun PairConfirm(model: AppModel, link: String) {
@@ -24,6 +24,8 @@ fun PairConfirm(model: AppModel, link: String) {
         text = {
             Text(
                 stringResource(R.string.pair_confirm_body, p.host, p.port) +
+                    // The relay's host is shown too: a code that points somewhere else is visible before anything is stored.
+                    (p.relay?.relayUrl()?.host?.let { "\n\n" + stringResource(R.string.pair_confirm_relay, it) } ?: "") +
                     if (model.isPaired) "\n\n" + stringResource(R.string.pair_confirm_replace) else "",
                 style = MaterialTheme.typography.bodyMedium,
             )

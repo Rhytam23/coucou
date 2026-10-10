@@ -75,6 +75,22 @@ class RelayLinkTest {
         assertFalse(p.toString().contains(key) || p.toString().contains(access) || p.toString().contains(room))
     }
 
+    @Test fun theLongestRealisticLinkIsStillAccepted() {
+        val name = java.net.URLEncoder.encode("é".repeat(48), "UTF-8").replace("+", "%20")
+        val host = "${"a".repeat(63)}.${"b".repeat(63)}.workers.dev"
+        val link = "coucou://pair?v=1&host=2001:db8:aaaa:bbbb:cccc:dddd:eeee:ffff&port=47821&fp=$fp&token=${"t".repeat(128)}&name=$name" +
+            "&relay=wss:%2F%2F$host:8443&room=$room&key=$key&access=$access"
+        assertTrue("${link.length} characters", link.length < com.coucou.android.core.PairingScan.MAX_LINK)
+        assertTrue(com.coucou.android.core.PairingScan.decide(link) is com.coucou.android.core.ScanDecision.Pairing)
+        assertEquals(host, PairingPayload.parse(link)!!.relay!!.relayUrl()!!.host)
+    }
+
+    @Test fun theConfirmationShowsTheRelayHostBeforeAnythingIsStored() {
+        val dialog = java.io.File("src/main/kotlin/com/coucou/android/ui/PairConfirm.kt").readText()
+        assertTrue(dialog.contains("p.relay?.relayUrl()?.host"))
+        assertTrue(dialog.contains("R.string.pair_confirm_relay"))
+    }
+
     @Test fun theHintsAreTheTwoExactMessages() {
         assertEquals(RelayHints.Hint.ONLINE, RelayHints.parse("""{"peer":"online"}"""))
         assertEquals(RelayHints.Hint.OFFLINE, RelayHints.parse("""{"peer":"offline"}"""))

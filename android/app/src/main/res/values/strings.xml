@@ -197,6 +197,7 @@
     <string name="scan_camera_error">The camera could not start. Paste the link instead.</string>
     <string name="pair_confirm_title">Pair with %1$s?</string>
     <string name="pair_confirm_body">%1$s:%2$d on your network. Only pair with a computer you own.</string>
+    <string name="pair_confirm_relay">It can also reach your computer from other networks through the relay at %1$s. Only pair if you set up that relay yourself.</string>
     <string name="pair_confirm_replace">This replaces the computer you are connected to now.</string>
     <string name="pair_confirm_ok">Pair</string>
     <string name="wardrobe_title">Mochi\'s wardrobe</string>

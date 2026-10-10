@@ -274,7 +274,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | R3 | PC client **(done)** | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
 | R4 | Android client **(done)** | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
 | R5 | End to end and CI **(done)** | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
-| R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
+| R6 | Review **(done)** | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
 
 ### Findings while building R1
 
@@ -314,7 +314,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 - **D7, size padding to 128 bytes** (recommended; costs a few bytes per frame).
 - **D8, join proof held in memory only,** with the squatting trade-off in section 6 (recommended), versus persisting a verifier.
 
-## 12. Deploy guide (written in R6; outline so you can judge the effort)
+## 12. Deploy guide (written in R6: `docs/RELAY_DEPLOY.md` is the real one; this outline is kept for the record)
 
 ```
 cd android/relay
@@ -327,7 +327,7 @@ curl https://coucou-link.<you>.workers.dev/   # "Coucou link relay"
 One secret is needed, the access key, and it never goes in git: `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='` to make it, then `npx wrangler secret put ACCESS_KEY` and paste it. The relay holds no content key. `wrangler.toml` contains no key. On the PC: Settings → Android phone →
 "Away from home (relay)": paste the URL and the access key (write-only field, stored in the OS keystore), switch on, show the pairing code. On the phone: pair again (scan), check the host shown.
 
-## 13. Staging test plan (what you will run; PC on home Wi-Fi, phone on mobile data)
+## 13. Staging test plan (the real, numbered checklist is in `docs/RELAY_DEPLOY.md` section 4)
 
 1. Deploy as above. Confirm `curl` answers. In the Cloudflare dashboard confirm **Observability/logs are off** (we never log payloads).
 2. PC: switch the relay on, paste the URL, show the pairing code. Status should read "Connected, phone offline".
@@ -427,3 +427,14 @@ no permission is ever approved without an explicit click and the phone's screen-
 - CI job `relay-e2e` runs both modes on every push. It deploys nothing and the relay listens on loopback only.
 - Still not covered: real Cloudflare (hibernation timing, the real rate-limit binding across data centres, the 100 s idle behaviour of
   a WebSocket without traffic) and a phone on mobile data. That is the staging test (`docs/RELAY_DEPLOY.md`).
+
+### Findings while building R6
+
+- The threat check is in `android/RELAY_THREAT_CHECK.md`: every row of section 5 with the test that fails if it stopped being true, and
+  what is accepted or not covered. Reading the code again as an attacker found two real problems, both fixed with tests: the phone
+  refused links over 1,024 characters, which the relay fields plus a long accented computer name could exceed (limit now 2,048, and a
+  Rust and a Kotlin test build the longest realistic link and check the parser and the QR); and the phone's pairing confirmation did not
+  show the relay's host as the spec says (it does now). Two further tests were added for rows that had none (a fake computer without K,
+  and "Pair again" cutting off the old pairing).
+- The deploy guide and the staging checklist for the phone on mobile data and the computer on home Wi-Fi are `docs/RELAY_DEPLOY.md`.
+- What is still open is only what cannot be done here: a real phone (Doze, battery), real Cloudflare, and the look of the Settings card.

@@ -985,6 +985,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn after_pair_again_the_old_pairing_gets_no_answer_and_the_new_one_works() {
+        block_on(async {
+            let (port, _seen, mut conns) = fake_relay(None).await;
+            let store = MemStore::default();
+            set_access_key(&store, &crypto::base64url_encode(&[7u8; 32])).unwrap();
+            let old = credentials(&store).unwrap();
+            let (old_room, old_key) = (old.room.clone(), PairingKey::from_base64url(&old.key.to_base64url()).unwrap());
+            // "Pair again": a new room and key, then the client reconnects with them (what the PC does).
+            let (new_room, _) = new_pairing(&store).unwrap();
+            assert_ne!(old_room, new_room);
+            let host = Arc::new(Recorder::default());
+            let hub = Hub::new(host.clone());
+            let shared = Shared::with_features(hub.clone(), TOKEN.to_string(), "Test PC".to_string(), None, Arc::new(server::NoFeatures));
+            let handle = start(shared.clone(), Target { tls: false, host: "127.0.0.1".into(), port }, credentials(&store).unwrap());
+            let mut ws = tokio::time::timeout(Duration::from_secs(5), conns.recv()).await.unwrap().unwrap();
+            // The phone that still holds the old room and K is not answered.
+            ws.send(Message::Binary(crypto::init_frame(&old_key, &old_room, crypto::fresh_nonce()).into())).await.unwrap();
+            ws.send(Message::Binary(crypto::init_frame(&old_key, &new_room, crypto::fresh_nonce()).into())).await.unwrap();
+            assert!(tokio::time::timeout(Duration::from_millis(300), ws.next()).await.is_err(), "no answer for the old pairing");
+            assert_eq!(shared.admission_counts().0, 0);
+            // The new pairing is answered.
+            let new_key = credentials(&store).unwrap().key;
+            let n = crypto::fresh_nonce();
+            ws.send(Message::Binary(crypto::init_frame(&new_key, &new_room, n).into())).await.unwrap();
+            let accept = loop {
+                if let Message::Binary(b) = tokio::time::timeout(Duration::from_secs(5), ws.next()).await.unwrap().unwrap().unwrap() {
+                    break b;
+                }
+            };
+            assert!(crypto::finish_handshake(&new_key, &new_room, &n, &accept).is_ok());
+            handle.stop();
+        });
+    }
+
     // ── End to end through a real relay (run by android/relay/tools/e2e.sh, never by `cargo test`) ──
 
     /// The computer's half of the end-to-end check: connects to the relay at `COUCOU_E2E_RELAY_URL` with the fixed test

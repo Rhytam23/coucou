@@ -4,7 +4,7 @@ A tiny, key-less Cloudflare Worker that lets *Coucou for Android* and a desktop 
 different networks, with no VPN and no shared Wi-Fi. **It is separate from Louis's `relay/`** (which holds an APNs key and
 only does iPhone Live Activities) and is deployed by you, on your own Cloudflare account.
 
-The wire is specified in `docs/RELAY_LINK.md`; the reasoning is in `android/RELAY_PLAN.md`.
+The wire is specified in `docs/RELAY_LINK.md`; the reasoning is in `android/RELAY_PLAN.md`; the step-by-step deploy and the phone-on-mobile-data test are in `docs/RELAY_DEPLOY.md`.
 
 ## What it does, and what it cannot do
 

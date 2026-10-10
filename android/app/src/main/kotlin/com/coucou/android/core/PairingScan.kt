@@ -22,8 +22,8 @@ object PairingScan {
         return if (PairingPayload.parse(t) != null) ScanDecision.Pairing(t) else ScanDecision.NotPairing
     }
 
-    /** A real pairing link is a few hundred characters; anything far longer is not one. */
-    const val MAX_LINK = 1_024
+    /** A real pairing link is a few hundred characters (up to about 900 with the relay fields and a long, accented name); anything far longer is not one. */
+    const val MAX_LINK = 2_048
 }
 
 /** Where the camera permission stands, for the scan screen. */
