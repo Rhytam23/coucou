@@ -1,0 +1,315 @@
+# Relay plan: Coucou for Android away from home Wi-Fi (PROPOSAL, nothing is built)
+
+Status: **waiting for the user's OK.** Written on 2026-10-10. No code, no deployment, nothing published, nothing
+sent to Louis. The earlier "stage G" (VPN switch) was built and then removed at the user's request; this plan replaces it.
+
+Sources read: `android/HANDOFF.md`, `docs/ANDROID_LINK.md`, `relay/README.md` and `relay/src/index.ts` (Louis's APNs
+relay, for style), `android/PARITY_PLAN.md` (stage G, row 16), `CLAUDE.md`, and the phone-link code on both sides.
+
+## 1. Goal and non-goals
+
+**Goal.** The phone and the PC sync over the internet from different networks (phone on mobile data, PC on home
+Wi-Fi), with no USB, no VPN and no shared Wi-Fi. The direct LAN link stays as the fast path and is tried first.
+
+**Non-goals.**
+- No accounts, no sign-in, no database, no analytics, no push provider.
+- No change to protocol v1: sessions, approvals, decisions, chat, diffs and the rest ride inside the secure channel as they are.
+- No built-in third-party endpoint: the relay URL is empty until the user enters one (section 9).
+- Stage I (running instructions on the PC) stays "not planned".
+- Nothing is deployed or published by me. The user deploys with their own Cloudflare account.
+
+## 2. Architecture in one picture
+
+```
+ PC (Coucou, Rust)  ──outbound WSS──►  Cloudflare Worker  ──►  Durable Object "room"  ◄──  outbound WSS ──  Phone (Kotlin)
+                                        (routes by room id)     (forwards opaque frames)
+        └────────────────── direct LAN link (TLS, pinned) stays the fast path ──────────────────┘
+```
+
+- **Relay** = one Cloudflare Worker plus one Durable Object class, `Room`. The object's name is the room id. A room
+  holds at most two live WebSockets: one with role `pc`, one with role `phone`.
+- It **forwards binary frames from one socket to the other and nothing else.** It cannot read them (they are end-to-end
+  encrypted), stores nothing (no database, no KV, no R2, no storage API call), logs nothing (observability off, as in
+  Louis's `wrangler.toml`), has no accounts and holds no secret at all (unlike Louis's relay, which holds the APNs key).
+- **Both sides connect outward**, so no port opening, no router setting, no dynamic DNS. Works behind NAT and carrier NAT.
+- The Durable Object uses the **WebSocket Hibernation API**, so an idle room is not billed for duration and holds no memory.
+  Keep-alive pings are answered by the platform (`setWebSocketAutoResponse`) without waking the object.
+
+URL shape: `wss://<the user's worker>/v1/room/<roomId>?role=pc|phone`.
+
+## 3. Pairing and keys
+
+The pairing link and QR gain optional fields (old phones ignore unknown keys and keep pairing over the LAN only):
+
+```
+coucou://pair?v=1&host=...&port=...&fp=...&token=...&name=...&relay=wss%3A%2F%2Fmy-relay.example.workers.dev&room=<22 chars>&key=<43 chars>
+```
+
+- `room`: 128 random bits (base64url, 22 characters). Unguessable. It is a locator, not a secret the design leans on.
+- `key` (**K**): 256 random bits (base64url, 43 characters), created on the PC from the OS random source. Shown only in the
+  pairing code. Stored on the PC in the OS keystore (the same `keyring` store as the pairing token) and on the phone
+  encrypted by the Android Keystore (the same `SecureStore` as the token). Never written to a log, a file or the relay.
+- The existing LAN `token` stays: it keeps authenticating the phone to the PC inside the channel (defence in depth).
+- The phone shows `relay` (the host name) in the existing "Pair with this computer?" confirmation, so the user sees which
+  server is going to carry the traffic before pairing.
+
+**Derived values** (HKDF-SHA-256, RFC 5869, no new dependency: `ring` on the PC, `javax.crypto.Mac` on Android):
+
+| name | derivation | use |
+|---|---|---|
+| `K_auth` | `HKDF(K, info="coucou-relay/v1 auth")` | MACs the two handshake frames |
+| `K_join` | `HKDF(K, info="coucou-relay/v1 join")` | presented to the relay as a join proof (section 6) |
+| `k_p2h`, `k_h2p` | `HKDF(K, salt = N_phone ‖ N_pc, info="coucou-relay/v1 session")`, 32 bytes each | session keys, one per direction |
+
+**Cipher.** AES-256-GCM (hardware-accelerated on both sides; `ring::aead` and `javax.crypto`, so no new crate or library).
+One key per direction and per connection, and a **96-bit nonce = 4 zero bytes ‖ 64-bit frame counter**. A counter nonce
+is safe here because the keys are fresh for every connection (a restart cannot reuse a (key, nonce) pair). Random
+nonces are not used. A session ends at 2^32 frames and re-handshakes.
+
+**Handshake** (the phone initiates; the PC only answers; the relay's "peer is here" notice is only a hint):
+
+1. Phone connects, then sends `init`: `N_phone` (16 random bytes) + `HMAC(K_auth, "init" ‖ room ‖ N_phone)`.
+2. PC checks the MAC, picks `N_pc`, sends `accept`: `N_pc` + `HMAC(K_auth, "accept" ‖ room ‖ N_phone ‖ N_pc)`.
+   Because the MAC covers the phone's *current* nonce, an old recorded `accept` is rejected.
+3. Both derive `k_p2h` and `k_h2p`. The first data frame each way proves the other side holds K.
+4. Inside the channel the existing v1 `hello`/`welcome` run as today (token, caps, protocol version).
+5. If either side reconnects, steps 1 to 4 run again with fresh nonces: new keys, counters back to 0.
+
+**Frame** (WebSocket binary message): `ver(1) ‖ type(1) ‖ counter(8) ‖ AES-GCM(ciphertext ‖ tag)`.
+- AAD = `"coucou-relay/v1" ‖ room ‖ direction ‖ ver ‖ type ‖ counter`. A frame cannot be moved to another room, turned
+  around, or have its header changed.
+- Data frames carry exactly one v1 line (UTF-8 JSON, at most 64 KiB, as on the LAN), padded to a multiple of 128 bytes
+  so the size does not tell "ping" from "approval" (decision D7).
+- **Replay and reordering:** the receiver requires the counter to be exactly the previous one plus 1. Anything else
+  (repeat, gap, jump back) tears the session down and re-handshakes. Duplicates are never delivered. Frames from an old
+  session fail authentication because the keys differ.
+- **Key rotation:** "Pair again" on the PC makes a new K and room, disconnects the old phone, and the old room stays
+  empty forever. Session keys already rotate on every connection.
+
+**Known limit, said plainly:** the session keys come from K and the two nonces only, so there is **no forward secrecy**.
+If K ever leaks, traffic someone recorded earlier could be decrypted. Adding an X25519 key agreement would fix that;
+`ring` has it, but Android's `KeyAgreement("X25519")` only exists from API 33 (our minSdk is 30), so it would need a small
+hand-written implementation. Decision D3 below; my recommendation is to ship without it and add it later if wanted.
+
+## 4. How protocol v1 rides inside, unchanged
+
+On the PC the existing server logic already runs over "any byte stream" (`server::run_with`). The relay client presents
+the decrypted frames as a newline-delimited stream to that same code, so `hello`, `welcome`, `sessions`, `approval`,
+`approvalResolved`, `decision`, `ping/pong`, `chat*`, `question/answer`, `getDiff/diff`, `usage`, `services`, `prefs` and
+their per-feature switches work **byte for byte as on the LAN**. On the phone, `LinkClient` gets a second connector
+(relay) next to the TLS-socket one. Nothing in `Protocol.kt` or `hub.rs` changes.
+
+What stays exactly as strict as on the LAN:
+
+| rule | on the relay |
+|---|---|
+| approval `fingerprint` (SHA-256 of pill, session, tool, command, input key) | unchanged; the decision names it, the PC applies it only to the approval **still pending** |
+| 120 s offer / 115 s PC dismissal | unchanged; the phone's timer and the PC's both run locally, the relay has no clock role |
+| decide once | unchanged; a second or late decision is ignored by the PC (`Hub::decide`) |
+| Allow needs the biometric or screen lock | unchanged; it is a phone-side gate before the `decision` is even built |
+| Deny does not | unchanged |
+| no "always allow" from the phone | unchanged |
+| per-feature PC switches (details, answers, diffs, usage, services, chat) | unchanged; re-read per connection |
+| command hidden on the lock screen; labels only on Home, island, notifications | unchanged (security hardening just done) |
+
+The relay adds **no new message that can approve anything**. Its own hints (peer online/offline) are shown as status
+only and are never trusted for a decision.
+
+## 5. Abuse and safety
+
+| threat | what happens |
+|---|---|
+| **Guessing a room id** | 128 bits: not feasible. Even with the id, an attacker cannot read or forge frames (no K). The join proof (section 6) also stops them occupying the slot once a real side is in the room. |
+| **Replay of a recorded frame** | Rejected: counter must be previous + 1, and old sessions used other keys. |
+| **Malicious or compromised relay** | Can drop, delay or cut frames (availability), and see metadata (below). **Cannot read content, forge a frame, forge an approval, or forge Allow/Deny.** A forged or altered frame fails the GCM tag and tears the session down. |
+| **Relay delays an approval** | The PC still only accepts a decision for the approval still pending; the phone offers it for at most 120 s from receipt; a late or duplicate decision is ignored. A delay cannot turn Deny into Allow. |
+| **Relay drops a decision** | The approval times out on the PC and is not allowed. Failure is on the safe side. |
+| **Relay truncates the end of a conversation** | Undetectable (a close looks like a close). It is a denial of service, not a break. |
+| **Stolen phone** | Has K and the token, but Allow still needs the biometric or screen lock; Deny does not. The user does "Pair again" on the PC: new K and room, the stolen phone is cut off at once. Phone-side storage is Keystore-encrypted. |
+| **Stolen PC / PC compromise** | Out of scope: it holds the agents and the keys anyway. |
+| **Eavesdropper on the network** | Sees TLS to the relay (and E2E ciphertext inside). |
+| **Flooding the relay** | Per-room message token bucket in the object (about 30 messages/s sustained, burst 60) and a per-IP connect limit at the Worker (Workers Rate Limiting binding); frame limit 66 KiB (anything bigger closes the socket with 1009); 2 sockets per room, newest of a role replaces the oldest only if it presents the join proof; the room id format is checked in the Worker before any object is created, so malformed paths cost nothing. |
+| **Creating many empty rooms to burn the free quota** | Possible by anyone who knows the URL: a random-id upgrade creates an object. It is limited by the per-IP rate limit, but a distributed attacker could exhaust the daily free quota and make the relay unavailable until the quota resets. The app then falls back to the LAN and shows "Relay unavailable". Cheapest fix is the paid Workers plan. Said honestly in section 8. |
+| **Reflection** (sending a side's own frame back) | Different key per direction and the direction in the AAD: rejected. |
+| **Downgrade** (pretending the peer has no relay) | Not a downgrade: the LAN path is a separate, equally strict, pinned-TLS path. |
+| **Phone talks to a fake PC through the relay** | The fake has no K: its `accept` MAC fails. |
+| **Two phones** | v1 of the relay supports one phone per room (D4); a second phone is a second pairing. The LAN link keeps supporting several. |
+
+**What the relay operator (the user, on their own Cloudflare account) and Cloudflare can learn:** the IP addresses of the
+PC and phone, that a pairing exists (the room id is stable per pairing), when each side is online, frame sizes
+(padded to 128 bytes) and timing, so roughly "something is happening". **They cannot learn:** any session name, command,
+path, approval, chat text or file name, and not K.
+
+## 6. The relay's rules, in detail
+
+- `GET /` answers `Coucou link relay` (a health check, like Louis's).
+- `GET /v1/room/<id>?role=pc|phone` with `Upgrade: websocket`; `<id>` must be 22 base64url characters, else 404 before any
+  object is touched. Sub-protocol header `coucou.v1.<K_join>` carries the join proof (base64url of 32 bytes).
+- **Join proof, held in memory only:** the first socket of a room sets `verifier = SHA-256(K_join)` in the socket's
+  hibernation attachment (not storage). Later sockets must present a `K_join` that hashes to the same value or are refused
+  (1008). When the room is empty the verifier is gone, so nothing is ever stored. Consequence: an attacker who knows the
+  room id could squat an *empty* room before its owner connects; they still could not read or inject anything, and the
+  legitimate PC would be refused until the squatter leaves, so the PC would show "Relay room is taken" and "Pair again"
+  would fix it. I think that trade-off is right; the alternative (persisting a verifier) would make the relay stateful.
+- Hints sent by the relay as small text messages (`{"peer":"online"|"offline"}`) when the other side joins or leaves.
+- A role's new connection replaces the old one only with a valid proof (closes it with 1000 "replaced").
+- Idle cap: platform auto-ping answered; a socket with no traffic and no ping for 120 s is closed.
+- Limits: 66 KiB per frame, token bucket per room, 2 sockets per room, no queueing (a frame for an absent peer is dropped,
+  and the sender hears `{"peer":"offline"}`). No message is ever buffered, so nothing is stored by accident.
+- `wrangler.toml`: `[observability] enabled = false`, `new_sqlite_classes = ["Room"]` (Durable Objects on the free plan need the
+  SQLite-backed class; we do not use its storage), no `[vars]` with secrets.
+- No third-party npm runtime dependencies in the Worker; dev dependencies: `wrangler`, `typescript`, `vitest`, `@cloudflare/vitest-pool-workers`.
+
+## 7. Android in the background
+
+Today `LinkService` is a foreground service of type `specialUse` that holds the LAN link, with a 20 s app-level ping.
+The relay transport lives inside the same service. Design:
+
+- **Transport choice:** try the saved LAN address first (2 s, as now), then NSD discovery, then the relay if the pairing has
+  one. When on the relay, retry the LAN once a minute while on Wi-Fi (and at once when the Wi-Fi changes) and switch back,
+  because the LAN is faster and costs the relay nothing. One transport is active at a time; a switch reconnects and the PC
+  re-sends the snapshot and any pending approval (the existing reconnect behaviour).
+- **Keep-alive:** a WebSocket ping every ~30 s answered by the platform (cheap for the relay), plus the existing encrypted v1
+  `ping/pong` every 20 s from the phone only while the screen is on or an agent is working; with the screen off and nothing
+  running, only the 30 s WebSocket ping. Carrier NATs often drop idle TCP flows between 30 s and a few minutes, so ~30 s is
+  the safe side. This is the main battery cost: radio wake-ups every 30 s while paired and away. **I have not measured it.**
+  The staging plan measures it with `dumpsys batterystats` over a night.
+- **Doze:** I do not know for certain how Doze treats network access for a `specialUse` foreground service on the A12s
+  (Android 13). It is the biggest unknown of this plan. The staging test (screen off, phone still, 30+ minutes, mobile data)
+  answers it. If the connection is cut, the first fixes are the standard ones (battery-optimisation exemption, shown to the
+  user with the exact setting); the next is FCM as a wake-up signal (below).
+- **Reconnect:** exponential backoff from 1 s to 60 s with jitter, reset on success; immediate retry when the network
+  changes (`NetworkWatch` exists); no retry loop while the phone has no network or the user disconnected.
+- **FCM, and why not now.** FCM would wake the phone reliably in Doze, but it needs Google Play services and a Firebase
+  project, the `google-services` plugin and `firebase-messaging` (a large closed-source dependency and a Google account in
+  the chain), would not work on phones without Google services, and a relay would then need a server credential (a secret to
+  guard). That is against "no third-party dependencies", against the "free of built-in third-party endpoints" goal, and
+  against the project's no-Play-services rule (the QR scanner was built without it for the same reason). So: **not now.**
+  If the Doze test shows the foreground service is not enough, I would propose FCM as an optional later stage carrying an empty
+  "wake up" signal only (no content: the phone then opens the WebSocket and gets everything E2E), decided with you after the data.
+- Notifications, the island and the biometric Allow are untouched: they react to the same `LinkListener` events.
+
+## 8. Cost, hosting and limits
+
+- **Who deploys:** you, with your own Cloudflare account (free). I write the Worker, a deploy guide and the commands; I do
+  not deploy it and no secret exists to put in git.
+- **Free-tier limits (from my memory of Cloudflare's published limits; I will re-check the pages before the deploy guide is written,
+  and you should too):** Workers about 100,000 requests/day; Durable Objects about 100,000 requests/day, with incoming
+  WebSocket messages counted at roughly 1/20 of a request, plus a daily duration allowance that hibernation keeps near zero
+  while idle. Rough budget for one PC and one phone: a few thousand frames a day while agents work, 2,880 pings/day: on the
+  order of a few hundred "requests" a day, far below the cap. A busy setup of ten paired phones is still comfortable.
+- **When exceeded:** Cloudflare refuses requests until the daily reset; the relay is unavailable, the app says "Relay
+  unavailable", the LAN keeps working, and nothing is lost (no data is stored anywhere). The paid Workers plan (about $5 a month)
+  removes the cap.
+- **Self-hosting:** the relay is about 150 lines of TypeScript with no secrets. I will also ship a Node reference
+  (`dev-relay.mjs`, used by the tests) that speaks the same wire, so it can be run on a small VPS or a Raspberry Pi. Any
+  server that forwards two WebSocket peers by room id and enforces the same limits works.
+- **Configurable relay URL, default none:** Settings on the PC has a field, empty by default, and the relay is off. The
+  phone receives the URL only through the pairing link and shows its host before pairing. The Android app has **no built-in
+  endpoint**, and neither does the PC app. This matches `CLAUDE.md` ("network calls only to services the user configured").
+
+## 9. Desktop side
+
+- **Settings → Android phone → "Away from home (relay)":** a switch next to Phone link, **off by default** (`phoneRelay` in
+  settings, owned by Rust like the other phone switches), the relay URL field (empty), a status line ("Off", "Connecting",
+  "Connected, phone online", "Connected, phone offline", "Relay unavailable", "Room is taken") and a hint under the pairing code
+  explaining that the link now also contains the key for the relay. Turning it on or off disconnects phones once, as the
+  other switches do. Needs the Phone link switch on; turning on with an empty URL is refused with a clear message.
+- **How the PC connects out:** an async task in the existing tokio runtime. It opens `wss://<relay>/v1/room/<room>?role=pc`,
+  waits for the phone's `init`, answers `accept`, then runs the existing v1 server code over the decrypted stream. It never
+  runs on the hook path: **it cannot block Claude Code** (rule from `CLAUDE.md`); if the relay is unreachable the agent is
+  unaffected.
+- **Admission:** the relay connection counts as one extra source in the existing admission policy and takes no LAN slot.
+- **Sleep and network changes:** when the PC sleeps the socket dies; the phone sees "Computer offline" and shows nothing
+  stale as live (it is marked offline within a few seconds of the relay's hint, and by the encrypted ping timeout otherwise).
+  On wake the task reconnects with backoff, and the phone re-handshakes. Agents do not run while the PC sleeps, so nothing
+  is missed; an approval that was pending when the PC fell asleep simply expires (the agent is not allowed). The PC does not
+  keep itself awake for this.
+- **Logging:** the relay URL host and status transitions only. Never K, tokens, frames, rooms or commands.
+
+## 10. What Louis should be told (draft for the user to send, or not)
+
+- Louis's `relay/` is a Cloudflare Worker that holds his **APNs key** and does one job: Live Activity pushes for the iPhone. It is
+  not touched.
+- The Android fork would add a **separate, key-less, user-deployed** relay (`android/relay/`, never under his `relay/`), used only
+  by the unofficial Android port, **off by default, with no URL built in**, and nothing flows to any server he runs or pays for.
+- The PC-side part sits in `windows/src-tauri/src/phone_link/` behind an opt-in switch; if he ever wants it upstream it is a
+  small, self-contained, reviewed change, and no PR is opened without the user's decision.
+- No telemetry, no accounts, no third party in the data path except the user's own Cloudflare account, and the payload is
+  end-to-end encrypted, so even that account cannot read it.
+- `android/PROPOSAL_FOR_LOUIS.md` would get a short section with the above after you approve; nothing is sent.
+
+## 11. Stages
+
+Each stage is a small series of commits with tests, "Phone link" CI green, `Co-Authored-By`, pushed only to `android`.
+
+| # | Stage | What | Tests |
+|---|---|---|---|
+| R0 | Spec and vectors | `docs/RELAY_LINK.md` (wire, handshake, frame, limits) and `android/relay/test-vectors.json` (fixed K, nonces, plaintexts, expected frames) | the vectors are used by R2 on both sides |
+| R1 | Relay service | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
+| R2 | Secure channel core | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
+| R3 | PC client | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
+| R4 | Android client | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
+| R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
+| R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
+
+### Decisions I need from you
+
+- **D1, WebSocket on the PC:** add the small `tokio-tungstenite` crate (MIT, rustls) or hand-write the WebSocket client over the
+  `tokio-rustls` we already have. Recommendation: the crate (a hand-rolled framing/handshake is where subtle bugs live; one
+  well-known dependency, justified in the commit as `CLAUDE.md` requires).
+- **D2, WebSocket on Android:** OkHttp (large, well-tested, Apache 2.0) or a minimal in-house client over `SSLSocket` (about
+  250 lines: text/binary/ping/pong/close, no extensions; tested against the Node twin and the Worker). Recommendation: in-house,
+  to keep the "no third-party dependency" rule; fall back to OkHttp if it proves flaky in staging.
+- **D3, forward secrecy:** ship now without it (recommended) or add an X25519 exchange first (needs a hand-written X25519 on
+  Android below API 33).
+- **D4, one phone per room** in v1 of the relay (recommended); more phones = more pairings.
+- **D5, location:** `android/relay/` (recommended, so Louis's `relay/` is never touched) versus a new top-level folder.
+- **D6, FCM:** not now, revisit after the Doze test (recommended).
+- **D7, size padding to 128 bytes** (recommended; costs a few bytes per frame).
+- **D8, join proof held in memory only,** with the squatting trade-off in section 6 (recommended), versus persisting a verifier.
+
+## 12. Deploy guide (written in R6; outline so you can judge the effort)
+
+```
+cd android/relay
+npm install
+npx wrangler login
+npx wrangler deploy            # prints https://coucou-link.<you>.workers.dev
+curl https://coucou-link.<you>.workers.dev/   # "Coucou link relay"
+```
+
+No `wrangler secret put` is needed: the relay holds no secret. `wrangler.toml` contains no key. On the PC: Settings → Android phone →
+"Away from home (relay)": paste the URL, switch on, show the pairing code. On the phone: pair again (scan), check the host shown.
+
+## 13. Staging test plan (what you will run; PC on home Wi-Fi, phone on mobile data)
+
+1. Deploy as above. Confirm `curl` answers. In the Cloudflare dashboard confirm **Observability/logs are off** (we never log payloads).
+2. PC: switch the relay on, paste the URL, show the pairing code. Status should read "Connected, phone offline".
+3. Phone: turn Wi-Fi **off** (mobile data only), scan the code, read the host in the confirmation, pair.
+   Expect: "Away from home Wi-Fi: connected via relay" and the PC shows "phone online".
+4. Start an agent on the PC: sessions appear on the phone. Trigger a permission request: the sheet appears, Deny works, Allow asks for the
+   screen lock, then the agent proceeds. Press the same decision twice quickly: the second is ignored.
+5. Let a request sit 2 minutes: it expires on both sides, and a late tap is refused.
+6. Put the phone on the home Wi-Fi: it switches to the direct link within a minute, and back to the relay when you leave.
+7. Sleep the PC for a minute, wake it: the phone shows "Computer offline", then recovers by itself.
+8. Kill the relay URL (change it on the PC): the PC shows "Relay unavailable", the agent is never delayed, and the LAN still works at home.
+9. "Pair again" on the PC: the phone is cut off at once and must scan the new code; the old phone cannot reconnect.
+10. **Doze/battery:** phone on mobile data, screen off, stationary, 30 minutes: does an approval still arrive? Then overnight:
+    `adb shell dumpsys batterystats --reset` before, `--charged com.coucou.android` after; report the percentage used.
+11. `npx wrangler tail` during a session: it should show connections and **no frame contents** (there are none to show).
+
+## 14. What I will not be able to test, said now
+
+- Doze and carrier-NAT behaviour on a real phone (only you can, section 13).
+- The Cloudflare free-tier limits and billing (from memory; verify on their pages; the deploy is yours).
+- Real battery cost.
+- The Windows build against a real WebSocket server (CI covers Windows tests, not a live relay).
+- That Cloudflare's WebSocket Hibernation and auto-response behave as documented in production (miniflare approximates them).
+
+## 15. Rules kept
+
+Nothing published, no release, no store listing, no PR to upstream; commits end with
+`Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`; pushes only to `android`; the Android app stays English only;
+new PC strings get the nine translations; `change log.md` stays local; secrets in the keystores; no telemetry; the agent is never blocked;
+no permission is ever approved without an explicit click and the phone's screen-lock check.
