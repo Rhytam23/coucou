@@ -159,3 +159,9 @@ networks block devices from finding each other (client isolation); then the type
 cross VPNs or routers. Debug builds: `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange`
 breaks the saved address on purpose so you can watch it repair itself.
 
+
+## Away from home (VPN)
+
+Coucou has no relay. To reach your computer outside your Wi-Fi, run Tailscale (or a similar VPN) on both devices, turn on
+"Also accept my phone through a VPN" in the computer's Settings > Android phone, and pair again. The steps and what the
+switch changes are in `docs/ANDROID_LINK.md` ("Away from home"). Not tried on a real VPN yet.

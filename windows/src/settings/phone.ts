@@ -52,6 +52,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       answersBlock(makeToggle),
       diffsBlock(makeToggle),
       usageBlock(makeToggle),
+      vpnBlock(makeToggle),
       servicesBlock(),
       chatBlock(makeToggle, settings),
     );
@@ -202,6 +203,44 @@ function servicesBlock(): HTMLElement {
     h("div", { class: "row" }, h("label", { text: t("Show these services on the phone") })),
     h("div", { class: "hint", text: t("Each tick lets your paired phone see that service's card: a headline and up to three short lines, read-only. Nothing is shown until you tick it. No addresses, subjects, links or keys are ever sent.") }),
     ...boxes.map((b) => b.row),
+    note,
+  );
+}
+
+/**
+ * Phones away from home, through a VPN such as Tailscale: off until the user turns it on. It only widens who may reach
+ * the link, from the local network to the addresses of the user's own VPN; the pairing code and the pinned certificate
+ * are still needed. Rust re-reads this switch for every connection.
+ */
+function vpnBlock(makeToggle: Toggle): HTMLElement {
+  const note = h("div", { class: "hint" });
+  const show = (address: string | null): void => {
+    note.textContent = address ? t("This computer's VPN address: {address}. The pairing code below uses it while this is on.").replace("{address}", address) : "";
+  };
+  const switchEl = makeToggle(false, (next) => {
+    void (async () => {
+      note.textContent = "";
+      try {
+        const status = await Bridge.phoneVpnSetEnabled(next);
+        show(status?.address ?? null);
+      } catch (err) {
+        switchEl.classList.remove("on");
+        switchEl.setAttribute("aria-pressed", "false");
+        note.textContent = String(err);
+      }
+    })();
+  });
+  void Bridge.phoneVpnStatus().then((status) => {
+    if (!status) return;
+    switchEl.classList.toggle("on", status.enabled);
+    switchEl.setAttribute("aria-pressed", String(status.enabled));
+    show(status.address);
+  });
+  return h(
+    "div",
+    {},
+    h("div", { class: "row" }, h("label", { text: t("Also accept my phone through a VPN") }), switchEl),
+    h("div", { class: "hint", text: t("For when you are away from home: install Tailscale (or a similar VPN) on this computer and on the phone, turn this on, then pair again. Only your own VPN addresses are accepted, never the open internet, and the pairing code and pinned certificate are still required.") }),
     note,
   );
 }

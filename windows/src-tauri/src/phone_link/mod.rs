@@ -103,6 +103,9 @@ impl server::Features for TauriFeatures {
     fn usage(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_usage
     }
+    fn vpn(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_vpn
+    }
     fn services(&self) -> Vec<String> {
         // Only ids the link knows, whatever the file held.
         let ticked = self.app.state::<Shared>().settings.lock().unwrap().phone_services.clone();
@@ -220,13 +223,13 @@ pub struct Pairing {
     pub name: String,
 }
 
-fn status_of(link: &PhoneLink, enabled: bool) -> Status {
+fn status_of(link: &PhoneLink, enabled: bool, vpn: bool) -> Status {
     let running = link.running.lock().unwrap();
     Status {
         enabled,
         running: running.is_some(),
         port: running.as_ref().map_or(0, |r| r.port),
-        host: pairing::lan_address().map(|ip| ip.to_string()).unwrap_or_default(),
+        host: pairing::pairing_address(vpn).map(|ip| ip.to_string()).unwrap_or_default(),
         name: pairing::computer_name(),
         clients: link.hub.clients(),
         error: link.error.lock().unwrap().clone(),
@@ -235,8 +238,11 @@ fn status_of(link: &PhoneLink, enabled: bool) -> Status {
 
 #[tauri::command]
 pub fn phone_link_status(link: State<PhoneLink>, shared: State<Shared>) -> Status {
-    let enabled = shared.settings.lock().unwrap().phone_link;
-    status_of(&link, enabled)
+    let (enabled, vpn) = {
+        let current = shared.settings.lock().unwrap();
+        (current.phone_link, current.phone_vpn)
+    };
+    status_of(&link, enabled, vpn)
 }
 
 /// Turns the link on or off. Only ever from the switch in Settings → Phone.
@@ -261,23 +267,24 @@ pub fn phone_link_set_enabled(
         current.clone()
     };
     let _ = app.emit("settings-changed", updated);
-    Ok(status_of(&link, enabled))
+    let vpn = shared.settings.lock().unwrap().phone_vpn;
+    Ok(status_of(&link, enabled, vpn))
 }
 
 /// The pairing link and its QR code. Only the settings window may ask: the token
 /// is the secret that lets a phone in.
 #[tauri::command]
-pub fn phone_link_pairing(window: WebviewWindow, link: State<PhoneLink>) -> Result<Pairing, String> {
+pub fn phone_link_pairing(window: WebviewWindow, link: State<PhoneLink>, shared: State<Shared>) -> Result<Pairing, String> {
     if window.label() != "settings" {
         return Err("only the settings window may show the pairing code".into());
     }
     let running = link.running.lock().unwrap();
     let r = running.as_ref().ok_or("the phone link is off")?;
-    pairing_of(r)
+    pairing_of(r, shared.settings.lock().unwrap().phone_vpn)
 }
 
-fn pairing_of(r: &Running) -> Result<Pairing, String> {
-    let host = pairing::lan_address().map(|ip| ip.to_string()).ok_or("no local network address found")?;
+fn pairing_of(r: &Running, vpn: bool) -> Result<Pairing, String> {
+    let host = pairing::pairing_address(vpn).map(|ip| ip.to_string()).ok_or("no local network address found")?;
     let name = r.shared.name.clone();
     let token = r.shared.token.lock().unwrap().clone();
     let link = pairing::pairing_link(&host, r.port, &r.identity.fingerprint, &token, &name);
@@ -288,7 +295,7 @@ fn pairing_of(r: &Running) -> Result<Pairing, String> {
 /// A new pairing code: the phone that had the old one is disconnected and must
 /// pair again.
 #[tauri::command]
-pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> Result<Pairing, String> {
+pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>, shared: State<Shared>) -> Result<Pairing, String> {
     if window.label() != "settings" {
         return Err("only the settings window may change the pairing".into());
     }
@@ -298,7 +305,7 @@ pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> 
     *r.shared.token.lock().unwrap() = token;
     link.hub.kick_all("auth", "unpaired");
     log::line("phone link: new pairing code, phones disconnected");
-    pairing_of(r)
+    pairing_of(r, shared.settings.lock().unwrap().phone_vpn)
 }
 
 // ── Session details for the phone: the switch (Settings → Android phone) ──
@@ -451,6 +458,51 @@ pub fn phone_usage_set_enabled(
     log::line(format!("phone link: plan usage on the phone {}", if enabled { "on" } else { "off" }));
     let _ = app.emit("settings-changed", updated);
     Ok(UsageStatus { enabled })
+}
+
+// ── Phones through a VPN: the switch (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VpnStatus {
+    pub enabled: bool,
+    /// This computer's VPN address, when it has one: what the pairing code will carry while the switch is on.
+    pub address: Option<String>,
+}
+
+fn vpn_status_of(enabled: bool) -> VpnStatus {
+    VpnStatus { enabled, address: pairing::vpn_address().map(|ip| ip.to_string()) }
+}
+
+#[tauri::command]
+pub fn phone_vpn_status(shared: State<Shared>) -> VpnStatus {
+    vpn_status_of(shared.settings.lock().unwrap().phone_vpn)
+}
+
+/// "Also accept my phone through a VPN (Tailscale)". Off by default: it widens who may reach the link from the local
+/// network to the addresses of your own VPN, and a connection still needs the pairing code and the pinned certificate.
+/// Phones are disconnected once on a change so a VPN phone does not stay connected after the switch goes off.
+#[tauri::command]
+pub fn phone_vpn_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<VpnStatus, String> {
+    only_settings(&window)?;
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_vpn = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "vpn setting changed");
+    log::line(format!("phone link: phones through a VPN {}", if enabled { "allowed" } else { "not allowed" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(vpn_status_of(enabled))
 }
 
 // ── Service cards on the phone: one tick per service (Settings → Android phone) ──

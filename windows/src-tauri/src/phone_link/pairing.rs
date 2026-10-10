@@ -139,6 +139,26 @@ pub fn lan_address() -> Option<std::net::IpAddr> {
     (!ip.is_unspecified() && !ip.is_loopback()).then_some(ip)
 }
 
+/// This computer's address on a VPN such as Tailscale (100.64.0.0/10), if it has one. Tailscale's own resolver
+/// address 100.100.100.100 only routes through its interface, so asking the OS which source address it would use
+/// finds it without reading any interface list. Sends nothing.
+pub fn vpn_address() -> Option<std::net::IpAddr> {
+    let socket = std::net::UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("100.100.100.100:9").ok()?;
+    let ip = socket.local_addr().ok()?.ip();
+    super::server::is_vpn(ip).then_some(ip)
+}
+
+/// The address the phone should dial: the VPN one when the user allowed VPN phones and there is one, else the LAN one.
+pub fn pairing_address(vpn_allowed: bool) -> Option<std::net::IpAddr> {
+    if vpn_allowed {
+        if let Some(ip) = vpn_address() {
+            return Some(ip);
+        }
+    }
+    lan_address()
+}
+
 /// The name the phone shows for this computer.
 pub fn computer_name() -> String {
     let name = std::env::var("COMPUTERNAME")

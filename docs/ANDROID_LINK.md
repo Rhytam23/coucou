@@ -226,6 +226,25 @@ out. A bare `{"type":"usage"}` means the computer has nothing to say any more: t
 `resetsAt` has passed counts as 0 on the phone, as on the PC. Nothing else about the plans (no account, no token, no cost) is
 ever sent, and nothing goes back.
 
+## Away from home: through a VPN (no protocol change)
+
+The link stays direct from phone to computer: there is no relay and no account. To use it away from home, put both
+devices on the same VPN, for example Tailscale.
+
+1. Install Tailscale (or a similar VPN) on the computer and on the phone and sign in with the same account.
+2. On the computer: Settings > Android phone > "Also accept my phone through a VPN" on. It is off by default.
+3. Pair again (a new code, or the same one): while the switch is on and the computer has a VPN address, the pairing
+   link carries that address (the settings window shows it) instead of the Wi-Fi one.
+4. Pair the phone while it can reach that address. The app stores it like any other address.
+
+What the switch changes: the computer also accepts peers in `100.64.0.0/10` (the carrier-grade NAT range Tailscale
+hands out), nothing else (`server::admits`). The open internet is still refused before any byte is read, and a phone
+still needs the pairing token and the pinned certificate. Turning it off disconnects the phones once. The pairing
+address is found by asking the OS which source address it would use toward `100.100.100.100` (Tailscale's resolver
+address); nothing is sent. With another VPN that uses a different range, type the address by hand in the phone's
+"Find my computer" box; the computer then only accepts it if it is in the range above.
+The computer's firewall must let the VPN interface reach the link's port (the app does not open ports).
+
 ## Mochi's outfit (optional capability `prefs`)
 
 A phone that sends `caps: ["prefs"]` in its `hello` is offered `prefs` in `welcome.caps` (no switch on the computer: what

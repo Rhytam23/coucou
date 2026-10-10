@@ -140,6 +140,12 @@ export interface PhoneUsageStatus {
   enabled: boolean;
 }
 
+export interface PhoneVpnStatus {
+  enabled: boolean;
+  /** This computer's VPN address (100.64.0.0/10), when it has one. */
+  address: string | null;
+}
+
 export interface PhoneDiffsStatus {
   enabled: boolean;
 }
@@ -292,6 +298,8 @@ export const Bridge = {
   /** None by default; only from the ticks in Settings. Phones are reconnected so they learn about it. */
   phoneServicesSet: (services: string[]) => callOrThrow<PhoneServicesStatus>("phone_services_set", { services }),
   phoneLinkPublishServices: (services: PhoneLinkService[]) => call<void>("phone_link_publish_services", { services }),
+  phoneVpnStatus: () => call<PhoneVpnStatus>("phone_vpn_status"),
+  phoneVpnSetEnabled: (enabled: boolean) => callOrThrow<PhoneVpnStatus>("phone_vpn_set_enabled", { enabled }),
   phoneUsageStatus: () => call<PhoneUsageStatus>("phone_usage_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneUsageSetEnabled: (enabled: boolean) => callOrThrow<PhoneUsageStatus>("phone_usage_set_enabled", { enabled }),
