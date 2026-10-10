@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +52,9 @@ import com.coucou.android.core.IconKind
 import com.coucou.android.core.IslandSurface
 import com.coucou.android.core.MotionSpec
 import com.coucou.android.core.Pills
+import com.coucou.android.core.QuestionFlow
+import com.coucou.android.link.AskedOption
+import com.coucou.android.link.QuestionRequest
 import com.coucou.android.core.Radii
 import com.coucou.android.core.Spacing
 import com.coucou.android.core.TypeScale
@@ -160,18 +166,95 @@ fun ApprovalSheet(model: AppModel, r: ApprovalRequest, onAllow: (ApprovalRequest
     }
 }
 
-/** A session has a question. Answering from the phone is a later stage, so this says whose it is and where to answer. */
+/**
+ * A question Claude Code asks. With the `answers` capability the options are here to tap, one question at a time, and the answer
+ * is sent only after the screen lock ([onSend]; the labels are the computer's exact ones, nothing typed ever goes in). Without it
+ * the sheet says whose question it is and where to answer.
+ */
 @Composable
-fun QuestionSheet(model: AppModel, pillId: String, onDismiss: () -> Unit) {
+fun QuestionSheet(model: AppModel, pillId: String, onDismiss: () -> Unit, onSend: (QuestionRequest, List<List<String>>) -> Unit) {
     val white = Color(IslandSurface.TEXT)
     val dim = Color(IslandSurface.TEXT_DIM)
     val wash = MochiConst.STATES[BotState.QUESTION]?.color?.let(::rgbColor)
+    val request = model.questionFor(pillId)
     BottomSheetHost(onDismiss, wash) {
+        if (request == null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                SheetMochi(BotState.QUESTION, agentColour(model, pillId))
+                Text(stringResource(R.string.question_title, model.agentName(pillId)), Modifier.weight(1f), style = TypeScale.TITLE.style(white), maxLines = 3)
+            }
+            Text(stringResource(R.string.question_body), Modifier.padding(top = 12.dp, bottom = 16.dp), style = TypeScale.BODY.style(dim))
+            PillButton(stringResource(R.string.question_ok), onDismiss, Modifier.fillMaxWidth(), PillKind.PRIMARY, onDark = true)
+            return@BottomSheetHost
+        }
+        var st by remember(request.fingerprint) { mutableStateOf(QuestionFlow.start(request.questions)) }
+        var armed by remember(request.fingerprint) { mutableStateOf(false) }
+        LaunchedEffect(request.fingerprint) { delay(ApprovalSheetPlan.GUARD_MS); armed = true }
+        val q = request.questions[st.index.coerceIn(0, request.questions.lastIndex)]
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             SheetMochi(BotState.QUESTION, agentColour(model, pillId))
-            Text(stringResource(R.string.question_title, model.agentName(pillId)), Modifier.weight(1f), style = TypeScale.TITLE.style(white), maxLines = 3)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stringResource(R.string.question_title, model.agentName(pillId)), style = TypeScale.SECONDARY.style(dim), maxLines = 2)
+                QuestionFlow.position(request.questions, st)?.let { (n, total) ->
+                    Text(stringResource(R.string.question_position, n, total), style = TypeScale.LABEL.style(dim))
+                }
+            }
         }
-        Text(stringResource(R.string.question_body), Modifier.padding(top = 12.dp, bottom = 16.dp), style = TypeScale.BODY.style(dim))
-        PillButton(stringResource(R.string.question_ok), onDismiss, Modifier.fillMaxWidth(), PillKind.PRIMARY, onDark = true)
+        Text(q.question, Modifier.padding(top = 12.dp), style = TypeScale.HEADLINE.style(white))
+        if (q.multiSelect) Text(stringResource(R.string.question_pick_many), Modifier.padding(top = 2.dp), style = TypeScale.SECONDARY.style(dim))
+        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (o in q.options) {
+                OptionRow(o, selected = o.label in st.picks[st.index], multi = q.multiSelect) { st = QuestionFlow.toggle(request.questions, st, o.label) }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (st.index > 0) PillButton(stringResource(R.string.question_back), { st = QuestionFlow.back(st) }, Modifier.weight(1f), onDark = true)
+            if (QuestionFlow.isLast(request.questions, st)) {
+                PillButton(
+                    stringResource(R.string.question_send),
+                    { QuestionFlow.picks(request.questions, st)?.let { onSend(request, it) } }, Modifier.weight(1f), PillKind.PRIMARY,
+                    enabled = armed && QuestionFlow.complete(request.questions, st), onDark = true,
+                    icon = { CoucouIcon(IconKind.LOCK, tint = Color(IslandSurface.ON_PRIMARY), size = 18.dp) },
+                )
+            } else {
+                PillButton(
+                    stringResource(R.string.question_next), { st = QuestionFlow.next(request.questions, st) }, Modifier.weight(1f), PillKind.PRIMARY,
+                    enabled = QuestionFlow.canAdvance(request.questions, st), onDark = true,
+                )
+            }
+        }
+        Text(stringResource(R.string.approval_hint), Modifier.padding(top = 10.dp), style = TypeScale.LABEL.style(dim))
+        Text(
+            stringResource(R.string.approval_later),
+            Modifier.heightIn(min = Spacing.MIN_TOUCH.dp).clickable(role = Role.Button, onClick = onDismiss).padding(vertical = 14.dp),
+            style = TypeScale.SECONDARY.style(dim),
+        )
+    }
+}
+
+/** One option: a label, its description, and a mark that it is picked. Tapping it is the only way to answer. */
+@Composable
+private fun OptionRow(option: AskedOption, selected: Boolean, multi: Boolean, onClick: () -> Unit) {
+    val white = Color(IslandSurface.TEXT)
+    val dim = Color(IslandSurface.TEXT_DIM)
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = Spacing.MIN_TOUCH.dp).clip(shape)
+            .background(Color.White.copy(alpha = if (selected) 0.16f else 0.07f))
+            .border(1.dp, if (selected) white.copy(alpha = 0.7f) else Color.Transparent, shape)
+            .selectable(selected = selected, role = if (multi) Role.Checkbox else Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(22.dp).clip(if (multi) RoundedCornerShape(6.dp) else CircleShape)
+                .background(if (selected) white else Color.Transparent)
+                .border(1.5.dp, if (selected) white else dim, if (multi) RoundedCornerShape(6.dp) else CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { if (selected) CoucouIcon(IconKind.CHECK, tint = Color(IslandSurface.ON_PRIMARY), size = 16.dp) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(option.label, style = TypeScale.BODY.style(white).copy(fontWeight = FontWeight.SemiBold))
+            if (option.description.isNotBlank()) Text(option.description, style = TypeScale.SECONDARY.style(dim))
+        }
     }
 }

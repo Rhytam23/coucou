@@ -84,6 +84,7 @@ import com.coucou.android.core.Nav
 import com.coucou.android.core.Pills
 import com.coucou.android.core.Screen
 import com.coucou.android.link.ApprovalRequest
+import com.coucou.android.link.QuestionRequest
 import com.coucou.android.link.LinkState
 import com.coucou.android.link.PairingPayload
 import com.coucou.android.mochi.BotEmote
@@ -190,7 +191,7 @@ class MainActivity : ComponentActivity() {
                         // A request for permission rises over whatever is on screen until it is decided or closed.
                         val pending = ApprovalSheetPlan.next(model.approvals, closedApproval)
                         if (pending != null && screen != Screen.SCAN) ApprovalSheet(model, pending, onAllow = ::approve, onDismiss = { closedApproval = pending.fingerprint })
-                        questionPill?.let { QuestionSheet(model, it, onDismiss = { questionPill = null }) }
+                        questionPill?.let { QuestionSheet(model, it, onDismiss = { questionPill = null }, onSend = ::sendAnswer) }
                         // A scanned code or a link from the camera app: the user decides before anything is paired.
                         model.pairRequest?.let { PairConfirm(model, it) }
                     }
@@ -254,6 +255,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * An answer to a question: only after the same screen-lock check as Allow. The lock prompt shows what is about to be
+     * sent (the labels picked); nothing about it is logged or stored.
+     */
+    private fun sendAnswer(request: QuestionRequest, picks: List<List<String>>) {
+        if (confirming) return
+        confirming = true
+        BiometricGate.confirm(
+            this, getString(R.string.question_confirm_title), picks.joinToString("; ") { it.joinToString(", ") }, getString(R.string.msg_need_lock),
+            onSuccess = {
+                confirming = false
+                questionPill = null
+                model.message = getString(if (model.answerQuestion(request.fingerprint, picks)) R.string.question_sent else R.string.question_not_sent)
+            },
+            onFail = { confirming = false; if (it.isNotBlank()) model.message = it },
+        )
+    }
+
     /** Allow: only after the biometric / screen-lock check. */
     private fun approve(r: ApprovalRequest) {
         if (confirming) return // a second tap must not open a second prompt
@@ -315,6 +334,7 @@ private fun Home(
                 linkDot = linkDotColor(model), linkText = linkStatusText(model),
                 onDetails = if (focus != null && HomePanel.hasDetails(focus)) ({ onSession(focus.pillId) }) else null,
                 onQuestion = if (focus != null && focus.state == BotState.QUESTION) ({ onQuestion(focus.pillId) }) else null,
+                canAnswer = focus != null && model.questionFor(focus.pillId) != null,
                 onLink = {
                     when (pair) {
                         HomePanel.Link.PAIR -> onScan() // not reachable on Home (no computer shows the pairing screen), harmless

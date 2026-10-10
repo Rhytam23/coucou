@@ -45,7 +45,7 @@ class SheetsTest {
 
     @Test fun bothButtonsIgnoreTapsDuringTheFirstMoments() {
         assertTrue(sheets.contains("delay(ApprovalSheetPlan.GUARD_MS)"))
-        assertEquals(2, Regex("""enabled = armed""").findAll(sheets).count())
+        assertEquals(3, Regex("""enabled = armed""").findAll(sheets).count())
     }
 
     @Test fun theSheetCanBeClosedAndNeverCatchesTapsMeantForTheScrim() {
@@ -60,9 +60,26 @@ class SheetsTest {
         assertTrue(main.contains("screen != Screen.SCAN"))
     }
 
-    @Test fun aQuestionIsReadOnlyForNow() {
-        assertTrue(sheets.contains("R.string.question_body"))
+    @Test fun aQuestionIsAnsweredOnlyAfterTheScreenLock() {
         assertTrue(main.contains("focus.state == BotState.QUESTION"))
-        assertFalse(sheets.contains("model.answer"))
+        // The sheet never talks to the link itself: it hands the picks to the activity, which asks for the lock first.
+        assertFalse(sheets.contains("model.answerQuestion"))
+        val send = main.substringAfter("private fun sendAnswer").substringBefore("/** Allow:")
+        assertTrue(send.indexOf("BiometricGate.confirm") in 0 until send.indexOf("model.answerQuestion"))
+        assertTrue(send.contains("if (confirming) return"))
+    }
+
+    @Test fun thePicksAreNeverLoggedOrStored() {
+        val send = main.substringAfter("private fun sendAnswer").substringBefore("/** Allow:")
+        assertFalse(send.contains("Log."))
+        val flow = src("core/QuestionFlow.kt")
+        assertFalse(flow.contains("Log."))
+        assertFalse(sheets.substringAfter("fun QuestionSheet").contains("rememberSaveable"))
+    }
+
+    @Test fun theAnswerButtonHasTheSameTapGuardAsAllow() {
+        val q = sheets.substringAfter("fun QuestionSheet")
+        assertTrue(q.contains("ApprovalSheetPlan.GUARD_MS"))
+        assertTrue(q.contains("enabled = armed && QuestionFlow.complete"))
     }
 }

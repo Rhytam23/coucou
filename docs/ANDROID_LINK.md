@@ -125,6 +125,32 @@ The whole `sessions` line stays under 56 KiB: when many sessions carry many step
 A field with nothing to say is left out. Turning the switch on or off disconnects the phones once so they reconnect and are told.
 Not sent, ever: the prompt, command output, Claude's full answer, file contents, full paths.
 
+## Answering Claude Code's questions (optional capability `answers`)
+
+A phone that sends `caps: ["answers"]` in its `hello`, while the user has turned on "Let the phone answer Claude Code's
+questions" on the computer (off by default; re-read for every connection), is offered `answers` in `welcome.caps`. Any other
+phone never hears of a question and cannot answer one (its `answer` messages are ignored).
+
+| Direction | `type` | fields |
+|---|---|---|
+| computer to phone | `question` | `pillId`, `fingerprint`, `createdAt` (ms), `questions[]`: `{question, multiSelect, options[]: {label, description}}` |
+| phone to computer | `answer` | `fingerprint`, `picks`: one list of labels per question, in order |
+| computer to phone | `approvalResolved` | `fingerprint`: the question was answered (here or on the computer) or timed out; remove it |
+
+- At most 4 questions of at most 8 options. A question with a longer text (500 characters), a longer label (120) or description
+  (300), no option, or two options with the same label is **not offered** (it stays on the computer): the answer must carry the
+  exact text and labels back to the agent, so nothing is ever cut.
+- `fingerprint` identifies the pending question like an approval's does (derived from the session, the question texts and the
+  island's request id); the request id itself never leaves the computer.
+- The computer applies an `answer` only if its fingerprint is the question **still pending**, it is not older than 115 s, and
+  `picks` matches exactly: one list per question; each label equal to one of that question's labels (exact, case-sensitive);
+  one label for a single choice; one or more distinct labels for a multiple choice. Anything else changes nothing and the
+  question stays open. Applied once, then the island's card closes as if answered there. The agent receives
+  `{question text: label}` (a list of labels for a multiple choice), the same shape the island produces.
+- **The phone asks for its screen lock (fingerprint, pattern, PIN) before it sends an answer**, like Allow. Nothing is
+  logged about what was picked, on either side.
+- A permission request is still sent to every phone as an `approval`, unchanged.
+
 ## Finding the computer again (optional, still protocol v1)
 
 The pairing link holds the computer's address, and an address changes with every network (a home Wi-Fi, a hotspot, a
@@ -181,8 +207,9 @@ simply keeps using the saved address.**
   turning it off also stops a running answer and forgets the phone's conversation. The phone's conversation is a
   separate in-memory `Chat`, not the island's. The provider code is the island's (`chat::send_for_phone`); a provider's
   error text is never forwarded or logged, only a kind (no key, unreachable, auth, provider).
-- Only permission requests (Allow/Deny) go to the phone; a question from Claude Code needs its options
-  picked on the island.
+- Permission requests (Allow/Deny) go to every phone. A question from Claude Code goes only to a phone with the `answers`
+  capability (Settings → Android phone → "Let the phone answer Claude Code's questions", off by default); otherwise its
+  options are picked on the island.
 - New crates: `mdns-sd` (+ `flume`, `if-addrs`, `socket-pktinfo`, `spin`; default features off, so no async runtime or logger) announces the computer on the local network while the link is on (`phone_link/discovery.rs`); `rcgen` (+ `yasna`) makes the certificate once, `qrcode` draws the pairing QR; `rustls`,
   `tokio-rustls` and `ring` were already in the dependency tree (through `reqwest`) and are now named
   directly. Hashing, randomness and the constant-time comparison use `ring`; no other crate.

@@ -35,6 +35,14 @@ const MAX_PROJECT_CHARS: usize = 64;
 /// (16 sessions of 20 steps of 200 characters would be 64 KB of text alone).
 pub const DETAILS_LINE_BUDGET: usize = 56 * 1024;
 
+/// Questions (cap `answers`): a question that does not fit these limits is left to the island, never cut,
+/// because the answer must carry the exact text and labels back to the agent.
+pub const MAX_QUESTIONS: usize = 4;
+pub const MAX_OPTIONS: usize = 8;
+const MAX_QUESTION_CHARS: usize = 500;
+const MAX_LABEL_CHARS: usize = 120;
+const MAX_DESCRIPTION_CHARS: usize = 300;
+
 /// The states the phone draws; anything else is sent as `idle`.
 const STATES: &[&str] = &[
     "idle", "working", "thinking", "searching", "approval", "question", "error", "finished",
@@ -45,6 +53,9 @@ const STATES: &[&str] = &[
 /// waiting `coucou-hook` and closes the card on the island.
 pub trait Host: Send + Sync {
     fn decide(&self, request_id: &str, allow: bool);
+    /// A phone answered a question Claude Code asked: each question's text mapped to the label picked (a list of
+    /// labels for a multi-select), the shape AskUserQuestion takes. Only called for the question still pending.
+    fn answer(&self, _request_id: &str, _answers: &serde_json::Map<String, serde_json::Value>) {}
 }
 
 /// One agent session, as the island reports it.
@@ -91,6 +102,42 @@ pub struct ApprovalIn {
     pub pill_id: String,
     pub tool: String,
     pub command: String,
+}
+
+/// One option of a question, as the island has it.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct OptionIn {
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+/// One question of an AskUserQuestion call.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionItemIn {
+    pub question: String,
+    pub options: Vec<OptionIn>,
+    #[serde(default)]
+    pub multi_select: bool,
+}
+
+/// The question Claude Code is waiting on, as the island has it (cap `answers`).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuestionIn {
+    pub request_id: String,
+    pub session_id: String,
+    pub pill_id: String,
+    pub questions: Vec<QuestionItemIn>,
+}
+
+struct Question {
+    request_id: String,
+    fingerprint: String,
+    pill_id: String,
+    items: Vec<QuestionItemIn>,
+    created_at: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -146,12 +193,15 @@ struct Sub {
     evicted: Arc<AtomicBool>,
     /// The phone asked for `details` and the user's switch was on when it connected.
     details: bool,
+    /// The phone asked for `answers` and the user's switch was on when it connected.
+    answers: bool,
 }
 
 #[derive(Default)]
 struct Inner {
     sessions: Vec<Session>,
     approval: Option<Approval>,
+    question: Option<Question>,
     subs: Vec<Sub>,
     next_sub: u64,
 }
@@ -247,7 +297,13 @@ impl Hub {
 
     /// Registers a connection that has authenticated. The returned lines bring it
     /// up to date: the sessions, then the request still waiting, if any.
+    #[cfg(test)]
     pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64, details: bool) -> (u64, Arc<AtomicBool>) {
+        self.subscribe_with(tx, now, details, false)
+    }
+
+    /// Like [`subscribe`], for a phone that may also have been offered `answers`.
+    pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, details: bool, answers: bool) -> (u64, Arc<AtomicBool>) {
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -257,8 +313,13 @@ impl Hub {
         if let Some(a) = &inner.approval {
             let _ = tx.try_send(Out::Line(approval_line(a).into()));
         }
+        if answers {
+            if let Some(q) = &inner.question {
+                let _ = tx.try_send(Out::Line(question_line(q).into()));
+            }
+        }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers });
         (id, evicted)
     }
 
@@ -308,7 +369,137 @@ impl Hub {
     }
 }
 
+impl Hub {
+    /// The question waiting on the island (None: none). Only phones that have `answers` hear of it. One that
+    /// does not fit the limits, or whose options cannot be told apart, stays on the island.
+    pub fn publish_question(&self, question: Option<QuestionIn>, now: u64) {
+        let mut inner = self.inner.lock().unwrap();
+        let usable = question.filter(|q| !q.request_id.is_empty() && fits_the_limits(&q.questions));
+        let same = match (&inner.question, &usable) {
+            (Some(a), Some(b)) => a.request_id == b.request_id,
+            (None, None) => true,
+            _ => false,
+        };
+        if same {
+            return;
+        }
+        if let Some(old) = inner.question.take() {
+            let line = resolved_line(&old.fingerprint);
+            broadcast_to_answers(&mut inner, &line);
+        }
+        if let Some(q) = usable {
+            let texts: Vec<&str> = q.questions.iter().map(|i| i.question.as_str()).collect();
+            let question = Question {
+                fingerprint: fingerprint(&q.pill_id, &q.session_id, "AskUserQuestion", &texts.join("\n"), &q.request_id),
+                request_id: q.request_id,
+                pill_id: q.pill_id,
+                items: q.questions,
+                created_at: now,
+            };
+            let line = question_line(&question);
+            inner.question = Some(question);
+            broadcast_to_answers(&mut inner, &line);
+        }
+    }
+
+    /// A phone's answer to the question that is still pending. `picks` has one list of labels per question, in order.
+    /// It is applied only if every label is exactly one of that question's options, one label for a single choice and
+    /// at least one (each at most once) for a multiple choice; anything else changes nothing.
+    pub fn answer(&self, fingerprint: &str, picks: &[Vec<String>], now: u64) -> Outcome {
+        let (request_id, answers) = {
+            let mut inner = self.inner.lock().unwrap();
+            let (late, answers) = match &inner.question {
+                Some(q) if constant_eq(q.fingerprint.as_bytes(), fingerprint.as_bytes()) => {
+                    let Some(answers) = build_answers(&q.items, picks) else { return Outcome::Invalid };
+                    (now.saturating_sub(q.created_at) > APPROVAL_TTL_MS, answers)
+                }
+                _ => return Outcome::NoMatch,
+            };
+            // Taken in every case: a question is answered once, or dismissed.
+            let q = inner.question.take().expect("checked above");
+            let line = resolved_line(&q.fingerprint);
+            broadcast_to_answers(&mut inner, &line);
+            if late {
+                return Outcome::Late;
+            }
+            (q.request_id, answers)
+        };
+        self.host.answer(&request_id, &answers);
+        Outcome::Applied
+    }
+}
+
+fn fits_the_limits(items: &[QuestionItemIn]) -> bool {
+    !items.is_empty()
+        && items.len() <= MAX_QUESTIONS
+        && items.iter().all(|i| {
+            let labels: Vec<&str> = i.options.iter().map(|o| o.label.as_str()).collect();
+            !i.question.trim().is_empty()
+                && i.question.chars().count() <= MAX_QUESTION_CHARS
+                && !labels.is_empty()
+                && labels.len() <= MAX_OPTIONS
+                && labels.iter().all(|l| !l.trim().is_empty() && l.chars().count() <= MAX_LABEL_CHARS)
+                && i.options.iter().all(|o| o.description.chars().count() <= MAX_DESCRIPTION_CHARS)
+                // two options with the same label could not be told apart in an answer
+                && labels.iter().enumerate().all(|(n, l)| !labels[..n].contains(l))
+        })
+}
+
+fn build_answers(items: &[QuestionItemIn], picks: &[Vec<String>]) -> Option<serde_json::Map<String, serde_json::Value>> {
+    if picks.len() != items.len() {
+        return None;
+    }
+    let mut out = serde_json::Map::new();
+    for (item, chosen) in items.iter().zip(picks) {
+        if chosen.is_empty() || chosen.len() > item.options.len() || (!item.multi_select && chosen.len() != 1) {
+            return None;
+        }
+        for (n, label) in chosen.iter().enumerate() {
+            if !item.options.iter().any(|o| &o.label == label) || chosen[..n].contains(label) {
+                return None;
+            }
+        }
+        let value = if item.multi_select { json!(chosen) } else { json!(chosen[0]) };
+        out.insert(item.question.clone(), value);
+    }
+    Some(out)
+}
+
+fn question_line(q: &Question) -> String {
+    let questions: Vec<serde_json::Value> = q
+        .items
+        .iter()
+        .map(|i| {
+            json!({
+                "question": i.question, "multiSelect": i.multi_select,
+                "options": i.options.iter().map(|o| json!({ "label": o.label, "description": o.description })).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    json!({ "type": "question", "pillId": q.pill_id, "fingerprint": q.fingerprint, "createdAt": q.created_at, "questions": questions }).to_string()
+}
+
+/// To the phones that have `answers` only: the others never learn a question existed.
+fn broadcast_to_answers(inner: &mut Inner, line: &str) {
+    let shared: Arc<str> = line.into();
+    inner.subs.retain(|s| {
+        if !s.answers {
+            return true;
+        }
+        let kept = s.tx.try_send(Out::Line(shared.clone())).is_ok();
+        if !kept {
+            s.evicted.store(true, Ordering::SeqCst);
+        }
+        kept
+    });
+}
+
 fn expire(inner: &mut Inner, now: u64) {
+    if inner.question.as_ref().is_some_and(|q| now.saturating_sub(q.created_at) > APPROVAL_TTL_MS) {
+        let q = inner.question.take().expect("checked above");
+        let line = resolved_line(&q.fingerprint);
+        broadcast_to_answers(inner, &line);
+    }
     if inner.approval.as_ref().is_some_and(|a| now.saturating_sub(a.created_at) > APPROVAL_TTL_MS) {
         let a = inner.approval.take().expect("checked above");
         let line = resolved_line(&a.fingerprint);
@@ -849,5 +1040,91 @@ mod tests {
         assert!(!constant_eq(b"abc", b"abd"));
         assert!(!constant_eq(b"abc", b"abcd"));
         assert!(!constant_eq(b"", b"a"));
+    }
+
+    // ── questions (cap `answers`) ───────────────────────────────────────────────────
+
+    #[derive(Default)]
+    struct AnswerRecorder(StdMutex<Vec<(String, serde_json::Value)>>);
+    impl Host for AnswerRecorder {
+        fn decide(&self, _: &str, _: bool) {}
+        fn answer(&self, request_id: &str, answers: &serde_json::Map<String, serde_json::Value>) {
+            self.0.lock().unwrap().push((request_id.to_string(), serde_json::Value::Object(answers.clone())));
+        }
+    }
+
+    fn ask(request: &str) -> QuestionIn {
+        QuestionIn {
+            request_id: request.into(),
+            session_id: "s1".into(),
+            pill_id: "integration_claude".into(),
+            questions: vec![QuestionItemIn {
+                question: "Which?".into(),
+                options: vec![OptionIn { label: "A".into(), description: String::new() }, OptionIn { label: "B".into(), description: "bee".into() }],
+                multi_select: false,
+            }],
+        }
+    }
+
+    fn qhub() -> (Arc<Hub>, Arc<AnswerRecorder>, mpsc::Receiver<Out>) {
+        let rec = Arc::new(AnswerRecorder::default());
+        let hub = Hub::new(rec.clone());
+        let (tx, rx) = mpsc::channel(16);
+        hub.subscribe_with(tx, 1_000, false, true);
+        (hub, rec, rx)
+    }
+
+    fn qfp(hub: &Hub) -> String {
+        hub.inner.lock().unwrap().question.as_ref().unwrap().fingerprint.clone()
+    }
+
+    #[test]
+    fn an_answer_older_than_the_limit_is_not_applied() {
+        let (hub, rec, mut rx) = qhub();
+        hub.publish_question(Some(ask("r1")), 1_000);
+        let fp = qfp(&hub);
+        assert_eq!(hub.answer(&fp, &[vec!["A".into()]], 1_000 + APPROVAL_TTL_MS + 1), Outcome::Late);
+        assert!(rec.0.lock().unwrap().is_empty());
+        let lines = drain(&mut rx);
+        assert_eq!(lines.last().unwrap()["type"], "approvalResolved");
+    }
+
+    #[test]
+    fn a_new_question_replaces_the_old_and_none_withdraws_it() {
+        let (hub, rec, mut rx) = qhub();
+        hub.publish_question(Some(ask("r1")), 1_000);
+        let first = qfp(&hub);
+        hub.publish_question(Some(ask("r1")), 1_001); // the same request again: nothing new
+        hub.publish_question(Some(ask("r2")), 1_002);
+        let second = qfp(&hub);
+        assert_ne!(first, second);
+        assert_eq!(hub.answer(&first, &[vec!["A".into()]], 1_003), Outcome::NoMatch, "the old one cannot be answered any more");
+        hub.publish_question(None, 1_004);
+        assert_eq!(hub.answer(&second, &[vec!["A".into()]], 1_005), Outcome::NoMatch);
+        assert!(rec.0.lock().unwrap().is_empty());
+        let types: Vec<String> = drain(&mut rx).iter().map(|l| l["type"].as_str().unwrap().to_string()).collect();
+        assert_eq!(types.iter().filter(|t| *t == "question").count(), 2);
+        assert_eq!(types.iter().filter(|t| *t == "approvalResolved").count(), 2);
+    }
+
+    #[test]
+    fn the_question_and_a_permission_request_do_not_disturb_each_other() {
+        let (hub, rec, _rx) = qhub();
+        hub.publish(vec![], Some(approval("p1", "ls")), 1_000);
+        hub.publish_question(Some(ask("r1")), 1_000);
+        assert!(hub.inner.lock().unwrap().approval.is_some());
+        let fp = qfp(&hub);
+        assert_eq!(hub.answer(&fp, &[vec!["B".into()]], 1_001), Outcome::Applied);
+        assert!(hub.inner.lock().unwrap().approval.is_some(), "the permission request is untouched");
+        assert_eq!(rec.0.lock().unwrap()[0], ("r1".to_string(), json!({ "Which?": "B" })));
+    }
+
+    #[test]
+    fn a_question_that_waited_too_long_is_gone_for_a_phone_that_connects_now() {
+        let (hub, _rec, _rx) = qhub();
+        hub.publish_question(Some(ask("r1")), 1_000);
+        let (tx, mut rx) = mpsc::channel(16);
+        hub.subscribe_with(tx, 1_000 + APPROVAL_TTL_MS + 1, false, true);
+        assert!(drain(&mut rx).iter().all(|l| l["type"] != "question"));
     }
 }

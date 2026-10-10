@@ -6,7 +6,7 @@
 // Rust (which answers the waiting hook) and only the card on the island is
 // closed here. While the link is off nothing is computed and no timer runs.
 
-import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkSession } from "../core/bridge";
+import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
 import { parseDiffStep } from "../core/diff";
 import { State } from "../core/state";
 import { dropPendingCard } from "./hooks";
@@ -18,6 +18,8 @@ const DEBOUNCE_MS = 250;
 export interface LinkSnapshot {
   sessions: PhoneLinkSession[];
   approval: PhoneLinkApproval | null;
+  /** The question Claude Code is asking, offered only to phones that may answer (Rust decides who). */
+  question: PhoneLinkQuestion | null;
 }
 
 /**
@@ -65,29 +67,52 @@ export function linkSnapshot(): LinkSnapshot {
       };
     });
 
-  // A question Claude Code asks needs its options picked on the island: only
-  // permission requests (Allow / Deny) go to the phone.
+  // Permission requests (Allow / Deny) go to every phone. A question goes only to a phone that has the `answers`
+  // capability (Rust decides), as its own message: the options with their labels, nothing else of the request.
   const a = State.pendingApproval;
   const approval =
     a && !a.questions && a.requestId
       ? { requestId: a.requestId, sessionId: a.sessionId, pillId: a.pillId, tool: a.tool, command: bareCommand(a.tool, a.command) }
       : null;
-  return { sessions, approval };
+  const question =
+    a && a.questions && a.questions.length > 0 && a.requestId
+      ? {
+          requestId: a.requestId,
+          sessionId: a.sessionId,
+          pillId: a.pillId,
+          questions: a.questions.map((q) => ({
+            question: q.question,
+            options: q.options.map((o) => ({ label: o.label, description: o.description ?? "" })),
+            multiSelect: q.multiSelect,
+          })),
+        }
+      : null;
+  return { sessions, approval, question };
 }
 
 /** Returns what undoes it (the tests use it; the app registers once and keeps it). */
 export function registerPhoneLink(island: Island): () => void {
   let running = false;
   let last = "";
+  /** What was last sent as the question; "" before anything was, so a link that comes up syncs the hub. */
+  let lastQuestion = "";
   let timer: number | null = null;
 
   const publish = () => {
     timer = null;
+    publishQuestion();
     const snapshot = linkSnapshot();
     const key = JSON.stringify(snapshot);
     if (key === last) return;
     last = key;
     void Bridge.phoneLinkPublish(snapshot.sessions, snapshot.approval);
+  };
+
+  const publishQuestion = () => {
+    const key = JSON.stringify(linkSnapshot().question);
+    if (key === lastQuestion) return;
+    lastQuestion = key;
+    void Bridge.phoneLinkPublishQuestion(JSON.parse(key));
   };
 
   const schedule = () => {
@@ -101,6 +126,7 @@ export function registerPhoneLink(island: Island): () => void {
     if (now === running) return;
     running = now;
     last = ""; // a link that has just come up needs the whole picture
+    lastQuestion = "";
     if (running) schedule();
     else if (timer != null) {
       window.clearTimeout(timer);

@@ -54,6 +54,8 @@ class DevDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val questions = LinkedBlockingQueue<QuestionRequest>()
+        override fun onQuestion(request: QuestionRequest) { questions.add(request) }
         val caps = LinkedBlockingQueue<Set<String>>()
         val chat = LinkedBlockingQueue<String>()
         override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
@@ -118,6 +120,52 @@ class DevDesktopInteropTest {
             client.start()
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
             assertTrue(rec.welcome.isEmpty())
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── answering a question, against the fake question of the Node desktop ─────────
+
+    @Test fun aQuestionIsAnsweredAndRemovedOnTheNodeDesktop() {
+        val info = startDesktop("--answers", "--once")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("answers"), rec.caps.poll(10, TimeUnit.SECONDS))
+            val q = rec.questions.poll(20, TimeUnit.SECONDS)
+            assertNotNull("no question arrived", q)
+            assertEquals(2, q!!.questions.size)
+            assertEquals(true, q.questions[1].multiSelect)
+            // Refused by the desktop: a label it never offered, then two picks for a single choice.
+            assertTrue(client.answer(q.fingerprint, listOf(listOf("nope"), listOf("Lint"))))
+            assertTrue(client.answer(q.fingerprint, listOf(listOf("main", "develop"), listOf("Lint"))))
+            assertNull(rec.resolved.poll(1, TimeUnit.SECONDS))
+            assertTrue(client.answer(q.fingerprint, listOf(listOf("develop"), listOf("Lint", "Build"))))
+            assertEquals(q.fingerprint, rec.resolved.poll(10, TimeUnit.SECONDS))
+            val deadline = System.currentTimeMillis() + 10_000
+            val seen = mutableListOf<String>()
+            while (System.currentTimeMillis() < deadline && seen.none { it.startsWith("ANSWER accepted") }) {
+                lines.poll(1, TimeUnit.SECONDS)?.let { seen.add(it) }
+            }
+            assertEquals(2, seen.count { it.startsWith("ANSWER refused") })
+            assertTrue(seen.any { it.startsWith("ANSWER accepted") })
+            assertTrue("the picked labels must not be logged", seen.none { it.contains("Build") || it.contains("develop") })
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun withoutTheSwitchTheNodeDesktopOffersNoQuestion() {
+        val info = startDesktop()
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertNotNull(rec.welcome.poll(10, TimeUnit.SECONDS))
+            assertNull(rec.questions.poll(3, TimeUnit.SECONDS))
+            assertTrue(!client.answer("a".repeat(64), listOf(listOf("x"))))
         } finally {
             client.stop()
         }

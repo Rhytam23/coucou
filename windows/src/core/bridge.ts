@@ -87,6 +87,18 @@ export interface PhoneLinkApproval {
   command: string;
 }
 
+/** The question Claude Code is waiting on, for a phone that may answer it (phone_link/hub.rs). */
+export interface PhoneLinkQuestion {
+  requestId: string;
+  sessionId: string;
+  pillId: string;
+  questions: { question: string; options: { label: string; description: string }[]; multiSelect: boolean }[];
+}
+
+export interface PhoneAnswersStatus {
+  enabled: boolean;
+}
+
 export const Bridge = {
   boot: () => call<BootInfo>("boot"),
   /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
@@ -203,12 +215,16 @@ export const Bridge = {
   phoneDetailsStatus: () => call<PhoneDetailsStatus>("phone_details_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneDetailsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDetailsStatus>("phone_details_set_enabled", { enabled }),
+  phoneAnswersStatus: () => call<PhoneAnswersStatus>("phone_answers_status"),
+  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
+  phoneAnswersSetEnabled: (enabled: boolean) => callOrThrow<PhoneAnswersStatus>("phone_answers_set_enabled", { enabled }),
   phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),
   phoneChatSetModels: (models: string[]) => callOrThrow<PhoneChatStatus>("phone_chat_set_models", { models }),
   phoneLinkPublish: (sessions: PhoneLinkSession[], approval: PhoneLinkApproval | null) =>
     call<void>("phone_link_publish", { sessions, approval }),
+  phoneLinkPublishQuestion: (question: PhoneLinkQuestion | null) => call<void>("phone_link_publish_question", { question }),
 
   // ── Chat, files, secrets ──────────────────────────────────────────────────
   /** One chat turn. The API key and any file bytes never leave Rust. */

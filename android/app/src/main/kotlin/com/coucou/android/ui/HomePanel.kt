@@ -82,6 +82,8 @@ fun HeroCard(
     linkDot: Color, linkText: String, onLink: () -> Unit, onDetails: (() -> Unit)?,
     /** Opens the question sheet; non-null only while the agent has a question. */
     onQuestion: (() -> Unit)? = null,
+    /** The phone can answer this question here (the `answers` capability): the button says so. */
+    canAnswer: Boolean = false,
 ) {
     val state = focus?.state ?: BotState.SLEEPING
     val wash = MochiConst.STATES[state]?.color?.let(::rgbColor)
@@ -130,7 +132,7 @@ fun HeroCard(
                             kind = PillKind.PRIMARY, onDark = true,
                         )
                     }
-                    if (onQuestion != null) PillButton(stringResource(R.string.question_see), onQuestion, kind = PillKind.PRIMARY, onDark = true)
+                    if (onQuestion != null) PillButton(stringResource(if (canAnswer) R.string.question_see_answer else R.string.question_see), onQuestion, kind = PillKind.PRIMARY, onDark = true)
                     if (onDetails != null) {
                         PillButton(
                             stringResource(R.string.session_details), onDetails, onDark = true,

@@ -46,10 +46,16 @@ const AUTH_PENALTY: Duration = Duration::from_millis(400);
 pub trait Features: Send + Sync {
     /// Session details: the steps, the last line, the project's folder name and the colour.
     fn details(&self) -> bool;
+    /// Answering the questions Claude Code asks, from the phone (the screen-lock check is the phone's).
+    fn answers(&self) -> bool {
+        false
+    }
 }
 
 /// Nothing extra: how the link behaved before capabilities existed.
+#[cfg(test)]
 pub struct NoFeatures;
+#[cfg(test)]
 impl Features for NoFeatures {
     fn details(&self) -> bool {
         false
@@ -218,6 +224,7 @@ where
     let chat = shared.chat.clone().filter(|c| asked_chat && c.enabled());
     let asked = |cap: &str| hello["caps"].as_array().is_some_and(|c| c.iter().any(|x| x == cap));
     let details = asked("details") && shared.features.details();
+    let answers = asked("answers") && shared.features.answers();
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
         offered.push("chat");
@@ -225,12 +232,15 @@ where
     if details {
         offered.push("details");
     }
+    if answers {
+        offered.push("answers");
+    }
     let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
     if !offered.is_empty() {
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe(tx.clone(), (shared.clock)(), details);
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), details, answers);
 
     // 2. the conversation
     loop {
@@ -259,6 +269,14 @@ where
                 // decision changes nothing at all.
                 let _ = shared.hub.decide(fingerprint, decision, (shared.clock)());
             }
+            Some("answer") if answers => {
+                // One list of labels per question. A malformed one, or one that does not match the pending question
+                // exactly, changes nothing (hub.rs).
+                let fingerprint = msg["fingerprint"].as_str().unwrap_or("");
+                if let Some(picks) = parse_picks(&msg["picks"]) {
+                    let _ = shared.hub.answer(fingerprint, &picks, (shared.clock)());
+                }
+            }
             Some("bye") => break,
             Some(t) if t.starts_with("chat") => {
                 if let Some(chat) = &chat {
@@ -272,6 +290,24 @@ where
     if let Some(chat) = &chat {
         chat.cancel_conn(id);
     }
+}
+
+/// `[["a"], ["b", "c"]]` as lists of strings, at most MAX_QUESTIONS lists of at most MAX_OPTIONS labels.
+fn parse_picks(v: &serde_json::Value) -> Option<Vec<Vec<String>>> {
+    let outer = v.as_array()?;
+    if outer.is_empty() || outer.len() > super::hub::MAX_QUESTIONS {
+        return None;
+    }
+    outer
+        .iter()
+        .map(|inner| {
+            let list = inner.as_array()?;
+            if list.len() > super::hub::MAX_OPTIONS {
+                return None;
+            }
+            list.iter().map(|x| x.as_str().map(str::to_string)).collect::<Option<Vec<String>>>()
+        })
+        .collect()
 }
 
 enum Next {

@@ -107,6 +107,7 @@ impl Advertiser {
         }
     }
 
+    #[cfg(test)]
     pub fn is_advertising(&self) -> bool {
         self.current.lock().unwrap().is_some()
     }

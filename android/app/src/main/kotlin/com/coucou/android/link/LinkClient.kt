@@ -22,6 +22,8 @@ interface LinkListener {
     fun onSessions(sessions: List<SessionInfo>) {}
     fun onApproval(request: ApprovalRequest) {}
     fun onApprovalResolved(fingerprint: String) {}
+    /** A question to answer (only with the `answers` capability). It is removed by [onApprovalResolved] with the same fingerprint. */
+    fun onQuestion(request: QuestionRequest) {}
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
@@ -40,6 +42,9 @@ interface DesktopLink {
     fun retryNow() {}
     /** allow/deny for a pending approval; false if unknown, expired, already decided or not connected. */
     fun decide(fingerprint: String, allow: Boolean): Boolean
+
+    /** Sends the picks for a question; false if the link is down or the computer did not offer `answers`. */
+    fun answer(fingerprint: String, picks: List<List<String>>): Boolean = false
 
     // Chat through the computer (docs/ANDROID_LINK.md). Not offered by the demo.
     fun chatModels() {}
@@ -93,6 +98,8 @@ class LinkClient(
     @Volatile private var running = false
     /** Set by an auth or version error: retrying with the same pairing can never work. */
     @Volatile private var fatal = false
+    /** The computer's welcome offered `answers` on this connection. */
+    @Volatile private var answersOffered = false
     @Volatile private var socket: Socket? = null
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
@@ -162,6 +169,9 @@ class LinkClient(
         }
     }
 
+    override fun answer(fingerprint: String, picks: List<List<String>>): Boolean =
+        answersOffered && Protocol.CAP_ANSWERS in caps && queue(ClientMsg.Answer(fingerprint, picks))
+
     override fun chatModels() { queue(ClientMsg.ChatModels) }
     override fun chatSend(id: String, model: String, text: String) = queue(ClientMsg.ChatSend(id, model, text))
     override fun chatCancel(id: String) { queue(ClientMsg.ChatCancel(id)) }
@@ -199,6 +209,7 @@ class LinkClient(
                 // stop() was called
             } finally {
                 out = null
+                answersOffered = false
                 runCatching { socket?.close() }
                 socket = null
                 approvals.clear()
@@ -237,6 +248,7 @@ class LinkClient(
                     if (msg.version != Protocol.VERSION) { listener.onError("version", "desktop speaks v${msg.version}"); fatal = true; return }
                     listener.onState(LinkState.CONNECTED)
                     listener.onWelcome(msg.desktopName, msg.os)
+                    answersOffered = Protocol.CAP_ANSWERS in msg.caps
                     listener.onCaps(msg.caps)
                     // Told what it may use right away, so the Chat screen has its list when it opens.
                     if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
@@ -244,6 +256,8 @@ class LinkClient(
                 is ServerMsg.Sessions -> listener.onSessions(msg.sessions)
                 is ServerMsg.Approval -> { approvals.add(msg.request); listener.onApproval(msg.request) }
                 is ServerMsg.ApprovalResolved -> { approvals.resolve(msg.fingerprint); listener.onApprovalResolved(msg.fingerprint) }
+                // Only offered to a phone that asked and was offered `answers`; ignored from a computer that did not.
+                is ServerMsg.Question -> if (answersOffered && Protocol.CAP_ANSWERS in caps) listener.onQuestion(msg.request)
                 ServerMsg.Pong -> {}
                 is ServerMsg.ChatModels -> listener.onChatModels(msg.models)
                 is ServerMsg.ChatDelta -> listener.onChatDelta(msg.id, msg.text)

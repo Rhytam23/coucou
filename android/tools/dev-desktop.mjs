@@ -2,11 +2,15 @@
 // A pretend Coucou desktop for developing and testing the Android app without the real one.
 // Speaks docs/ANDROID_LINK.md (v1): TLS with a self-signed certificate, newline-delimited JSON.
 //
-//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details]
+//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details] [--answers]
 //
 // --details offers the "details" capability: the sessions then carry steps, finalLine, project (a folder
 // name) and color, like the real desktop with "Show session details on the phone" turned on. A phone that
 // did not ask for it gets the plain v1 sessions.
+//
+// --answers offers the "answers" capability: the scripted run then asks a FAKE question (two questions,
+// one single choice and one multi-select) and accepts an `answer` message, checked like the real desktop
+// (exact labels, one pick for a single choice, 1..n different picks for a multi-select).
 //
 // --fake-chat offers the "chat" capability with a FAKE provider, so the phone's Chat screen can be tried
 // without a key and without spending anything. Models: fake/echo, fake/other. Special messages:
@@ -95,12 +99,32 @@ const CHAT_WINDOW_MS = 10 * 60 * 1000;
 const CHAT_PIECE = 8 * 1024;
 const chatSends = [];
 
+const FAKE_QUESTIONS = [
+  { question: "Which branch should I use?", multiSelect: false, options: [{ label: "main", description: "The default branch" }, { label: "develop", description: "" }] },
+  { question: "Which checks should I run?", multiSelect: true, options: [{ label: "Lint", description: "" }, { label: "Tests", description: "Unit tests" }, { label: "Build", description: "" }] },
+];
+
+// The same rules as phone_link/hub.rs: one list per question, labels exactly as offered and different;
+// exactly one for a single choice, at least one for a multi-select.
+function validPicks(questions, picks) {
+  if (!Array.isArray(picks) || picks.length !== questions.length) return null;
+  for (let i = 0; i < questions.length; i++) {
+    const p = picks[i];
+    const labels = questions[i].options.map((o) => o.label);
+    if (!Array.isArray(p) || p.length < 1 || new Set(p).size !== p.length) return null;
+    if (!p.every((x) => typeof x === "string" && labels.includes(x))) return null;
+    if (!questions[i].multiSelect && p.length !== 1) return null;
+  }
+  return picks;
+}
+
 function script(now) {
   const s = (pillId, agent, state, statusText, stepIndex, stepCount) => ({ pillId, agent, state, statusText, stepIndex, stepCount, updatedAt: now });
   return [
     [s("integration_claude", "Claude Code", "thinking", "Reading the project", 1, 6)],
     [s("integration_claude", "Claude Code", "working", "Editing files", 2, 6), s("agent_codex", "Codex", "searching", "Searching the code", 1, 4)],
     "approval",
+    ...(flag("answers") ? ["question"] : []),
     [s("integration_claude", "Claude Code", "working", "Building", 4, 6), s("agent_codex", "Codex", "question", "Which branch?", 3, 4)],
     [s("integration_claude", "Claude Code", "finished", "Done", 6, 6), s("agent_codex", "Codex", "error", "Tests failed", 3, 4)],
     [s("agent_gemini", "Gemini CLI", "sleeping", "Idle", 0, 0)],
@@ -118,6 +142,8 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
   let step = 0;
   let chat = false; // negotiated in the hello
   let details = false;
+  let answers = false;
+  let asked = null; // { fingerprint, questions }
   const sessionsMsg = (list) => ({ type: "sessions", sessions: details ? withDetails(list) : list });
   let run = null; // { id, timer }
   const chatError = (id, reason) => send({ type: "chatError", id, reason, message: CHAT_REASONS[reason] ?? "Something went wrong on the computer." });
@@ -169,7 +195,16 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
     const entries = script(Date.now());
     const e = entries[step % entries.length];
     step++;
-    if (e === "approval") {
+    if (e === "question") {
+      const questions = FAKE_QUESTIONS;
+      const fp = fingerprint("integration_claude", "dev_session", "AskUserQuestion", JSON.stringify(questions), `q${step}`);
+      asked = { fingerprint: fp, questions };
+      send(sessionsMsg([
+        { pillId: "integration_claude", agent: "Claude Code", state: "question", statusText: "Asking you a question", stepIndex: 3, stepCount: 6, updatedAt: Date.now() },
+      ]));
+      send({ type: "question", pillId: "integration_claude", fingerprint: fp, createdAt: Date.now(), questions });
+      log(`QUESTION sent ${fp}`);
+    } else if (e === "approval") {
       const command = "npm run build";
       const fp = fingerprint("integration_claude", "dev_session", "Bash", command, `n${step}`);
       pending = { fingerprint: fp };
@@ -195,7 +230,8 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       log(`HELLO ok device=${JSON.stringify(m.device)}`);
       chat = flag("fake-chat") && Array.isArray(m.caps) && m.caps.includes("chat");
       details = flag("details") && Array.isArray(m.caps) && m.caps.includes("details");
-      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : [])];
+      answers = flag("answers") && Array.isArray(m.caps) && m.caps.includes("answers");
+      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : []), ...(answers ? ["answers"] : [])];
       send({ type: "welcome", v: V, desktop: NAME, os: process.platform, ...(offered.length ? { caps: offered } : {}) });
       advance();
       timer = setInterval(advance, STEP_MS);
@@ -212,6 +248,18 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       }
       case "chatReset": {
         if (chat) { if (run) { const id = run.id; stopRun(); chatError(id, "canceled"); } log("CHAT reset"); }
+        return;
+      }
+      case "answer": {
+        const picks = answers && asked && m.fingerprint === asked.fingerprint ? validPicks(asked.questions, m.picks) : null;
+        if (picks) {
+          log(`ANSWER accepted ${m.fingerprint} (${picks.length} question(s))`); // the labels are not logged
+          send({ type: "approvalResolved", fingerprint: asked.fingerprint });
+          asked = null;
+          if (flag("once")) setTimeout(() => process.exit(0), 200);
+        } else {
+          log(`ANSWER refused ${m.fingerprint}`);
+        }
         return;
       }
       case "decision": {

@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -130,6 +130,39 @@ class DebugPillReceiver : BroadcastReceiver() {
                 names.forEachIndexed { i, (agent, cmd) ->
                     model.recordDecision(com.coucou.android.core.Decision(agent, "Bash", cmd, allowed = i != 2, atMs = now - i * 3_600_000L))
                 }
+            }
+            // A question with two parts that can be answered here, with the screen lock, without a computer:
+            //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind askquestion
+            "askquestion" -> {
+                model.onSessions(listOf(session(BotState.WORKING, "Working")))
+                model.onSessions(listOf(session(BotState.QUESTION, "Which search engine?")))
+                model.debugQuestion(
+                    "agent_gemini",
+                    com.coucou.android.link.QuestionRequest(
+                        "agent_gemini", "f".repeat(64),
+                        listOf(
+                            com.coucou.android.link.AskedQuestion(
+                                "Which search engine?",
+                                listOf(
+                                    com.coucou.android.link.AskedOption("Postgres full-text", "Built in, no new service"),
+                                    com.coucou.android.link.AskedOption("Meilisearch", "Typo tolerant, one more thing to run"),
+                                    com.coucou.android.link.AskedOption("Algolia", "Hosted"),
+                                ),
+                                multiSelect = false,
+                            ),
+                            com.coucou.android.link.AskedQuestion(
+                                "Which extras do you want?",
+                                listOf(
+                                    com.coucou.android.link.AskedOption("Typo tolerance", ""),
+                                    com.coucou.android.link.AskedOption("Facets", "Filter by category"),
+                                    com.coucou.android.link.AskedOption("Synonyms", ""),
+                                ),
+                                multiSelect = true,
+                            ),
+                        ),
+                        now,
+                    ),
+                )
             }
             "approval" -> model.onApproval(
                 ApprovalRequest("agent_gemini", "debug-$now", "Bash", "rm -rf node_modules && npm install", now),

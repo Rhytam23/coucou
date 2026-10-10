@@ -17,10 +17,14 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details")
+    val CAPABILITIES = listOf("chat", "details", "answers")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
+    /** Answering the questions Claude Code asks, from the phone (each answer confirmed with the screen lock). */
+    const val CAP_ANSWERS = "answers"
+    const val MAX_QUESTIONS = 4
+    const val MAX_OPTIONS = 8
     const val MAX_STEPS = 20
     const val MAX_STEP_CHARS = 200
     const val MAX_PROJECT_CHARS = 64
@@ -56,11 +60,21 @@ data class ApprovalRequest(
     val createdAtMs: Long,
 )
 
+/** One option of a question Claude Code asked. */
+data class AskedOption(val label: String, val description: String)
+
+/** One question of an AskUserQuestion call. */
+data class AskedQuestion(val question: String, val options: List<AskedOption>, val multiSelect: Boolean)
+
+/** A question waiting for an answer (cap `answers`). */
+data class QuestionRequest(val pillId: String, val fingerprint: String, val questions: List<AskedQuestion>, val createdAtMs: Long)
+
 sealed interface ServerMsg {
     data class Welcome(val version: Int, val desktopName: String, val os: String, val caps: Set<String> = emptySet()) : ServerMsg
     data class Sessions(val sessions: List<SessionInfo>) : ServerMsg
     data class Approval(val request: ApprovalRequest) : ServerMsg
     data class ApprovalResolved(val fingerprint: String) : ServerMsg
+    data class Question(val request: QuestionRequest) : ServerMsg
     data object Pong : ServerMsg
     data class ChatModels(val models: List<ChatModel>) : ServerMsg
     /** [text] is appended to the answer being written. */
@@ -78,6 +92,8 @@ sealed interface ClientMsg {
     data class Decision(val fingerprint: String, val allow: Boolean) : ClientMsg
     data object Ping : ClientMsg
     data object Bye : ClientMsg
+    /** [picks]: one list of labels per question, in order (exactly one for a single choice). */
+    data class Answer(val fingerprint: String, val picks: List<List<String>>) : ClientMsg
     data object ChatModels : ClientMsg
     data class ChatSend(val id: String, val model: String, val text: String) : ClientMsg
     data class ChatCancel(val id: String) : ClientMsg
@@ -98,6 +114,8 @@ object Wire {
                 .put("decision", if (m.allow) "allow" else "deny")
             ClientMsg.Ping -> o.put("type", "ping")
             ClientMsg.Bye -> o.put("type", "bye")
+            is ClientMsg.Answer -> o.put("type", "answer").put("fingerprint", m.fingerprint)
+                .put("picks", JSONArray(m.picks.map { JSONArray(it) }))
             ClientMsg.ChatModels -> o.put("type", "chatModels")
             is ClientMsg.ChatSend -> o.put("type", "chatSend").put("id", m.id).put("model", m.model).put("text", m.text)
             is ClientMsg.ChatCancel -> o.put("type", "chatCancel").put("id", m.id)
@@ -124,6 +142,7 @@ object Wire {
                     ),
                 )
                 "approvalResolved" -> ServerMsg.ApprovalResolved(o.getString("fingerprint"))
+                "question" -> question(o)?.let { ServerMsg.Question(it) }
                 "pong" -> ServerMsg.Pong
                 "chatModels" -> ServerMsg.ChatModels(o.getJSONArray("models").objects().mapNotNull(::chatModel))
                 "chatDelta" -> ServerMsg.ChatDelta(chatId(o), o.getString("text"))
@@ -152,6 +171,23 @@ object Wire {
         project = folderName(o.optString("project", "")),
         color = o.optString("color", "").takeIf { isColor(it) },
     )
+
+    /**
+     * A question as the computer offers it, or null if it breaks the limits (the computer would not send such a
+     * one): 1 to 4 questions, each with 1 to 8 options that have different, non-blank labels.
+     */
+    private fun question(o: JSONObject): QuestionRequest? {
+        val fingerprint = o.getString("fingerprint").also { require(isFingerprint(it)) }
+        val items = o.getJSONArray("questions").objects().map { q ->
+            val options = q.getJSONArray("options").objects().map { AskedOption(it.getString("label"), it.optString("description", "")) }
+            AskedQuestion(q.getString("question"), options, q.optBoolean("multiSelect", false))
+        }
+        val ok = items.isNotEmpty() && items.size <= Protocol.MAX_QUESTIONS && items.all { i ->
+            i.question.isNotBlank() && i.options.isNotEmpty() && i.options.size <= Protocol.MAX_OPTIONS &&
+                i.options.all { it.label.isNotBlank() } && i.options.map { it.label }.distinct().size == i.options.size
+        }
+        return if (ok) QuestionRequest(o.getString("pillId"), fingerprint, items, o.optLong("createdAt", 0)) else null
+    }
 
     /** Strings of a JSON array, in order; anything else in it is skipped. */
     private fun stringList(a: JSONArray?): List<String> =

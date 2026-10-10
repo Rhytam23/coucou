@@ -3372,6 +3372,28 @@
    "ru": "Телефон сам находит этот компьютер снова, когда сеть меняется. Компьютер объявляется в вашей локальной сети только пока этот переключатель включён. Некоторые точки доступа и гостевые сети это блокируют.",
    "id": "Ponsel Anda menemukan komputer ini lagi secara otomatis saat jaringan berubah. Komputer ini hanya diumumkan di jaringan lokal Anda selama sakelar ini aktif. Beberapa hotspot dan jaringan tamu memblokirnya."
   },
+  "Let the phone answer Claude Code's questions": {
+   "zh-Hans": "允许手机回答 Claude Code 的提问",
+   "hi": "फ़ोन को Claude Code के सवालों के जवाब देने दें",
+   "es": "Dejar que el teléfono responda a las preguntas de Claude Code",
+   "ar": "السماح للهاتف بالإجابة عن أسئلة Claude Code",
+   "fr": "Laisser le téléphone répondre aux questions de Claude Code",
+   "bn": "ফোনকে Claude Code-এর প্রশ্নের উত্তর দিতে দিন",
+   "pt-BR": "Deixar o celular responder às perguntas do Claude Code",
+   "ru": "Разрешить телефону отвечать на вопросы Claude Code",
+   "id": "Izinkan ponsel menjawab pertanyaan Claude Code"
+  },
+  "The phone shows each question with its options. Every answer is confirmed with the phone's fingerprint or screen lock.": {
+   "zh-Hans": "手机会显示每个问题及其选项。每个回答都需要用手机的指纹或锁屏来确认。",
+   "hi": "फ़ोन हर सवाल को उसके विकल्पों के साथ दिखाता है। हर जवाब की पुष्टि फ़ोन के फ़िंगरप्रिंट या स्क्रीन लॉक से होती है।",
+   "es": "El teléfono muestra cada pregunta con sus opciones. Cada respuesta se confirma con la huella o el bloqueo de pantalla del teléfono.",
+   "ar": "يعرض الهاتف كل سؤال مع خياراته. يتم تأكيد كل إجابة ببصمة الهاتف أو قفل الشاشة.",
+   "fr": "Le téléphone affiche chaque question avec ses options. Chaque réponse est confirmée avec l'empreinte ou le verrouillage d'écran du téléphone.",
+   "bn": "ফোন প্রতিটি প্রশ্ন তার বিকল্পসহ দেখায়। প্রতিটি উত্তর ফোনের ফিঙ্গারপ্রিন্ট বা স্ক্রিন লক দিয়ে নিশ্চিত করা হয়।",
+   "pt-BR": "O celular mostra cada pergunta com suas opções. Cada resposta é confirmada com a digital ou o bloqueio de tela do celular.",
+   "ru": "Телефон показывает каждый вопрос с вариантами. Каждый ответ подтверждается отпечатком пальца или блокировкой экрана телефона.",
+   "id": "Ponsel menampilkan setiap pertanyaan beserta pilihannya. Setiap jawaban dikonfirmasi dengan sidik jari atau kunci layar ponsel."
+  },
   "Android phone": {
    "zh-Hans": "Android 手机",
    "hi": "Android फ़ोन",

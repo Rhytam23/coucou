@@ -83,6 +83,8 @@ pub struct Settings {
     /// The phone may see session details (steps, last line, project folder name, colour). Off until the
     /// user turns it on in Settings → Android phone; owned by the Rust side like `phone_link`.
     pub phone_details: bool,
+    /// Let the phone answer the questions Claude Code asks (cap `answers`). Off by default; owned by Rust like the other phone switches.
+    pub phone_answers: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -142,6 +144,7 @@ impl Default for Settings {
             phone_chat: false,
             phone_chat_models: Vec::new(),
             phone_details: false,
+            phone_answers: false,
         }
     }
 }
@@ -422,7 +425,8 @@ mod tests {
   "phoneLink": true,
   "phoneChat": true,
   "phoneChatModels": ["openai/gpt-x"],
-  "phoneDetails": true
+  "phoneDetails": true,
+  "phoneAnswers": true
 }"##;
 
     fn custom() -> Value {
@@ -563,6 +567,15 @@ mod tests {
         assert_eq!(models.phone_chat_models, vec!["openai/gpt-x".to_string()]);
         let bad = parse(&custom_with("phoneChatModels", Some(serde_json::json!("openai/gpt-x")))).unwrap();
         assert!(bad.phone_chat_models.is_empty());
+    }
+
+    #[test]
+    fn a_file_from_before_phone_answers_keeps_it_off() {
+        // Answering for the agent from the phone is never on by default; an older file is not consent.
+        assert!(!Settings::default().phone_answers);
+        assert!(!parse(&custom_with("phoneAnswers", None)).unwrap().phone_answers);
+        assert!(parse(&custom_with("phoneAnswers", Some(serde_json::json!(true)))).unwrap().phone_answers);
+        assert!(!parse(&custom_with("phoneAnswers", Some(serde_json::json!("yes")))).unwrap().phone_answers, "a wrong type does not switch it on");
     }
 
     #[test]
@@ -878,6 +891,7 @@ mod tests {
                 "phoneChat",
                 "phoneChatModels",
                 "phoneDetails",
+                "phoneAnswers",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

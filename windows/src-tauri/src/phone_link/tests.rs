@@ -28,10 +28,13 @@ fn block_on<F: Future>(f: F) -> F::Output {
 }
 
 #[derive(Default)]
-struct Recorder(Mutex<Vec<(String, bool)>>);
+struct Recorder(Mutex<Vec<(String, bool)>>, Mutex<Vec<(String, Value)>>);
 impl Host for Recorder {
     fn decide(&self, request_id: &str, allow: bool) {
         self.0.lock().unwrap().push((request_id.to_string(), allow));
+    }
+    fn answer(&self, request_id: &str, answers: &serde_json::Map<String, Value>) {
+        self.1.lock().unwrap().push((request_id.to_string(), Value::Object(answers.clone())));
     }
 }
 
@@ -1039,6 +1042,215 @@ mod details_tests {
             rig.hub.publish(sessions, None, server::now_ms());
             let (_c, _, line) = phone(&rig, Some(json!(["details"]))).await;
             assert_eq!(line["sessions"].as_array().unwrap().len(), 16);
+        });
+    }
+}
+
+
+// ── Answering questions (cap `answers`) end to end ───────────────────────────────────────────
+
+mod answers_tests {
+    use super::*;
+    use crate::phone_link::hub::{OptionIn, QuestionIn, QuestionItemIn};
+    use crate::phone_link::server::Features;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Switch(AtomicBool);
+    impl Features for Switch {
+        fn details(&self) -> bool {
+            false
+        }
+        fn answers(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    fn opt(l: &str) -> OptionIn {
+        OptionIn { label: l.into(), description: format!("about {l}") }
+    }
+
+    fn question(request: &str) -> QuestionIn {
+        QuestionIn {
+            request_id: request.into(),
+            session_id: "s1".into(),
+            pill_id: "integration_claude".into(),
+            questions: vec![
+                QuestionItemIn { question: "Which engine?".into(), options: vec![opt("Postgres"), opt("Meilisearch")], multi_select: false },
+                QuestionItemIn { question: "Which extras?".into(), options: vec![opt("Typos"), opt("Facets"), opt("Synonyms")], multi_select: true },
+            ],
+        }
+    }
+
+    async fn rig(on: bool) -> Rig {
+        Rig::start_full(None, Arc::new(Switch(AtomicBool::new(on)))).await
+    }
+
+    async fn phone(rig: &Rig, caps: Option<Value>) -> (Client, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        (c, welcome)
+    }
+
+    /// Everything the phone is sent up to the answer to a ping: proves what it was and was not told.
+    async fn types_until_pong(c: &mut Client) -> Vec<String> {
+        c.send(json!({ "type": "ping" })).await;
+        let mut seen = Vec::new();
+        for _ in 0..10 {
+            let m = c.recv().await.expect("closed");
+            let t = m["type"].as_str().unwrap_or("").to_string();
+            if t == "pong" {
+                return seen;
+            }
+            seen.push(t);
+        }
+        panic!("no pong");
+    }
+
+    fn answers_of(rig: &Rig) -> Vec<(String, Value)> {
+        rig.host.1.lock().unwrap().clone()
+    }
+
+    #[test]
+    fn a_phone_that_asks_is_offered_answers_only_while_the_switch_is_on() {
+        block_on(async {
+            let on = rig(true).await;
+            let (_c, welcome) = phone(&on, Some(json!(["answers"]))).await;
+            assert_eq!(welcome["caps"], json!(["answers"]));
+            let off = rig(false).await;
+            let (_c, welcome) = phone(&off, Some(json!(["answers"]))).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+        });
+    }
+
+    #[test]
+    fn the_question_reaches_a_phone_with_the_capability_and_no_other() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut with, _) = phone(&rig, Some(json!(["answers"]))).await;
+            let (mut old, _) = phone(&rig, None).await;
+            rig.hub.publish_question(Some(question("r1")), server::now_ms());
+            let q = with.expect("question").await;
+            assert_eq!(q["questions"][0]["question"], "Which engine?");
+            assert_eq!(q["questions"][1]["multiSelect"], true);
+            assert_eq!(q["questions"][0]["options"][1]["label"], "Meilisearch");
+            assert!(q["fingerprint"].as_str().unwrap().len() == 64);
+            assert!(q.get("requestId").is_none() && !q.to_string().contains("r1"), "the island's request id stays on the computer");
+            // the older phone is told nothing, not even that something was resolved
+            rig.hub.publish_question(None, server::now_ms());
+            assert_eq!(with.expect("approvalResolved").await["fingerprint"], q["fingerprint"]);
+            let told = types_until_pong(&mut old).await;
+            assert!(!told.iter().any(|t| t == "question" || t == "approvalResolved"), "{told:?}");
+        });
+    }
+
+    #[test]
+    fn a_phone_that_connects_late_still_gets_the_question_that_waits() {
+        block_on(async {
+            let rig = rig(true).await;
+            rig.hub.publish_question(Some(question("r1")), server::now_ms());
+            let (mut c, _) = phone(&rig, Some(json!(["answers"]))).await;
+            assert_eq!(c.expect("question").await["questions"].as_array().unwrap().len(), 2);
+        });
+    }
+
+    #[test]
+    fn a_valid_answer_goes_back_to_the_agent_in_the_shape_of_the_island() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut c, _) = phone(&rig, Some(json!(["answers"]))).await;
+            rig.hub.publish_question(Some(question("r1")), server::now_ms());
+            let q = c.expect("question").await;
+            c.send(json!({ "type": "answer", "fingerprint": q["fingerprint"], "picks": [["Meilisearch"], ["Typos", "Synonyms"]] })).await;
+            c.expect("approvalResolved").await;
+            let got = answers_of(&rig);
+            assert_eq!(got.len(), 1);
+            assert_eq!(got[0].0, "r1");
+            assert_eq!(got[0].1, json!({ "Which engine?": "Meilisearch", "Which extras?": ["Typos", "Synonyms"] }));
+            // once only
+            c.send(json!({ "type": "answer", "fingerprint": q["fingerprint"], "picks": [["Postgres"], ["Facets"]] })).await;
+            c.send(json!({ "type": "ping" })).await;
+            c.expect("pong").await;
+            assert_eq!(answers_of(&rig).len(), 1);
+        });
+    }
+
+    #[test]
+    fn a_wrong_answer_changes_nothing_and_the_question_stays_open() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut c, _) = phone(&rig, Some(json!(["answers"]))).await;
+            rig.hub.publish_question(Some(question("r1")), server::now_ms());
+            let fp = c.expect("question").await["fingerprint"].clone();
+            let bad = [
+                json!([["Postgres"]]),                              // one pick too few
+                json!([["Mongo"], ["Typos"]]),                      // not an option
+                json!([["postgres"], ["Typos"]]),                   // not the exact label
+                json!([["Postgres", "Meilisearch"], ["Typos"]]),    // two for a single choice
+                json!([["Postgres"], []]),                          // nothing for a multiple choice
+                json!([["Postgres"], ["Typos", "Typos"]]),          // the same twice
+                json!([["Postgres"], "Typos"]),                     // wrong shape
+                json!("Postgres"),
+                json!([[1], [2]]),
+            ];
+            for picks in bad {
+                c.send(json!({ "type": "answer", "fingerprint": fp, "picks": picks })).await;
+            }
+            c.send(json!({ "type": "answer", "fingerprint": "0".repeat(64), "picks": [["Postgres"], ["Typos"]] })).await;
+            c.send(json!({ "type": "ping" })).await;
+            c.expect("pong").await;
+            assert!(answers_of(&rig).is_empty());
+            // and the right one still works afterwards
+            c.send(json!({ "type": "answer", "fingerprint": fp, "picks": [["Postgres"], ["Facets"]] })).await;
+            c.expect("approvalResolved").await;
+            assert_eq!(answers_of(&rig).len(), 1);
+        });
+    }
+
+    #[test]
+    fn a_phone_without_the_capability_cannot_answer_even_with_the_right_fingerprint() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut with, _) = phone(&rig, Some(json!(["answers"]))).await;
+            let (mut old, _) = phone(&rig, None).await;
+            rig.hub.publish_question(Some(question("r1")), server::now_ms());
+            let fp = with.expect("question").await["fingerprint"].clone();
+            old.send(json!({ "type": "answer", "fingerprint": fp, "picks": [["Postgres"], ["Typos"]] })).await;
+            old.send(json!({ "type": "ping" })).await;
+            old.expect("pong").await;
+            assert!(answers_of(&rig).is_empty());
+        });
+    }
+
+    #[test]
+    fn a_question_that_does_not_fit_the_limits_stays_on_the_island() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut c, _) = phone(&rig, Some(json!(["answers"]))).await;
+            let mut long = question("r1");
+            long.questions[0].options[0].label = "x".repeat(200);
+            rig.hub.publish_question(Some(long), server::now_ms());
+            let mut twins = question("r2");
+            twins.questions[0].options = vec![opt("Same"), opt("Same")];
+            rig.hub.publish_question(Some(twins), server::now_ms());
+            let told = types_until_pong(&mut c).await;
+            assert!(!told.iter().any(|t| t == "question"), "nothing was offered: {told:?}");
+        });
+    }
+
+    #[test]
+    fn a_permission_request_still_reaches_every_phone_as_before() {
+        block_on(async {
+            let rig = rig(true).await;
+            let (mut with, _) = phone(&rig, Some(json!(["answers"]))).await;
+            let (mut old, _) = phone(&rig, None).await;
+            rig.approval("r9", "ls", 0);
+            assert_eq!(with.expect("approval").await["tool"], "Bash");
+            assert_eq!(old.expect("approval").await["tool"], "Bash");
         });
     }
 }

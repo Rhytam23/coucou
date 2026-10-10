@@ -222,3 +222,55 @@ test("a session with nothing to add has no empty details", () => {
     assert.equal(s.project, undefined);
   }
 });
+
+test("a question goes to the phone as its own message, with the options and nothing else of the request", () => {
+  assert.equal(linkSnapshot().question, null);
+  State.beginApproval({
+    requestId: "q1", sessionId: "s1", pillId: CLAUDE, tool: "AskUserQuestion", command: "Which branch?",
+    questions: [
+      { question: "Which branch?", options: [{ label: "main", description: "the default" }, { label: "dev", description: "" }], multiSelect: false },
+      { question: "Which checks?", options: [{ label: "lint", description: "style" }], multiSelect: true },
+    ],
+  });
+  const snap = linkSnapshot();
+  assert.equal(snap.approval, null, "it is not a permission request");
+  assert.deepEqual(snap.question, {
+    requestId: "q1", sessionId: "s1", pillId: CLAUDE,
+    questions: [
+      { question: "Which branch?", options: [{ label: "main", description: "the default" }, { label: "dev", description: "" }], multiSelect: false },
+      { question: "Which checks?", options: [{ label: "lint", description: "style" }], multiSelect: true },
+    ],
+  });
+  assert.ok(!JSON.stringify(snap.question).includes("command"), "the island's command text is not part of it");
+});
+
+test("a request without an id, or a question without options, is not offered", () => {
+  State.beginApproval({ requestId: "", sessionId: "s1", pillId: CLAUDE, tool: "AskUserQuestion", command: "x", questions: [{ question: "A?", options: [{ label: "y", description: "" }], multiSelect: false }] });
+  assert.equal(linkSnapshot().question, null);
+  State.endApproval();
+  State.beginApproval({ requestId: "q2", sessionId: "s1", pillId: CLAUDE, tool: "AskUserQuestion", command: "x", questions: [] });
+  assert.equal(linkSnapshot().question, null);
+});
+
+test("the question is published when it appears and withdrawn when it is answered, and not repeated", async () => {
+  dispose = registerPhoneLink(island);
+  await settle();
+  tick(250);
+  const q = () => sent("phone_link_publish_question");
+  assert.equal(q().length, 1, "the hub is told there is none when the link comes up");
+  assert.equal(q()[0].question, null);
+
+  State.beginApproval({ requestId: "q1", sessionId: "s1", pillId: CLAUDE, tool: "AskUserQuestion", command: "x", questions: [{ question: "A?", options: [{ label: "y", description: "" }], multiSelect: false }] });
+  tick(250);
+  assert.equal(q().length, 2);
+  assert.equal(q()[1].question.requestId, "q1");
+
+  State.notify();
+  tick(250);
+  assert.equal(q().length, 2, "unchanged: not sent again");
+
+  State.endApproval();
+  tick(250);
+  assert.equal(q().length, 3);
+  assert.equal(q()[2].question, null);
+});

@@ -55,6 +55,14 @@ struct TauriHost {
 }
 
 impl Host for TauriHost {
+    fn answer(&self, request_id: &str, answers: &serde_json::Map<String, serde_json::Value>) {
+        log::line(format!("phone link: answered a question id={request_id}")); // never what was picked
+        recap::forget_request(&self.app, request_id);
+        let map: std::collections::HashMap<String, serde_json::Value> = answers.clone().into_iter().collect();
+        pipe::answer_question(&self.app, request_id, &map);
+        let _ = self.app.emit_to(island::WINDOW_LABEL, "phone-link-decided", request_id.to_string());
+    }
+
     fn decide(&self, request_id: &str, allow: bool) {
         let word = if allow { "allow" } else { "deny" };
         log::line(format!("phone link: decision id={request_id} {word}"));
@@ -80,6 +88,9 @@ struct TauriFeatures {
 impl server::Features for TauriFeatures {
     fn details(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_details
+    }
+    fn answers(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_answers
     }
 }
 
@@ -312,6 +323,44 @@ pub fn phone_details_set_enabled(
     Ok(DetailsStatus { enabled })
 }
 
+// ── Answering questions from the phone: the switch (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswersStatus {
+    pub enabled: bool,
+}
+
+#[tauri::command]
+pub fn phone_answers_status(shared: State<Shared>) -> AnswersStatus {
+    AnswersStatus { enabled: shared.settings.lock().unwrap().phone_answers }
+}
+
+/// "Let the phone answer Claude Code's questions". Off by default. A change disconnects the phones once so they
+/// reconnect and are told (or not) about the capability. The phone confirms every answer with its screen lock.
+#[tauri::command]
+pub fn phone_answers_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<AnswersStatus, String> {
+    only_settings(&window)?;
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_answers = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "answers setting changed");
+    log::line(format!("phone link: answering questions {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(AnswersStatus { enabled })
+}
+
 // ── Chat from the phone: the switch and the list of models (Settings → Android phone) ──
 
 #[derive(Serialize)]
@@ -388,6 +437,15 @@ pub fn phone_chat_set_models(
     Ok(status)
 }
 
+/// The question Claude Code is waiting on (None: none), for phones that may answer it.
+#[tauri::command]
+pub fn phone_link_publish_question(link: State<PhoneLink>, question: Option<hub::QuestionIn>) {
+    if link.running.lock().unwrap().is_none() {
+        return;
+    }
+    link.hub.publish_question(question, server::now_ms());
+}
+
 /// The island's picture of its sessions and of the request waiting for an answer.
 #[tauri::command]
 pub fn phone_link_publish(link: State<PhoneLink>, sessions: Vec<SessionIn>, approval: Option<ApprovalIn>) {
@@ -397,7 +455,6 @@ pub fn phone_link_publish(link: State<PhoneLink>, sessions: Vec<SessionIn>, appr
     link.hub.publish(sessions, approval, server::now_ms());
 }
 
-/// Called once at launch: the link comes back if the user had turned it on.
 /// The app is quitting: withdraw the announcement so phones forget this computer at once.
 pub fn stop_on_exit(app: &AppHandle) {
     if let Some(link) = app.try_state::<PhoneLink>() {
@@ -405,6 +462,7 @@ pub fn stop_on_exit(app: &AppHandle) {
     }
 }
 
+/// Called once at launch: the link comes back if the user had turned it on.
 pub fn start_if_enabled(app: &AppHandle) {
     let enabled = app.state::<Shared>().settings.lock().unwrap().phone_link;
     if enabled {

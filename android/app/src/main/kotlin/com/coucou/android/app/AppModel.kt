@@ -32,6 +32,7 @@ import com.coucou.android.core.ChatModels
 import com.coucou.android.core.ChatSession
 import com.coucou.android.link.AddressFinder
 import com.coucou.android.link.ApprovalRequest
+import com.coucou.android.link.QuestionRequest
 import com.coucou.android.link.Cancelable
 import com.coucou.android.link.Discovery
 import com.coucou.android.link.DiscoveryPolicy
@@ -61,6 +62,8 @@ class AppModel(private val context: Context) : LinkListener {
     var desktopName by mutableStateOf<String?>(null); private set
     var sessions by mutableStateOf<List<SessionInfo>>(emptyList()); private set
     var approvals by mutableStateOf<List<ApprovalRequest>>(emptyList()); private set
+    /** Questions Claude Code asks that this phone may answer (only with the `answers` capability); kept in memory, never written. */
+    var questions by mutableStateOf<List<QuestionRequest>>(emptyList()); private set
     var message by mutableStateOf<String?>(null)
 
     // ── Finding the computer again when its address changed (docs/ANDROID_LINK.md, "Finding the computer") ──
@@ -456,6 +459,8 @@ class AppModel(private val context: Context) : LinkListener {
 
     /** Every card goes: the desktop offers a request again if it is still pending once we reconnect. */
     private fun dropApprovals() {
+        questions.forEach { expiry.remove(it.fingerprint)?.let { r -> main.removeCallbacks(r) } }
+        questions = emptyList()
         overlay.hide()
         expiry.values.forEach { main.removeCallbacks(it) }
         expiry.clear()
@@ -551,8 +556,47 @@ class AppModel(private val context: Context) : LinkListener {
         }
     }
 
+    override fun onQuestion(request: QuestionRequest) {
+        main.post {
+            questions = questions.filter { it.fingerprint != request.fingerprint } + request
+            // Offered for 120 s from now, like an approval; the computer drops it at 115 s.
+            expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
+            val gone = Runnable { removeQuestion(request.fingerprint) }
+            expiry[request.fingerprint] = gone
+            main.postDelayed(gone, Protocol.APPROVAL_TTL_MS)
+        }
+    }
+
+    private fun removeQuestion(fingerprint: String) {
+        expiry.remove(fingerprint)?.let { main.removeCallbacks(it) }
+        questions = questions.filter { it.fingerprint != fingerprint }
+    }
+
+    private var answersLocal = false
+
+    /** Debug receiver only: a sample question with two parts, answerable here without a computer. */
+    internal fun debugQuestion(pillId: String, request: QuestionRequest) {
+        answersLocal = true
+        questions = questions.filter { it.fingerprint != request.fingerprint } + request
+    }
+
+    /** The question of this agent, if one waits for the phone's answer. */
+    fun questionFor(pillId: String): QuestionRequest? = questions.firstOrNull { it.pillId == pillId }
+
+    /**
+     * Sends the picks; the lock check has already happened in the UI (BiometricGate). True if it was sent. What was
+     * picked is not logged, not stored and not put in the history.
+     */
+    fun answerQuestion(fingerprint: String, picks: List<List<String>>): Boolean {
+        // Debug sample only (see debugQuestion): there is no computer to send to, so a tap simply completes.
+        val sent = if (answersLocal && link == null) true else link?.answer(fingerprint, picks) ?: false
+        if (sent) removeQuestion(fingerprint)
+        return sent
+    }
+
     override fun onApprovalResolved(fingerprint: String) {
         main.post {
+            removeQuestion(fingerprint)
             removeApproval(fingerprint)
             if (wantAllow == fingerprint) wantAllow = null
         }
