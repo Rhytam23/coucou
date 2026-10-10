@@ -1,9 +1,7 @@
 package com.coucou.android.core
 
 /**
- * The redesign's design tokens (android/UX_PLAN.md, section 4) as plain numbers, so a test can check
- * contrast and the scale without Compose. Screens move to them one stage at a time (U1..U8); until a
- * screen is moved it keeps drawing with [Palette] and the Material theme.
+ * The design tokens as plain numbers, so a test can check contrast and the scale without Compose. The app is dark only.
  *
  * Louis Raillé's Mochi, its state colours and the pill colours are not here and are not changed.
  */
@@ -37,16 +35,10 @@ data class Tokens(
             primaryButton = 0xFFF5F6F8, onPrimaryButton = 0xFF0B0C0E, secondaryButton = 0xFF292A2D,
             danger = 0xFFFF8D97, online = 0xFF34D399, washAlpha = 0.5,
         )
-        val LIGHT = Tokens(
-            bg = 0xFFF2F3F5, panel = 0xFFFFFFFF, panel2 = 0xFFEEF0F3, line = 0xFFE3E5E9,
-            text = 0xFF16171B, textDim = 0xFF5F646D, textFaint = 0xFF7A808A,
-            primaryButton = 0xFF16171B, onPrimaryButton = 0xFFFFFFFF, secondaryButton = 0xFFE6E8EC,
-            danger = 0xFFC62828, online = 0xFF0F9F6E, washAlpha = 0.2,
-        )
     }
 }
 
-/** The always-dark surfaces: the hero panel on Home and the island over other apps are black in both themes. */
+/** The black surfaces: the hero panel on Home and the island over other apps. */
 object IslandSurface {
     const val BLACK = 0xFF000000L
     const val PANEL = 0xFF141518L
@@ -59,8 +51,7 @@ object IslandSurface {
 }
 
 /**
- * The link dot colours, one value each for every theme and for the always-dark surfaces: each is visible
- * (3:1 or better) on white paper, on black and on the dark panels. A bright green on white would vanish.
+ * The link dot colours: each is visible (3:1 or better) on black and on the dark panels.
  */
 object StatusPalette {
     const val ONLINE = 0xFF0F9F6EL

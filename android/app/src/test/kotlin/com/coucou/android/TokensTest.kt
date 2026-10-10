@@ -12,9 +12,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The redesign's tokens: readable text on every surface it sits on, in both themes, and a scale that holds together. */
+/** The redesign's tokens: readable text on every surface it sits on, on the dark theme, and a scale that holds together. */
 class TokensTest {
-    private val themes = mapOf("dark" to Tokens.DARK, "light" to Tokens.LIGHT)
+    private val themes = mapOf("dark" to Tokens.DARK)
     private fun c(a: Long, b: Long) = Palette.contrast(a, b)
 
     @Test fun primaryTextIsReadableOnEverySurface() {
@@ -65,8 +65,7 @@ class TokensTest {
         }
     }
 
-    @Test fun theWashIsSofterOnLight() {
-        assertTrue(Tokens.LIGHT.washAlpha < Tokens.DARK.washAlpha)
+    @Test fun theWashIsSoft() {
         assertTrue(Tokens.DARK.washAlpha in 0.3..0.6)
     }
 
@@ -94,8 +93,8 @@ class TokensTest {
         assertEquals(14, Radii.ISLAND_COMPACT)
     }
 
-    @Test fun statusDotsAreVisibleOnPaperBlackAndDarkPanels() {
-        val surfaces = listOf(Tokens.LIGHT.bg, Tokens.LIGHT.panel, Tokens.DARK.bg, Tokens.DARK.panel, IslandSurface.HERO, IslandSurface.BLACK)
+    @Test fun statusDotsAreVisibleOnBlackAndDarkPanels() {
+        val surfaces = listOf(Tokens.DARK.bg, Tokens.DARK.panel, IslandSurface.HERO, IslandSurface.BLACK)
         for (c in listOf(StatusPalette.ONLINE, StatusPalette.BUSY, StatusPalette.OFFLINE)) for (s in surfaces) {
             assertTrue("${c.toString(16)} on ${s.toString(16)}", Palette.contrast(c, s) >= 3.0)
         }

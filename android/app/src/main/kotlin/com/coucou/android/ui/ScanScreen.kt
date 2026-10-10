@@ -118,7 +118,7 @@ fun ScanScreen(onBack: () -> Unit, onText: (String) -> Boolean) {
     )
 
     val backLabel = stringResource(R.string.action_back)
-    // A camera screen: black in both themes, edge to edge, with light text.
+    // A camera screen: black, edge to edge, with light text.
     Column(
         Modifier.fillMaxSize().background(Color(IslandSurface.BLACK)).windowInsetsPadding(WindowInsets.statusBars).padding(horizontal = Gutter),
         verticalArrangement = Arrangement.spacedBy(Gap),

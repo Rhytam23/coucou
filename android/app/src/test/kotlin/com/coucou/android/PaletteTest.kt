@@ -5,9 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** No dark text on a dark background, in either theme: every text colour is readable on the surfaces it sits on. */
+/** No dark text on a dark background: every text colour is readable on the surfaces it sits on (the app is dark only). */
 class PaletteTest {
-    private val themes = mapOf("dark" to Palette.DARK, "light" to Palette.LIGHT)
+    private val themes = mapOf("dark" to Palette.DARK)
 
     @Test fun contrastMath() {
         assertEquals(21.0, Palette.contrast(0xFF000000, 0xFFFFFFFF), 0.01)
@@ -31,9 +31,5 @@ class PaletteTest {
 
     @Test fun cardsAreToldApartFromThePage() {
         for ((name, p) in themes) assertTrue("$name border", Palette.contrast(p.line, p.card) >= 1.1)
-    }
-
-    @Test fun theTwoThemesAreOppositeNotTheSame() {
-        assertTrue(Palette.contrast(Palette.DARK.background, Palette.LIGHT.background) > 10)
     }
 }

@@ -264,7 +264,7 @@ class IslandOverlay(
 
     // ── What is drawn ────────────────────────────────────────────────────────
 
-    // The island is black in both themes: it is the camera hole grown. Colours are the shared always-dark ones.
+    // The island is black: it is the camera hole grown. Colours are the shared always-dark ones.
     private val ink = Color(IslandSurface.BLACK)
     private val dim = Color(IslandSurface.TEXT_DIM)
 

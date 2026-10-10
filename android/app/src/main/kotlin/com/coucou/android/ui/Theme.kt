@@ -1,7 +1,6 @@
 package com.coucou.android.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Card
@@ -9,7 +8,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -23,11 +21,9 @@ import com.coucou.android.core.Tokens
  * The look of the Coucou website (docs/site.css): near-black page, slightly lighter cards with a thin
  * border, soft blue accent, rounded corners and pill-shaped buttons. Mochi itself is untouched.
  */
-private fun scheme(p: Palette, t: Tokens, dark: Boolean): ColorScheme {
-    val base = if (dark) darkColorScheme() else lightColorScheme()
-    // Surfaces and text come from the redesign's tokens, so every screen sits on the same black (or paper)
-    // as the new ones; the accent still comes from Palette until each screen moves over (U2..U6).
-    return base.copy(
+private fun scheme(p: Palette, t: Tokens): ColorScheme {
+    // Surfaces and text come from the tokens, the accent from Palette.
+    return darkColorScheme().copy(
         background = Color(t.bg), surface = Color(t.bg),
         surfaceVariant = Color(t.panel), surfaceContainer = Color(t.panel),
         onBackground = Color(t.text), onSurface = Color(t.text), onSurfaceVariant = Color(t.textDim),
@@ -36,8 +32,7 @@ private fun scheme(p: Palette, t: Tokens, dark: Boolean): ColorScheme {
     )
 }
 
-private val Dark = scheme(Palette.DARK, Tokens.DARK, dark = true)
-private val Light = scheme(Palette.LIGHT, Tokens.LIGHT, dark = false)
+private val Dark = scheme(Palette.DARK, Tokens.DARK)
 
 /** Link status colours (the dot next to "Connected"). */
 object StatusColors {
@@ -48,11 +43,8 @@ object StatusColors {
 
 @Composable
 fun CoucouTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val scheme: ColorScheme = if (dark) Dark else Light
-    // The redesign's tokens ride along; screens that have not moved over still use the Material scheme above.
-    CompositionLocalProvider(LocalTokens provides if (dark) Tokens.DARK else Tokens.LIGHT) {
-        MaterialTheme(colorScheme = scheme, content = content)
+    CompositionLocalProvider(LocalTokens provides Tokens.DARK) {
+        MaterialTheme(colorScheme = Dark, content = content)
     }
 }
 

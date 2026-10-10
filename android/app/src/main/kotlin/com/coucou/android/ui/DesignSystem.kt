@@ -93,7 +93,7 @@ internal fun DrawScope.drawWash(color: Color, alpha: Float) {
     )
 }
 
-/** The hero panel at the top of Home: black in both themes, hanging from the screen's top edge. */
+/** The hero panel at the top of Home: black, hanging from the screen's top edge. */
 @Composable
 fun HeroPanel(modifier: Modifier = Modifier, wash: Color? = null, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(bottomStart = Radii.HERO_BOTTOM.dp, bottomEnd = Radii.HERO_BOTTOM.dp)

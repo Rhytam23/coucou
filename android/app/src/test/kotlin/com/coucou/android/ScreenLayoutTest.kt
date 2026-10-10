@@ -85,11 +85,11 @@ class ScreenLayoutTest {
     @Test fun homeHangsFromTheTopEdgeAndKeepsItsStatusBarIconsLight() {
         assertTrue(main.contains("WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)"))
         assertTrue(homePanel.contains("WindowInsets.statusBars"))
-        assertTrue(main.contains("isAppearanceLightStatusBars = !darkTheme && !(screen == Screen.SCAN || screen == Screen.HOME && model.mode != Mode.NONE)"))
+        assertTrue(main.contains("isAppearanceLightStatusBars = false"))
         // the screens that start at the top edge pad themselves below the status bar
         assertTrue(src("ui/PairingScreen.kt").contains("WindowInsets.statusBars"))
         assertTrue(src("ui/ScanScreen.kt").contains("WindowInsets.statusBars"))
-        assertTrue("the camera screen is black in both themes", src("ui/ScanScreen.kt").contains("background(Color(IslandSurface.BLACK))"))
+        assertTrue("the camera screen is black", src("ui/ScanScreen.kt").contains("background(Color(IslandSurface.BLACK))"))
     }
 
     @Test fun recentIsOnHome() {

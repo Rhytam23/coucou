@@ -64,8 +64,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.core.view.WindowCompat
 import androidx.compose.ui.res.stringResource
@@ -152,10 +150,8 @@ class MainActivity : ComponentActivity() {
         model.resume()
         setContent {
             CoucouTheme {
-                // Home's hero is black in both themes, so its status bar icons stay light there; elsewhere they follow the theme.
-                val view = LocalView.current
-                val darkTheme = isSystemInDarkTheme()
-                SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && !(screen == Screen.SCAN || screen == Screen.HOME && model.mode != Mode.NONE) }
+                // The app is dark only: the status bar icons are always light.
+                SideEffect { WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = false }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.fillMaxSize().windowInsetsPadding(if (screen == Screen.HOME || screen == Screen.SCAN) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom) else WindowInsets.safeDrawing)) {
                         val tabs = Nav.tabs()
