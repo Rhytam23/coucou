@@ -633,7 +633,6 @@ class AppModel(private val context: Context) : LinkListener {
 
     /** Debug: serve this sample for any file instead of asking a computer. */
     internal var debugDiff: ((com.coucou.android.link.FileChange) -> com.coucou.android.core.FileDiffView)? = null
-    internal fun setDebugDiff(provider: ((com.coucou.android.link.FileChange) -> com.coucou.android.core.FileDiffView)?) { debugDiff = provider }
 
     /** Opens the sheet for a file of a session's list and asks the computer for its lines. */
     fun openDiff(pillId: String, file: com.coucou.android.link.FileChange) {

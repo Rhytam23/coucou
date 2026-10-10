@@ -148,7 +148,7 @@ class DebugPillReceiver : BroadcastReceiver() {
                         ),
                     ),
                 )
-                model.setDebugDiff { f ->
+                model.debugDiff = { f ->
                     val rows = when {
                         f.tooLarge -> emptyList()
                         big -> (0 until 200).map { i -> com.coucou.android.link.DiffRow(if (i % 7 == 0) '+' else if (i % 7 == 1) '-' else ' ', "line $i of a long file") }
