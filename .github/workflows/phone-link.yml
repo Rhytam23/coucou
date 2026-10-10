@@ -73,6 +73,25 @@ jobs:
           COUCOU_RUST_INTEROP: '1'
         run: ./gradlew testDebugUnitTest --tests '*RustDesktopInteropTest' --console=plain
 
+  relay:
+    runs-on: ubuntu-24.04
+    defaults: { run: { working-directory: android/relay } }
+    steps:
+      - uses: actions/checkout@v5
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: npm, cache-dependency-path: android/relay/package-lock.json }
+      - run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Relay behaviour (workerd and the Node twin), guards
+        run: npm test
+      - name: Test vectors are up to date
+        run: npm run vectors
+      - name: A deploy builds (nothing is uploaded)
+        env: { WRANGLER_SEND_METRICS: "false" }
+        run: npx wrangler deploy --dry-run --outdir "$RUNNER_TEMP/relay-build"
+
   android:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: android } }

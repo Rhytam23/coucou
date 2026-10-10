@@ -41,7 +41,7 @@ coucou://pair?v=1&host=…&port=…&fp=…&token=…&name=…&relay=<wss URL, pe
 ```
 GET wss://<relay>/v1/room/<room>?role=pc|phone
 Authorization: Bearer <access key, base64url>
-Sec-WebSocket-Protocol: coucou.v1.<K_join, base64url>
+Sec-WebSocket-Protocol: coucou.v1, coucou.join.<K_join, base64url>
 ```
 
 - The relay refuses, **before it creates or contacts any room**, a request whose path is not `/v1/room/` plus exactly 22
@@ -49,10 +49,12 @@ Sec-WebSocket-Protocol: coucou.v1.<K_join, base64url>
   The check is a constant-time comparison of SHA-256 digests. **If the relay has no access key configured it refuses every
   room request (fail closed).** Refusals are `404` (bad path), `401` (access key) or `429` (rate limit); the body is empty.
 - `GET /` answers `200` with the text `Coucou link relay` and needs no key.
-- The relay accepts the upgrade and answers with `Sec-WebSocket-Protocol: coucou.v1`.
+- The client offers both sub-protocols (a strict client requires the server to choose one it offered); the relay accepts the
+  upgrade and answers with `Sec-WebSocket-Protocol: coucou.v1`. A request whose `coucou.join.` value is missing or is not 43
+  base64url characters is refused with `400` before any room is touched.
 - **Join proof, in memory only.** The first live socket of a room records `SHA-256(K_join)` in its WebSocket attachment
   (hibernation state, not storage). Later sockets of that room must present a `K_join` that hashes to the same value or are
-  closed with `1008`. When the room is empty the record is gone.
+  closed with `1008 join proof`. When the room is empty the record is gone.
 - **Slots.** One live socket per role. A new socket for a role that already has one (with a valid join proof) replaces the
   old one, which is closed with `1000 replaced`. One phone per room.
 - **Limits.** A frame is at most 66,000 bytes (larger: close `1009`). Per room, a token bucket of 30 messages/s sustained,
@@ -61,8 +63,10 @@ Sec-WebSocket-Protocol: coucou.v1.<K_join, base64url>
 - **Hints.** When the other role joins or leaves, the relay sends the remaining socket a text message
   `{"peer":"online"}` or `{"peer":"offline"}`. Hints are for the status line and the phone's retry; **they are never
   trusted for anything else** (they are not authenticated).
-- **Keep-alive.** The relay answers WebSocket pings itself (`setWebSocketAutoResponse`, which does not wake the room).
-  A socket silent for 120 s is closed.
+- **Keep-alive.** A client may send the **text** message `ping`; the platform answers `pong` itself
+  (`setWebSocketAutoResponse`), without waking the room, so heartbeats cost almost nothing. These are the only text messages a
+  client may send; any other text message closes the socket with `1003`. The relay has **no idle timer** (a timer would wake the
+  room): liveness is judged by the clients, from the encrypted v1 `ping/pong` and from these `pong`s.
 - **Access key rotation takes effect on live rooms.** Each socket's attachment keeps the first 8 bytes of
   `SHA-256(access key)` it was admitted with; when the next frame arrives and the current key's digest differs, the relay
   closes the socket with `1008 access key changed`.

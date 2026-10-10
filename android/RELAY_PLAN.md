@@ -166,7 +166,7 @@ path, approval, chat text or file name, and not K.
 - `GET /` answers `Coucou link relay` (a health check, like Louis's).
 - `GET /v1/room/<id>?role=pc|phone` with `Upgrade: websocket`; `<id>` must be 22 base64url characters, else 404 before any
   object is touched; `Authorization: Bearer <access key>` must match the Worker secret (401, constant-time, fail closed).
-  Sub-protocol header `coucou.v1.<K_join>` carries the join proof (base64url of 32 bytes). The wire is specified in `docs/RELAY_LINK.md`.
+  Sub-protocol offer `coucou.v1, coucou.join.<K_join>` carries the join proof (base64url of 32 bytes). The wire is specified in `docs/RELAY_LINK.md`.
 - **Join proof, held in memory only:** the first socket of a room sets `verifier = SHA-256(K_join)` in the socket's
   hibernation attachment (not storage). Later sockets must present a `K_join` that hashes to the same value or are refused
   (1008). When the room is empty the verifier is gone, so nothing is ever stored. Consequence: an attacker who knows the
@@ -175,7 +175,7 @@ path, approval, chat text or file name, and not K.
   would fix it. I think that trade-off is right; the alternative (persisting a verifier) would make the relay stateful.
 - Hints sent by the relay as small text messages (`{"peer":"online"|"offline"}`) when the other side joins or leaves.
 - A role's new connection replaces the old one only with a valid proof (closes it with 1000 "replaced").
-- Idle cap: platform auto-ping answered; a socket with no traffic and no ping for 120 s is closed.
+- Keep-alive: a client text `ping` is answered `pong` by the platform without waking the object. No idle timer in the relay (a timer would wake the room); clients judge liveness themselves.
 - Limits: 66 KiB per frame, token bucket per room, 2 sockets per room, no queueing (a frame for an absent peer is dropped,
   and the sender hears `{"peer":"offline"}`). No message is ever buffered, so nothing is stored by accident.
 - `wrangler.toml`: `[observability] enabled = false`, `new_sqlite_classes = ["Room"]` (Durable Objects on the free plan need the
@@ -269,12 +269,21 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | # | Stage | What | Tests |
 |---|---|---|---|
 | R0 | Spec and vectors **(done)** | `docs/RELAY_LINK.md` (wire, access key, handshake, frame, limits, rotation) and `android/relay/test-vectors.json` + generator `android/relay/tools/gen-vectors.mjs` | generator self-checks (RFC 5869 vector, no (key, nonce) twice), CI `--check`, an independent Python re-computation; the vectors are used by R2 on both sides |
-| R1 | Relay service | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
+| R1 | Relay service **(done)** | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
 | R2 | Secure channel core | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
 | R3 | PC client | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
 | R4 | Android client | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
 | R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
 | R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
+
+### Findings while building R1
+
+- The Workers test plugin was renamed upstream: R1 uses `@cloudflare/vitest-plugin` 1.4.0 (the old `vitest-pool-workers` is
+  deprecated) with `vitest` 4.1.x. npm's resolver crashes on its peer range, so `android/relay/.npmrc` sets `legacy-peer-deps`.
+- The sub-protocol offer is `coucou.v1, coucou.join.<proof>` (a strict client needs the server's choice to be one it offered).
+- The relay has no idle timer (it would wake the room); the heartbeat is a text `ping` answered `pong` by the platform.
+- The Workers Rate Limiting binding works in workerd; the tests raise its limit and the 429 path has its own test.
+- Wrangler may send anonymous usage statistics (Cloudflare's tool, not ours): the guide says how to turn it off.
 
 ### Decisions (all answered yes; the text is kept for the record)
 
