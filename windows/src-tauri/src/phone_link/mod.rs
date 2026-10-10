@@ -21,6 +21,7 @@ mod hub;
 #[cfg(test)]
 mod interop;
 mod pairing;
+mod relay_crypto;
 mod server;
 #[cfg(test)]
 mod tests;

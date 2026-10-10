@@ -270,7 +270,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 |---|---|---|---|
 | R0 | Spec and vectors **(done)** | `docs/RELAY_LINK.md` (wire, access key, handshake, frame, limits, rotation) and `android/relay/test-vectors.json` + generator `android/relay/tools/gen-vectors.mjs` | generator self-checks (RFC 5869 vector, no (key, nonce) twice), CI `--check`, an independent Python re-computation; the vectors are used by R2 on both sides |
 | R1 | Relay service **(done)** | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
-| R2 | Secure channel core | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
+| R2 | Secure channel core **(done)** | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
 | R3 | PC client | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
 | R4 | Android client | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
 | R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
@@ -284,6 +284,19 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 - The relay has no idle timer (it would wake the room); the heartbeat is a text `ping` answered `pong` by the platform.
 - The Workers Rate Limiting binding works in workerd; the tests raise its limit and the 429 path has its own test.
 - Wrangler may send anonymous usage statistics (Cloudflare's tool, not ours): the guide says how to turn it off.
+
+### Findings while building R2
+
+- Rust (`phone_link/relay_crypto.rs`, `ring`: HKDF, HMAC, AES-256-GCM, no new crate) and Kotlin (`link/RelayCrypto.kt`,
+  `javax.crypto`, a hand-written 20-line HKDF checked against RFC 5869) both reproduce **every byte** of
+  `android/relay/test-vectors.json`, which Node and an independent Python implementation also produced. Because the vectors are
+  deterministic, "Rust reads what Kotlin wrote and the reverse" holds byte for byte.
+- A mutation test found a gap in my first Rust tests (both directions sharing one key went unnoticed because the vectors were
+  checked with the helper functions, not with the `Session` itself). Fixed: both twins now have a test where the sessions
+  themselves must reproduce the vector frames in each direction.
+- A frame whose counter byte is altered is refused by the counter rule (`BadCounter`) before its tag is looked at; the vector
+  file calls that case a bad tag, either way it is refused and the session is dead.
+- No forward secrecy, as decided (D3).
 
 ### Decisions (all answered yes; the text is kept for the record)
 

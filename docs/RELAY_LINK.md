@@ -134,7 +134,7 @@ ver (1 byte = 1) ‖ type (1 byte) ‖ counter (8 bytes, big endian) ‖ body
 3. Every connection derives new keys from fresh random nonces, so a restart or reconnect (counter back to 0) is a new key.
    Random 128-bit nonces are used for this; a collision would need ~2^64 sessions.
 
-Required tests (R2, both Rust and Kotlin): `mustRefuse`, `mustRefuseInOrder` and `data` vectors of `test-vectors.json`;
+Required tests (R2, both Rust and Kotlin; done in `phone_link/relay_crypto.rs` and `link/RelayCryptoTest.kt`): `mustRefuse`, `mustRefuseInOrder` and `data` vectors of `test-vectors.json`;
 a property test that enumerates (key, nonce) over thousands of frames in both directions and two sessions and finds no
 duplicate; a test that a sender at counter 2^32 − 1 refuses to send; a test that two sessions with different nonces have
 different keys.
