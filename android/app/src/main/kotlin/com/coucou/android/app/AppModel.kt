@@ -28,7 +28,13 @@ import com.coucou.android.core.ChatHistory
 import com.coucou.android.core.ChatMessage
 import com.coucou.android.core.ChatModels
 import com.coucou.android.core.ChatSession
+import com.coucou.android.link.AddressFinder
 import com.coucou.android.link.ApprovalRequest
+import com.coucou.android.link.Cancelable
+import com.coucou.android.link.Discovery
+import com.coucou.android.link.DiscoveryPolicy
+import com.coucou.android.link.DiscoveryState
+import com.coucou.android.link.PinnedProbe
 import com.coucou.android.link.DemoLink
 import com.coucou.android.link.DesktopLink
 import com.coucou.android.link.LinkClient
@@ -54,6 +60,26 @@ class AppModel(private val context: Context) : LinkListener {
     var sessions by mutableStateOf<List<SessionInfo>>(emptyList()); private set
     var approvals by mutableStateOf<List<ApprovalRequest>>(emptyList()); private set
     var message by mutableStateOf<String?>(null)
+
+    // ── Finding the computer again when its address changed (docs/ANDROID_LINK.md, "Finding the computer") ──
+    /** What the search for the computer is doing, for the status line and the hint. */
+    var discovery by mutableStateOf(DiscoveryState.IDLE); private set
+    /** The pairing the running link uses (with the address in force); the token stays in memory only as long as the link does. */
+    @Volatile private var currentPairing: PairingPayload? = null
+    private val probeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "coucou-probe").apply { isDaemon = true } }
+    private val netWatch = NetworkWatch(context) { up -> main.post { onNetworkChanged(up) } }
+    private val finder = AddressFinder(
+        source = NsdDiscovery(context), probe = PinnedProbe,
+        pairing = { currentPairing }, allowed = { mayDiscover() },
+        onAddress = { host, port -> main.post { onAddressFound(host, port) } },
+        onState = { st -> main.post { discovery = st } },
+        scheduler = { delay, task -> val r = Runnable { task() }; main.postDelayed(r, delay); Cancelable { main.removeCallbacks(r) } },
+        runner = { task -> probeExecutor.execute { task() } },
+    )
+
+    private fun mayDiscover() = DiscoveryPolicy.mayDiscover(
+        paired = currentPairing != null, demo = mode == Mode.DEMO, wifiUp = netWatch.wifiUp, linkConnected = linkState == LinkState.CONNECTED,
+    )
 
     private val prefs = context.getSharedPreferences("coucou_ui", Context.MODE_PRIVATE)
     private val kv = object : KeyValueStore {
@@ -322,8 +348,51 @@ class AppModel(private val context: Context) : LinkListener {
     private fun connect(p: PairingPayload) {
         mode = Mode.PAIRED
         desktopName = p.desktopName.ifBlank { p.host }
+        currentPairing = p
         link = LinkClient(p, Build.MODEL ?: "Android", this).also { it.start() }
+        netWatch.start()
         LinkService.start(context)
+    }
+
+    /** The saved address is replaced; the token and the pinned certificate are the same. The link restarts at once. */
+    private fun useAddress(host: String, port: Int) {
+        val p = currentPairing ?: return
+        val q = Discovery.withAddress(p, host, port)
+        store.savePairing(q)
+        currentPairing = q
+        link?.stop()
+        link = LinkClient(q, Build.MODEL ?: "Android", this).also { it.start() }
+    }
+
+    /** A computer matching the paired fingerprint answered with the pinned certificate (checked by a bare TLS handshake). */
+    private fun onAddressFound(host: String, port: Int) {
+        if (mode != Mode.PAIRED || currentPairing == null) return
+        Log.d("CoucouDiscovery", "address updated")
+        useAddress(host, port)
+    }
+
+    private fun onNetworkChanged(wifiUp: Boolean) {
+        if (mode != Mode.PAIRED) return
+        if (!wifiUp) { finder.stop(); return } // no Wi-Fi: nothing to scan
+        link?.retryNow() // do not wait out the backoff on a new network
+        if (mayDiscover()) finder.networkChanged()
+    }
+
+    /**
+     * "Enter address manually": a host or host:port typed by the user. The pairing, the token and the pinned
+     * certificate are unchanged, so a wrong or hostile address still cannot get past the certificate check.
+     */
+    fun setAddress(text: String): Boolean {
+        val (host, port) = Discovery.parseAddress(text) ?: return false
+        if (currentPairing == null) return false
+        useAddress(host, port)
+        return true
+    }
+
+    /** Debug only (see DebugPillReceiver): pretend the computer's address changed, so the search has to repair it. */
+    fun debugAddressChanged() {
+        if (currentPairing == null) return
+        useAddress("192.0.2.77", currentPairing!!.port) // a documentation address that never answers
     }
 
     fun startDemo() {
@@ -342,6 +411,9 @@ class AppModel(private val context: Context) : LinkListener {
     fun stopDemo() = stopLink()
 
     private fun stopLink() {
+        finder.stop()
+        netWatch.stop()
+        currentPairing = null
         link?.stop()
         link = null
         mode = Mode.NONE
@@ -391,6 +463,7 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onState(state: LinkState) {
         main.post {
             linkState = state
+            if (state == LinkState.CONNECTED) finder.connected() // found it (or never lost it): stop looking
             // A card for a request we can no longer answer would only produce "no longer pending".
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
             if (state != LinkState.CONNECTED) chatLinkLost()
@@ -470,6 +543,11 @@ class AppModel(private val context: Context) : LinkListener {
             removeApproval(fingerprint)
             if (wantAllow == fingerprint) wantAllow = null
         }
+    }
+
+    override fun onConnectFailed(consecutive: Int) {
+        // The saved address failed: now (and only now) look for the computer on the network.
+        if (consecutive >= DiscoveryPolicy.FAILURES_BEFORE_DISCOVERY) main.post { if (mayDiscover()) finder.request() }
     }
 
     override fun onError(code: String, message: String) {

@@ -23,6 +23,8 @@ interface LinkListener {
     fun onApproval(request: ApprovalRequest) {}
     fun onApprovalResolved(fingerprint: String) {}
     fun onError(code: String, message: String) {}
+    /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
+    fun onConnectFailed(consecutive: Int) {}
     fun onChatModels(models: List<ChatModel>) {}
     fun onChatDelta(id: String, text: String) {}
     fun onChatDone(id: String, text: String?) {}
@@ -34,6 +36,8 @@ interface DesktopLink {
     val approvals: ApprovalBook
     fun start()
     fun stop()
+    /** Try the connection again now (the network changed); the demo has nothing to retry. */
+    fun retryNow() {}
     /** allow/deny for a pending approval; false if unknown, expired, already decided or not connected. */
     fun decide(fingerprint: String, allow: Boolean): Boolean
 
@@ -49,6 +53,8 @@ interface DesktopLink {
 fun interface Connector { fun connect(timeoutMs: Int): Socket }
 
 object PinnedTls {
+    private const val HANDSHAKE_TIMEOUT_MS = 10_000
+
     fun connector(p: PairingPayload) = Connector { timeoutMs ->
         val ctx = SSLContext.getInstance("TLS").apply {
             init(null, arrayOf(PinnedTrustManager(p.certSha256)), SecureRandom())
@@ -57,7 +63,7 @@ object PinnedTls {
         raw.connect(InetSocketAddress(p.host, p.port), timeoutMs)
         val tls = ctx.socketFactory.createSocket(raw, p.host, p.port, true) as javax.net.ssl.SSLSocket
         tls.enabledProtocols = tls.supportedProtocols.filter { it == "TLSv1.3" || it == "TLSv1.2" }.toTypedArray()
-        tls.soTimeout = timeoutMs
+        tls.soTimeout = HANDSHAKE_TIMEOUT_MS // the TCP connect above is quick (a wrong address must fail fast); the handshake gets longer
         tls.startHandshake()
         tls
     }
@@ -79,6 +85,8 @@ class LinkClient(
     private val backoffMs: LongArray = longArrayOf(1_000, 2_000, 4_000, 8_000, 16_000, 30_000),
     /** The optional features asked for in the hello; empty is what an app without them sends. */
     private val caps: List<String> = Protocol.CAPABILITIES,
+    /** How long the saved address gets to accept the connection before it counts as a failure (then the network is searched). */
+    private val connectTimeoutMs: Int = DiscoveryPolicy.SAVED_CONNECT_TIMEOUT_MS,
 ) : DesktopLink {
     override val approvals = ApprovalBook(clockMs)
 
@@ -89,6 +97,8 @@ class LinkClient(
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
     private val writeLock = Any()
+    /** Released by [retryNow] to cut a backoff wait short (the network changed). */
+    private val wake = java.util.concurrent.Semaphore(0)
     /** Android forbids network I/O on the main thread, and the UI calls decide() and stop(): writes happen here. */
     @Volatile private var writer: ExecutorService? = null
 
@@ -112,6 +122,9 @@ class LinkClient(
         thread?.interrupt()
         thread = null
     }
+
+    /** Try again now instead of waiting out the backoff: the network changed, or a new address was found. */
+    override fun retryNow() { wake.release() }
 
     /** Sends allow/deny for a pending approval. False if it is unknown, expired, decided or the link is down. */
     override fun decide(fingerprint: String, allow: Boolean): Boolean {
@@ -168,7 +181,7 @@ class LinkClient(
             listener.onState(LinkState.CONNECTING)
             var connectedOnce = false
             try {
-                val s = connector.connect(10_000)
+                val s = connector.connect(connectTimeoutMs)
                 socket = s
                 s.soTimeout = readTimeoutMs
                 s.tcpNoDelay = true
@@ -193,10 +206,11 @@ class LinkClient(
             if (fatal) running = false
             if (!running) break
             listener.onState(LinkState.DISCONNECTED)
-            if (connectedOnce) attempt = 0
+            if (connectedOnce) attempt = 0 else listener.onConnectFailed(attempt + 1)
             val wait = backoffMs[minOf(attempt, backoffMs.size - 1)]
             attempt++
-            try { Thread.sleep(wait) } catch (_: InterruptedException) { break }
+            wake.drainPermits()
+            try { wake.tryAcquire(wait, java.util.concurrent.TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { break }
         }
         listener.onState(LinkState.DISCONNECTED)
     }

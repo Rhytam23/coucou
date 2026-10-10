@@ -4,6 +4,8 @@
     <!-- Only the paired computer is contacted. No ads, no analytics, no billing. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Finding the computer again after a Wi-Fi change: a multicast lock held only while browsing the local network. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Asked only when the user taps "Scan QR code" to read the pairing code; used on that screen only. -->

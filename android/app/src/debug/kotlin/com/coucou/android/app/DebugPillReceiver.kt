@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -104,6 +104,10 @@ class DebugPillReceiver : BroadcastReceiver() {
                 if (!accepted) model.message = context.getString(com.coucou.android.R.string.scan_not_pairing)
                 android.util.Log.d("CoucouScan", "debug scan accepted=$accepted")
             }
+            // Pretend the computer's address changed: the saved address is replaced by one that never answers, so the
+            // phone has to find the computer by itself (needs a paired computer with the phone link on).
+            //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange
+            "addrchange" -> model.debugAddressChanged()
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }

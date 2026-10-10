@@ -141,3 +141,21 @@ accepted; no picture is stored or sent, and neither the token nor the scanned te
 
 Try without the camera (debug builds): `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind scan --es text "coucou://pair?..."`
 then open the app: the confirmation appears. Any other `--es text` shows the "not a Coucou pairing code" hint.
+
+## When the computer's address changes
+
+Pairing stores the computer's address, and an address changes with every network (home Wi-Fi, a hotspot). While the
+phone link is on, the computer announces itself on the local network (mDNS, `_coucou._tcp`, with only the protocol version
+and a short certificate id), and the phone finds it again by itself:
+
+1. the saved address is tried first (2 seconds);
+2. if it fails, the phone looks for the computer for up to 15 seconds ("Looking for your computer…"), again after a network
+   change, and with growing pauses otherwise; it does not search when connected or when Wi-Fi is off;
+3. a computer is accepted only if its short id matches the one you paired **and** its full certificate matches the pinned
+   one, checked before the token is ever sent. The new address replaces the old one; the pairing stays.
+
+If nothing is found, the app says so calmly and offers "Pair again" and "Enter address manually". Some hotspots and guest
+networks block devices from finding each other (client isolation); then the typed address is the way. Multicast does not
+cross VPNs or routers. Debug builds: `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange`
+breaks the saved address on purpose so you can watch it repair itself.
+

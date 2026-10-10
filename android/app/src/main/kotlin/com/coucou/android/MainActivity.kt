@@ -100,7 +100,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.semantics.Role
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
+import com.coucou.android.link.DiscoveryState
+import com.coucou.android.ui.AddressSheet
 import com.coucou.android.ui.AgentRows
+import com.coucou.android.ui.DiscoveryHint
 import com.coucou.android.ui.ApprovalSheet
 import com.coucou.android.ui.MessagePanel
 import com.coucou.android.ui.PairingScreen
@@ -278,6 +281,7 @@ private fun Home(
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var addressOpen by rememberSaveable { mutableStateOf(false) }
 
     // Allow tapped on a notification before the link was back: open the prompt once the request is here.
     LaunchedEffect(model.approvals, model.wantAllow) {
@@ -323,6 +327,10 @@ private fun Home(
                 },
             )
         }
+        // The saved address failed and a search found nothing: a calm hint with two ways out.
+        if (model.mode == Mode.PAIRED && model.linkState != LinkState.CONNECTED && model.discovery == DiscoveryState.NOT_FOUND) {
+            item { Box(Modifier.padding(horizontal = Gutter)) { DiscoveryHint(onPairAgain = onScan, onEnterAddress = { addressOpen = true }) } }
+        }
         model.message?.let { msg ->
             item { Box(Modifier.padding(horizontal = Gutter)) { MessagePanel(msg) { model.message = null } } }
         }
@@ -358,6 +366,8 @@ private fun Home(
         if (model.overlayWished && !model.overlayPermission) item { Box(Modifier.padding(horizontal = Gutter)) { OverlayHint(onOverlay) } }
         item { Spacer(Modifier.height(Gutter)) }
     }
+    // After the list, so it draws over it.
+    if (addressOpen) AddressSheet(model) { addressOpen = false }
 }
 
 private const val HOME_KEY = "home"

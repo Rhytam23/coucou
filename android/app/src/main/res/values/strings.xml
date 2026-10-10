@@ -45,6 +45,15 @@
     <string name="ask_placeholder">Ask your AI…</string>
     <string name="recent_title">Recent</string>
     <string name="recent_all">See all</string>
+    <string name="status_looking">Looking for your computer…</string>
+    <string name="discovery_title">Can\'t find your computer</string>
+    <string name="discovery_body">Is the phone on the same Wi-Fi as the computer? Is the computer awake, with Coucou running and the phone link on, and does Windows allow Coucou on private networks? Some hotspots and guest networks block devices from finding each other (client isolation).</string>
+    <string name="discovery_pair_again">Pair again</string>
+    <string name="discovery_enter_address">Enter address manually</string>
+    <string name="address_title">Computer address</string>
+    <string name="address_hint">For example 192.168.1.20 or 192.168.1.20:47821. Your pairing stays as it is: only the address changes.</string>
+    <string name="address_save">Use this address</string>
+    <string name="address_bad">That is not a valid address.</string>
     <string name="tab_home">Home</string>
     <string name="tab_chat">Chat</string>
     <string name="tab_settings">Settings</string>
