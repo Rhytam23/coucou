@@ -13,9 +13,10 @@ import android.net.Uri
 import android.util.Log
 import com.coucou.android.MainActivity
 import com.coucou.android.R
+import com.coucou.android.core.Glance
+import com.coucou.android.core.GlanceTone
 import com.coucou.android.core.OverlayPolicy
 import com.coucou.android.link.ApprovalRequest
-import com.coucou.android.link.LinkState
 import com.coucou.android.mochi.BotState
 
 /**
@@ -66,26 +67,40 @@ class Notifications(private val context: Context) {
         return PendingIntent.getActivity(context, code, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
-    fun ongoing(model: AppModel?): Notification {
-        val text = when {
-            model == null -> context.getString(R.string.status_connecting)
-            model.linkState == LinkState.CONNECTED ->
-                listOfNotNull(context.getString(R.string.status_connected), model.desktopName).joinToString(" · ")
-            model.linkState == LinkState.CONNECTING -> context.getString(R.string.status_connecting)
-            else -> context.getString(R.string.status_not_connected)
-        }
-        return Notification.Builder(context, CH_LINK)
+    /**
+     * The quiet notification that keeps the link alive: the headline of [Glance] as its title, the detail under it and,
+     * when expanded, one line per agent ("Claude Code: Working"). Only states, never a command or a path. On a locked
+     * screen it shows the plain "Connected" line, like the other notifications of the app.
+     */
+    fun ongoing(model: AppModel?): Notification = ongoing(model?.glance())
+
+    private fun ongoing(g: Glance?): Notification {
+        val title = g?.headline ?: context.getString(R.string.status_connecting)
+        val detail = g?.detail.orEmpty()
+        val b = Notification.Builder(context, CH_LINK)
             .setSmallIcon(R.drawable.ic_stat_mochi)
-            .setContentTitle(context.getString(R.string.app_name))
-            .setContentText(text)
+            .setContentTitle(title)
+            .setContentText(detail)
+            .setColor(g?.tone?.argb ?: GlanceTone.CALM.argb)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                Notification.Builder(context, CH_LINK).setSmallIcon(R.drawable.ic_stat_mochi)
+                    .setContentTitle(context.getString(R.string.app_name))
+                    .setContentText(if (g?.connected == true) context.getString(R.string.status_connected) else context.getString(R.string.status_not_connected))
+                    .build(),
+            )
             .setContentIntent(open(null, false, 0))
-            .build()
+        if (g != null && g.lines.isNotEmpty()) {
+            b.setStyle(Notification.BigTextStyle().bigText(g.lines.joinToString("\n") { "${it.agent}: ${it.text}" }).setSummaryText(detail))
+        }
+        return b.build()
     }
 
-    fun updateOngoing(model: AppModel) {
-        if (model.mode == Mode.PAIRED) runCatching { nm.notify(ONGOING_ID, ongoing(model)) }
+    fun updateOngoing(model: AppModel, g: Glance = model.glance()) {
+        if (model.mode == Mode.PAIRED) runCatching { nm.notify(ONGOING_ID, ongoing(g)) }
     }
 
     fun showApproval(r: ApprovalRequest, agentName: String, alert: OverlayPolicy.ApprovalAlert = OverlayPolicy.ApprovalAlert.HEADS_UP) {

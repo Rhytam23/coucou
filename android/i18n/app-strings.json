@@ -10,6 +10,7 @@
     "action_allow": "Allow",
     "action_deny": "Deny",
     "action_close": "Close",
+    "widget_description": "Shows whether your agents are working, without opening Coucou.",
     "status_connected": "Connected",
     "status_connecting": "Connecting…",
     "status_not_connected": "Not connected",

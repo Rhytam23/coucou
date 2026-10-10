@@ -317,7 +317,21 @@ class AppModel(private val context: Context) : LinkListener {
      * What the island shows right now (an agent at work, a question, a request), from the current
      * sessions and requests. When it may not show at all it is removed completely.
      */
+    /** What the notification, the widget and the tile say right now. */
+    fun glance(): com.coucou.android.core.Glance = com.coucou.android.core.GlanceBuilder.build(
+        mode != Mode.NONE || isPaired, linkState, desktopName, sessions, approvals.size, this::agentName,
+    )
+
+    /** The small surfaces follow every change of sessions, requests and link; none of them runs a timer. */
+    private fun pushGlance() {
+        val g = glance()
+        notifier.updateOngoing(this, g)
+        GlanceWidget.update(context, g)
+        GlanceTile.requestUpdate(context)
+    }
+
     private fun refreshIsland() {
+        pushGlance()
         if (!islandAllowed()) {
             overlay.hide()
             return
@@ -507,7 +521,6 @@ class AppModel(private val context: Context) : LinkListener {
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
             if (state != LinkState.CONNECTED) chatLinkLost()
             refreshIsland()
-            notifier.updateOngoing(this)
         }
     }
 
@@ -586,7 +599,6 @@ class AppModel(private val context: Context) : LinkListener {
             }
             lastState.keys.retainAll(sessions.map { it.pillId }.toSet())
             refreshIsland()
-            notifier.updateOngoing(this)
         }
     }
 

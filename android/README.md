@@ -165,3 +165,11 @@ breaks the saved address on purpose so you can watch it repair itself.
 Coucou has no relay. To reach your computer outside your Wi-Fi, run Tailscale (or a similar VPN) on both devices, turn on
 "Also accept my phone through a VPN" in the computer's Settings > Android phone, and pair again. The steps and what the
 switch changes are in `docs/ANDROID_LINK.md` ("Away from home"). Not tried on a real VPN yet.
+
+## Widget, tile and notification
+
+Long-press the home screen > Widgets > "Coucou for Android" for a small summary (a coloured dot, one headline such as
+"Claude Code is working", and a line per agent). Edit the quick settings and drag in the "Coucou for Android" tile: it is
+on while the computer is connected and a tap opens the app. The ongoing notification shows the same headline and, when
+expanded, one line per agent. They show agent names and states only: no commands, paths, file names or answers.
+They are updated by the app when something changes and never on a timer. Not seen on a device yet.
