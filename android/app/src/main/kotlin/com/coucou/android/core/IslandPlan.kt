@@ -16,7 +16,7 @@ object IslandPlan {
     private val WORKING = setOf(BotState.WORKING, BotState.THINKING, BotState.SEARCHING)
 
     /**
-     * What is going on right now: a permission request, a question, or an agent at work. Null when
+     * What is going on right now: a permission request (its text is the kind of action, never the command), a question, or an agent at work. Null when
      * the island may not show or nothing needs it. [approvals] come first; [name] gives the agent's name.
      */
     fun active(
@@ -27,7 +27,7 @@ object IslandPlan {
     ): IslandSpec? {
         if (!allowed) return null
         approvals.firstOrNull()?.let {
-            return IslandSpec(IslandSpec.Kind.APPROVAL, it.pillId, name(it.pillId), BotState.APPROVAL, "${it.tool}: ${it.command}", it.fingerprint)
+            return IslandSpec(IslandSpec.Kind.APPROVAL, it.pillId, name(it.pillId), BotState.APPROVAL, ToolLabels.action(it.tool), it.fingerprint)
         }
         val question = sessions.firstOrNull { it.state == BotState.QUESTION }
         if (question != null) return spec(IslandSpec.Kind.QUESTION, question, name)

@@ -30,6 +30,8 @@ data class IslandBox(
  */
 object IslandGeometry {
     const val MARGIN_DP = 12
+    /** The concave flare on each side where the island meets the top edge of the screen (the PC's `#island::before/after`). */
+    const val EAR_DP = 14
     const val MAX_W_DP = 340
     const val WORKING_W_DP = 240 // narrow: it should look like it grows out of the camera hole
     const val MIN_NOTCH_DP = 44
@@ -37,7 +39,8 @@ object IslandGeometry {
 
     fun place(screenW: Int, density: Float, cutoutTop: PxRect?, statusBarH: Int): IslandBox {
         fun dp(v: Int) = (v * density).toInt()
-        val maxW = min(screenW - 2 * dp(MARGIN_DP), dp(MAX_W_DP))
+        // The flares sit outside the island's width, so they come off the room it may use.
+        val maxW = min(screenW - 2 * dp(MARGIN_DP) - 2 * dp(EAR_DP), dp(MAX_W_DP))
         val cut = cutoutTop?.takeIf { it.width > 0 && it.bottom > 0 }
         val top = max(cut?.bottom ?: statusBarH, 0)
         // Keep the island on screen even when the cut-out is off-centre.
@@ -50,7 +53,7 @@ object IslandGeometry {
             centerOffsetX = offset, topInset = top, notchWidth = notch,
             workingW = min(dp(WORKING_W_DP), maxW), workingH = top + dp(52),
             cardW = maxW, cardH = top + dp(96),
-            approvalW = maxW, approvalH = top + dp(196),
+            approvalW = maxW, approvalH = top + dp(168),
             cornerSmall = dp(14), cornerLarge = dp(22),
         )
     }

@@ -39,7 +39,7 @@ class IslandPlanTest {
         assertEquals(IslandSpec.Kind.QUESTION, IslandPlan.active(all, emptyList(), true, name)!!.kind)
         val withRequest = IslandPlan.active(all, listOf(request), true, name)!!
         assertEquals(IslandSpec.Kind.APPROVAL, withRequest.kind)
-        assertEquals("Bash: ls", withRequest.text)
+        assertEquals("the island says what kind of action, never the command", "run a command", withRequest.text)
         assertEquals("Alpha", withRequest.agent)
     }
 

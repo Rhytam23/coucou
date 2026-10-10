@@ -1,6 +1,6 @@
 # Coucou for Android: full UI/UX redesign, "island first"
 
-Status: **decided: Option A, with the defaults below (section 8).** **U0 (design system) is done**: tokens, icons, components and a Design screen (Settings > Mochi gallery > Design system); no existing screen uses them yet. **U1 (navigation shell + Settings) is done.** **U2 (Home) is done.** **U3 (approval and question sheets) is done.** **U4 (pairing and scan) is done.** **U5 (chat) is done.** **U6 (session detail and activity) is done.** U7 (the island) is next. The prototype was updated after the
+Status: **decided: Option A, with the defaults below (section 8).** **U0 (design system) is done**: tokens, icons, components and a Design screen (Settings > Mochi gallery > Design system); no existing screen uses them yet. **U1 (navigation shell + Settings) is done.** **U2 (Home) is done.** **U3 (approval and question sheets) is done.** **U4 (pairing and scan) is done.** **U5 (chat) is done.** **U6 (session detail and activity) is done.** **U7 (the island) is done.** U8 (polish) is next. The prototype was updated after the
 user's note about agent colours (section 4.1). Prototype: `android/design/prototype.html` (open it in any browser; it is a phone-sized mock).
 
 Sources read: `android/HANDOFF.md`, `android/PARITY_PLAN.md`, `windows/src/views/*` (chat, ticker, views,
