@@ -22,5 +22,5 @@ test("copying the link shows the hint and keeps it after the button text goes ba
   const click = src.slice(src.indexOf('copy.addEventListener("click"'), src.indexOf("const repair"));
   assert.ok(click.includes("copied.hidden = false"), "the hint is shown by the click");
   assert.ok(!click.includes("copied.hidden = true"), "and not hidden again by the timer");
-  assert.ok(src.includes("    copied,\n"), "it sits right under the link");
+  assert.match(src, /\n\s*copied,\r?\n/, "it sits right under the link");
 });
