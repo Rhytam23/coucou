@@ -10,12 +10,14 @@
 //   * a first message that is not a valid `hello` within a few seconds;
 //   * a wrong token or protocol version (after a short pause, so guessing is slow);
 //   * a line over 64 KiB, or silence for 90 s (the phone pings every 20 s);
-//   * more than a handful of connections at once.
+//   * more than a handful of connections at once, and more than two silent ones from one address: see
+//     admission.rs (strangers share a small pool, a phone that authenticated before keeps its place, and the
+//     TLS handshake and the hello get less time when the pool is filling up).
 // It never touches the agent: a decision goes through `Hub::decide`, which only
 // applies the request still pending.
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,6 +31,7 @@ use tokio_rustls::rustls::version::{TLS12, TLS13};
 use tokio_rustls::rustls::{crypto::ring as ring_provider, ServerConfig};
 use tokio_rustls::TlsAcceptor;
 
+use super::admission::{Admission, Ticket};
 use super::chat::ChatLink;
 use super::hub::{constant_eq, Hub, Out};
 use super::pairing::Identity;
@@ -36,9 +39,7 @@ use super::pairing::Identity;
 pub const PROTOCOL: u64 = 1;
 pub const MAX_LINE: usize = 64 * 1024;
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
-const MAX_CONNECTIONS: usize = 8;
 /// Pause before answering a wrong token.
 const AUTH_PENALTY: Duration = Duration::from_millis(400);
 
@@ -85,12 +86,12 @@ pub struct Shared {
     /// Chat from the phone; None where the feature is not wired in. Offered only to a phone that asks for it.
     pub chat: Option<Arc<ChatLink>>,
     pub features: Arc<dyn Features>,
-    connections: AtomicUsize,
+    admission: Arc<Admission>,
 }
 
 impl Shared {
     pub fn with_features(hub: Arc<Hub>, token: String, name: String, chat: Option<Arc<ChatLink>>, features: Arc<dyn Features>) -> Arc<Shared> {
-        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, features, connections: AtomicUsize::new(0) })
+        Arc::new(Shared { hub, token: Mutex::new(token), name, clock: now_ms, chat, features, admission: Admission::new() })
     }
 }
 
@@ -145,15 +146,12 @@ pub fn serve(listener: TcpListener, acceptor: TlsAcceptor, shared: Arc<Shared>) 
             if !is_local(peer.ip()) {
                 continue; // dropped before any byte is read
             }
-            if shared.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
-                shared.connections.fetch_sub(1, Ordering::SeqCst);
-                continue;
-            }
+            // The slot is held until the connection ends (the ticket drops), whatever way it ends.
+            let Some(ticket) = shared.admission.admit(peer.ip()) else { continue };
             let (shared, acceptor) = (shared.clone(), acceptor.clone());
             tokio::spawn(async move {
                 let _ = tcp.set_nodelay(true);
-                one_connection(tcp, acceptor, &shared).await;
-                shared.connections.fetch_sub(1, Ordering::SeqCst);
+                one_connection(tcp, acceptor, &shared, Arc::new(ticket)).await;
             });
         }
     });
@@ -174,20 +172,20 @@ pub fn is_local(ip: IpAddr) -> bool {
     }
 }
 
-async fn one_connection(tcp: TcpStream, acceptor: TlsAcceptor, shared: &Arc<Shared>) {
-    let Ok(Ok(tls)) = tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(tcp)).await else { return };
-    run(tls, shared).await;
+async fn one_connection(tcp: TcpStream, acceptor: TlsAcceptor, shared: &Arc<Shared>, ticket: Arc<Ticket>) {
+    let Ok(Ok(tls)) = tokio::time::timeout(ticket.wait(), acceptor.accept(tcp)).await else { return };
+    run_with(tls, shared, Some(ticket)).await;
 }
 
-/// The conversation over any byte stream (TLS in the app, a pipe in a test).
-pub async fn run<S>(stream: S, shared: &Arc<Shared>)
+/// The conversation over a byte stream (TLS in the app), holding its admission ticket until it ends.
+async fn run_with<S>(stream: S, shared: &Arc<Shared>, ticket: Option<Arc<Ticket>>)
 where
     S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
 {
     let (read, mut write) = tokio::io::split(stream);
     let (tx, mut rx) = mpsc::channel::<Out>(64);
 
-    let reader = tokio::spawn(read_loop(read, tx, shared.clone()));
+    let reader = tokio::spawn(read_loop(read, tx, shared.clone(), ticket));
 
     while let Some(out) = rx.recv().await {
         let (line, last) = match out {
@@ -202,7 +200,7 @@ where
     let _ = write.shutdown().await;
 }
 
-async fn read_loop<R>(read: R, tx: mpsc::Sender<Out>, shared: Arc<Shared>)
+async fn read_loop<R>(read: R, tx: mpsc::Sender<Out>, shared: Arc<Shared>, ticket: Option<Arc<Ticket>>)
 where
     R: AsyncRead + Unpin,
 {
@@ -210,7 +208,8 @@ where
     let say = |v: serde_json::Value| tx.send(Out::Line(v.to_string().into()));
 
     // 1. hello
-    let hello = match tokio::time::timeout(HELLO_TIMEOUT, lines.next()).await {
+    let hello_wait = ticket.as_ref().map_or(HELLO_TIMEOUT, |t| t.wait());
+    let hello = match tokio::time::timeout(hello_wait, lines.next()).await {
         Ok(Next::Line(l)) => l,
         Ok(Next::TooLong) => {
             let _ = tx.send(Out::Close { code: "protocol", message: "line too long" }).await;
@@ -229,6 +228,11 @@ where
         tokio::time::sleep(AUTH_PENALTY).await;
         let _ = tx.send(Out::Close { code: "auth", message: "bad token or version" }).await;
         return;
+    }
+    // A valid hello: from here on this connection no longer counts against the unauthenticated limits, and the
+    // address is remembered so a flood from elsewhere cannot keep this phone out.
+    if let Some(t) = &ticket {
+        t.authenticated();
     }
     // Capabilities: offered only if the phone asked and the user's switch is on right now. A phone
     // that sends none (an older app) is never sent, and never answered, anything about chat.

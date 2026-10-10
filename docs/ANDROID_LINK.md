@@ -226,6 +226,24 @@ out. A bare `{"type":"usage"}` means the computer has nothing to say any more: t
 `resetsAt` has passed counts as 0 on the phone, as on the PC. Nothing else about the plans (no account, no token, no cost) is
 ever sent, and nothing goes back.
 
+## Admission (what a flood cannot do)
+
+The server answers the local network before it knows who is calling, so it bounds what a caller who has not yet sent
+a valid `hello` can hold (`phone_link/admission.rs`, pure bookkeeping with unit tests):
+
+- one source address may hold at most **2** connections that have not said a valid hello;
+- addresses that never authenticated (strangers) share **4** such connections between them, so at least half of the 8
+  slots stay free for a phone the computer already knows;
+- an address that sent a valid hello is remembered, in memory only (8 addresses, never written to disk), and is not
+  held to the stranger pool: the paired phone can always reconnect, even during a flood from other addresses;
+- when the pool is getting full, the TLS handshake and the hello get 3 s instead of 10 s, so silent connections free
+  their slots quickly;
+- a slot is given back whenever the connection ends, however it ends.
+
+What it does not do: a device that floods from many addresses at once can still keep a *new, never-paired* phone out
+for a few seconds at a time; it cannot keep out the phone that is already paired. A wrong token still costs the caller
+a pause and is never admitted.
+
 ## Mochi's outfit (optional capability `prefs`)
 
 A phone that sends `caps: ["prefs"]` in its `hello` is offered `prefs` in `welcome.caps` (no switch on the computer: what
@@ -286,7 +304,8 @@ simply keeps using the saved address.**
 - Settings → Android phone: off by default (`phoneLink` in settings.json, owned by Rust: the webview
   cannot switch it on). While off, nothing listens, nothing is published and no timer runs.
 - It listens on `0.0.0.0` (port 47821, else any free port) but drops every peer that is not on the
-  local network (private, loopback, link-local). At most 8 connections; 10 s to say hello; 90 s idle.
+  local network (private, loopback, link-local). At most 8 connections; 10 s to say hello (3 s when the pool is
+  filling up); 90 s idle. Unauthenticated connections are limited, see "Admission" below.
 - The certificate (ECDSA P-256, self-signed) is generated once; its key and the pairing token live in
   the OS keystore (Credential Manager / Secret Service) and nowhere else. Without a keystore the link
   does not start.

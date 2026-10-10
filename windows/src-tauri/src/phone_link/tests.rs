@@ -135,13 +135,20 @@ struct Client {
 
 impl Client {
     async fn connect(port: u16, pin: &str) -> Result<Client, String> {
+        Client::connect_from("127.0.0.1", port, pin).await
+    }
+
+    /// From a chosen loopback address (127.0.0.2 and so on), to stand in for another device on the network.
+    async fn connect_from(source: &str, port: u16, pin: &str) -> Result<Client, String> {
         let config = ClientConfig::builder_with_provider(Arc::new(provider::default_provider()))
             .with_safe_default_protocol_versions()
             .unwrap()
             .dangerous()
             .with_custom_certificate_verifier(Arc::new(Pin(pin.to_string())))
             .with_no_client_auth();
-        let tcp = TcpStream::connect(("127.0.0.1", port)).await.map_err(|e| e.to_string())?;
+        let socket = tokio::net::TcpSocket::new_v4().map_err(|e| e.to_string())?;
+        socket.bind(format!("{source}:0").parse().unwrap()).map_err(|e| e.to_string())?;
+        let tcp = socket.connect(std::net::SocketAddr::from(([127, 0, 0, 1], port))).await.map_err(|e| e.to_string())?;
         let tls = TlsConnector::from(Arc::new(config))
             .connect(ServerName::try_from("coucou").unwrap(), tcp)
             .await
@@ -475,22 +482,105 @@ fn turning_it_off_closes_the_phones_and_stops_listening() {
     });
 }
 
+/// True when this machine lets us use 127.0.0.2 and 127.0.0.3 as other devices (Linux and Windows do; some systems do not).
+fn loopback_aliases() -> bool {
+    ["127.0.0.2", "127.0.0.3"].iter().all(|a| std::net::TcpListener::bind((*a, 0)).is_ok())
+}
+
+/// Whether a connection that was admitted answers a hello (a dropped one is closed unserved or never completes TLS).
+async fn served(c: Result<Client, String>) -> bool {
+    match c {
+        Err(_) => false,
+        Ok(mut c) => {
+            c.send(json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "probe" })).await;
+            c.recv().await.is_some()
+        }
+    }
+}
+
 #[test]
-fn many_connections_cannot_exhaust_the_desktop() {
+fn the_total_number_of_connections_is_limited() {
     block_on(async {
         let rig = Rig::start().await;
-        // Idle, un-authenticated connections up to the limit; the next is dropped.
-        let mut held = Vec::new();
+        // Eight phones that said a valid hello fill the pool; the ninth is dropped.
+        let mut phones = Vec::new();
         for _ in 0..8 {
-            held.push(Client::connect(rig.port, &rig.fingerprint).await.unwrap());
+            phones.push(Client::paired(&rig).await);
         }
-        let extra = Client::connect(rig.port, &rig.fingerprint).await;
-        if let Ok(mut extra) = extra {
-            // The TCP connection may be accepted by the OS but is closed unserved.
-            extra.send(json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "late" })).await;
-            assert!(extra.recv().await.is_none());
+        assert!(!served(Client::connect(rig.port, &rig.fingerprint).await).await, "the ninth connection");
+        drop(phones);
+    });
+}
+
+#[test]
+fn one_address_cannot_hold_more_than_two_silent_connections() {
+    block_on(async {
+        let rig = Rig::start().await;
+        let a = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let b = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        // A third that never says hello is refused before it can wait.
+        assert!(!served(Client::connect(rig.port, &rig.fingerprint).await).await, "the third from one address");
+        // Closing one frees its place.
+        drop(a);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(served(Client::connect(rig.port, &rig.fingerprint).await).await);
+        drop(b);
+    });
+}
+
+#[test]
+fn a_flood_from_one_address_cannot_lock_out_the_paired_phone() {
+    if !loopback_aliases() {
+        eprintln!("skipped: this machine has no 127.0.0.2/127.0.0.3");
+        return;
+    }
+    block_on(async {
+        let rig = Rig::start().await;
+        // The phone (127.0.0.1) pairs once, so the computer knows its address.
+        drop(Client::paired(&rig).await);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Another device floods with silent connections: only two are kept.
+        let mut flood = Vec::new();
+        for _ in 0..10 {
+            if let Ok(c) = Client::connect_from("127.0.0.2", rig.port, &rig.fingerprint).await {
+                flood.push(c);
+            }
         }
-        drop(held);
+        assert!(flood.len() <= 2, "the flood is capped at two, got {}", flood.len());
+        // The paired phone connects and is served, again and again, while the flood goes on.
+        for _ in 0..3 {
+            let mut phone = Client::paired(&rig).await;
+            phone.send(json!({ "type": "ping" })).await;
+            phone.expect("pong").await;
+        }
+        drop(flood);
+    });
+}
+
+#[test]
+fn a_flood_from_several_addresses_still_leaves_room_for_the_known_phone() {
+    if !loopback_aliases() {
+        eprintln!("skipped: this machine has no 127.0.0.2/127.0.0.3");
+        return;
+    }
+    block_on(async {
+        let rig = Rig::start().await;
+        drop(Client::paired(&rig).await);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Two other devices fill the whole stranger pool (2 + 2).
+        let mut flood = Vec::new();
+        for source in ["127.0.0.2", "127.0.0.3"] {
+            for _ in 0..4 {
+                if let Ok(c) = Client::connect_from(source, rig.port, &rig.fingerprint).await {
+                    flood.push(c);
+                }
+            }
+        }
+        assert_eq!(flood.len(), 4, "strangers share four places");
+        let mut phone = Client::paired(&rig).await;
+        phone.send(json!({ "type": "ping" })).await;
+        phone.expect("pong").await;
+        drop(flood);
     });
 }
 
