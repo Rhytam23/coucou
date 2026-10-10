@@ -11,6 +11,7 @@ on:
       - 'windows/**'
       - 'android/**'
       - 'docs/ANDROID_LINK.md'
+      - 'docs/RELAY_LINK.md'
       - '.github/workflows/phone-link.yml'
   workflow_dispatch:
 
@@ -85,6 +86,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
       - name: Translations are up to date
         run: node scripts/gen-strings.mjs --check
+      - name: Relay test vectors are up to date
+        run: node relay/tools/gen-vectors.mjs --check
       - name: Tests, debug build, lint
         run: ./gradlew test assembleDebug lint --console=plain
       - name: No ads, billing or analytics (condition of the author's permission)

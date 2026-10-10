@@ -1,7 +1,28 @@
 # Relay plan: Coucou for Android away from home Wi-Fi (PROPOSAL, nothing is built)
 
-Status: **waiting for the user's OK.** Written on 2026-10-10. No code, no deployment, nothing published, nothing
-sent to Louis. The earlier "stage G" (VPN switch) was built and then removed at the user's request; this plan replaces it.
+Status: **approved by the user on 2026-10-10**, with the decisions and two additions below. Implementation goes stage by stage
+(R0 first); the user is told the commit id after each stage. Nothing is deployed, published or sent to Louis, and Louis's
+`relay/` is not touched. The earlier "stage G" (VPN switch) was built and then removed at the user's request; this plan replaces it.
+
+### Approval record
+
+- **D1 yes** (`tokio-tungstenite` on the PC). **D2 yes**: in-house WebSocket client on Android, with tests for framing, masking,
+  fragmentation, oversized frames and a malformed-input fuzz test; **OkHttp stays the fallback**. **D3 yes** (no forward secrecy
+  for now). **D4 yes** (one phone per room). **D5 yes** (`android/relay/`). **D6 yes** (no FCM for now). **D7 yes** (pad to 128).
+  **D8 yes** (join proof in memory only).
+- **Addition 1, deploy-time access key.** The relay creates or joins rooms only for requests carrying a random 256-bit access key
+  the user sets at deploy time as a Worker secret (`wrangler secret put ACCESS_KEY`, never in git). The PC setting and the
+  pairing link carry it (the link is the only place the phone learns it). The relay **still never sees any content key**. It
+  is checked before any room is created, in constant time, and **the relay fails closed** (no key configured = every room
+  request refused). Rotation is documented in `docs/RELAY_LINK.md` section 7: set the new secret, paste it on the PC; live
+  sockets are closed at their next frame; the PC tells paired phones the new key inside the encrypted channel (`relayAccess`),
+  so they do not have to scan again. This also closes the "burn the free quota with random rooms" hole of section 5: that now
+  needs the access key.
+- **Addition 2, separate directions.** Each direction has its **own key** (`k_p2h`, `k_h2p`) **and** a direction byte in the
+  nonce (`nonce = direction ‖ 000 ‖ counter`), so a (key, nonce) pair cannot repeat across directions even if one of the two
+  protections had a bug; counters only go up by one; every connection derives fresh keys. The generator of the test vectors
+  asserts "no (key, nonce) twice" over thousands of frames, both directions and two sessions; R2 repeats it in Rust and Kotlin.
+- **Stage R0 (done):** `docs/RELAY_LINK.md` (the wire spec) and `android/relay/test-vectors.json` with its generator.
 
 Sources read: `android/HANDOFF.md`, `docs/ANDROID_LINK.md`, `relay/README.md` and `relay/src/index.ts` (Louis's APNs
 relay, for style), `android/PARITY_PLAN.md` (stage G, row 16), `CLAUDE.md`, and the phone-link code on both sides.
@@ -62,7 +83,7 @@ coucou://pair?v=1&host=...&port=...&fp=...&token=...&name=...&relay=wss%3A%2F%2F
 | `k_p2h`, `k_h2p` | `HKDF(K, salt = N_phone ‖ N_pc, info="coucou-relay/v1 session")`, 32 bytes each | session keys, one per direction |
 
 **Cipher.** AES-256-GCM (hardware-accelerated on both sides; `ring::aead` and `javax.crypto`, so no new crate or library).
-One key per direction and per connection, and a **96-bit nonce = 4 zero bytes ‖ 64-bit frame counter**. A counter nonce
+One key per direction and per connection, and a **96-bit nonce = direction byte ‖ 3 zero bytes ‖ 64-bit frame counter** (addition 2). A counter nonce
 is safe here because the keys are fresh for every connection (a restart cannot reuse a (key, nonce) pair). Random
 nonces are not used. A session ends at 2^32 frames and re-handshakes.
 
@@ -129,7 +150,7 @@ only and are never trusted for a decision.
 | **Stolen PC / PC compromise** | Out of scope: it holds the agents and the keys anyway. |
 | **Eavesdropper on the network** | Sees TLS to the relay (and E2E ciphertext inside). |
 | **Flooding the relay** | Per-room message token bucket in the object (about 30 messages/s sustained, burst 60) and a per-IP connect limit at the Worker (Workers Rate Limiting binding); frame limit 66 KiB (anything bigger closes the socket with 1009); 2 sockets per room, newest of a role replaces the oldest only if it presents the join proof; the room id format is checked in the Worker before any object is created, so malformed paths cost nothing. |
-| **Creating many empty rooms to burn the free quota** | Possible by anyone who knows the URL: a random-id upgrade creates an object. It is limited by the per-IP rate limit, but a distributed attacker could exhaust the daily free quota and make the relay unavailable until the quota resets. The app then falls back to the LAN and shows "Relay unavailable". Cheapest fix is the paid Workers plan. Said honestly in section 8. |
+| **Creating many empty rooms to burn the free quota** | Needs the deploy-time access key (addition 1); a request without it is refused with `401` before any room exists. Someone who holds the key (every paired phone does) could still burn the quota; the fix is to rotate the access key (docs/RELAY_LINK.md section 7). If the quota is exhausted the app falls back to the LAN and shows "Relay unavailable"; the paid Workers plan removes the cap. |
 | **Reflection** (sending a side's own frame back) | Different key per direction and the direction in the AAD: rejected. |
 | **Downgrade** (pretending the peer has no relay) | Not a downgrade: the LAN path is a separate, equally strict, pinned-TLS path. |
 | **Phone talks to a fake PC through the relay** | The fake has no K: its `accept` MAC fails. |
@@ -144,7 +165,8 @@ path, approval, chat text or file name, and not K.
 
 - `GET /` answers `Coucou link relay` (a health check, like Louis's).
 - `GET /v1/room/<id>?role=pc|phone` with `Upgrade: websocket`; `<id>` must be 22 base64url characters, else 404 before any
-  object is touched. Sub-protocol header `coucou.v1.<K_join>` carries the join proof (base64url of 32 bytes).
+  object is touched; `Authorization: Bearer <access key>` must match the Worker secret (401, constant-time, fail closed).
+  Sub-protocol header `coucou.v1.<K_join>` carries the join proof (base64url of 32 bytes). The wire is specified in `docs/RELAY_LINK.md`.
 - **Join proof, held in memory only:** the first socket of a room sets `verifier = SHA-256(K_join)` in the socket's
   hibernation attachment (not storage). Later sockets must present a `K_join` that hashes to the same value or are refused
   (1008). When the room is empty the verifier is gone, so nothing is ever stored. Consequence: an attacker who knows the
@@ -157,7 +179,8 @@ path, approval, chat text or file name, and not K.
 - Limits: 66 KiB per frame, token bucket per room, 2 sockets per room, no queueing (a frame for an absent peer is dropped,
   and the sender hears `{"peer":"offline"}`). No message is ever buffered, so nothing is stored by accident.
 - `wrangler.toml`: `[observability] enabled = false`, `new_sqlite_classes = ["Room"]` (Durable Objects on the free plan need the
-  SQLite-backed class; we do not use its storage), no `[vars]` with secrets.
+  SQLite-backed class; we do not use its storage), no `[vars]` with secrets. The one secret, `ACCESS_KEY`, is set with
+  `npx wrangler secret put ACCESS_KEY` and is never in git.
 - No third-party npm runtime dependencies in the Worker; dev dependencies: `wrangler`, `typescript`, `vitest`, `@cloudflare/vitest-pool-workers`.
 
 ## 7. Android in the background
@@ -245,7 +268,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 
 | # | Stage | What | Tests |
 |---|---|---|---|
-| R0 | Spec and vectors | `docs/RELAY_LINK.md` (wire, handshake, frame, limits) and `android/relay/test-vectors.json` (fixed K, nonces, plaintexts, expected frames) | the vectors are used by R2 on both sides |
+| R0 | Spec and vectors **(done)** | `docs/RELAY_LINK.md` (wire, access key, handshake, frame, limits, rotation) and `android/relay/test-vectors.json` + generator `android/relay/tools/gen-vectors.mjs` | generator self-checks (RFC 5869 vector, no (key, nonce) twice), CI `--check`, an independent Python re-computation; the vectors are used by R2 on both sides |
 | R1 | Relay service | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
 | R2 | Secure channel core | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
 | R3 | PC client | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
@@ -253,7 +276,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
 | R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
 
-### Decisions I need from you
+### Decisions (all answered yes; the text is kept for the record)
 
 - **D1, WebSocket on the PC:** add the small `tokio-tungstenite` crate (MIT, rustls) or hand-write the WebSocket client over the
   `tokio-rustls` we already have. Recommendation: the crate (a hand-rolled framing/handshake is where subtle bugs live; one
@@ -279,8 +302,8 @@ npx wrangler deploy            # prints https://coucou-link.<you>.workers.dev
 curl https://coucou-link.<you>.workers.dev/   # "Coucou link relay"
 ```
 
-No `wrangler secret put` is needed: the relay holds no secret. `wrangler.toml` contains no key. On the PC: Settings → Android phone →
-"Away from home (relay)": paste the URL, switch on, show the pairing code. On the phone: pair again (scan), check the host shown.
+One secret is needed, the access key, and it never goes in git: `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='` to make it, then `npx wrangler secret put ACCESS_KEY` and paste it. The relay holds no content key. `wrangler.toml` contains no key. On the PC: Settings → Android phone →
+"Away from home (relay)": paste the URL and the access key (write-only field, stored in the OS keystore), switch on, show the pairing code. On the phone: pair again (scan), check the host shown.
 
 ## 13. Staging test plan (what you will run; PC on home Wi-Fi, phone on mobile data)
 
