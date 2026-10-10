@@ -6,7 +6,8 @@
 #   android/relay/tools/e2e.sh worker      # the real Worker code in workerd (default)
 #   android/relay/tools/e2e.sh node        # the Node twin
 #
-# PHONE_CMD overrides how the Kotlin test is run (default: Gradle, as CI does).
+# PHONE_CMD overrides how the Kotlin test is run (default: Gradle, as CI does). The test task is cleaned first: Gradle does not
+# treat the environment as an input, so a cached "up to date" result would silently skip the test.
 set -euo pipefail
 
 MODE="${1:-worker}"
@@ -45,7 +46,7 @@ echo "starting the computer side (Rust)"
 PC_PID=$!
 
 echo "running the phone side (Kotlin)"
-PHONE_CMD="${PHONE_CMD:-cd $ROOT/android && ./gradlew testDebugUnitTest --tests '*RelayE2ETest' --console=plain}"
+PHONE_CMD="${PHONE_CMD:-cd $ROOT/android && ./gradlew cleanTestDebugUnitTest testDebugUnitTest --tests '*RelayE2ETest' --console=plain}"
 if ! bash -c "$PHONE_CMD"; then
   echo "the phone side failed"; tail -30 "$LOG/pc.log" || true; exit 1
 fi
