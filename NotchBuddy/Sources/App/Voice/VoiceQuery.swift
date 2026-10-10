@@ -58,7 +58,8 @@ enum VoiceQuery {
         if hasAny(["quota", "limite", "limites", "forfait", "usage", "plan"]) {
             return has("codex") ? .codexPlan : .claudePlan
         }
-        if hasAny(["claude", "codex", "cursor", "gemini", "copilot", "agent", "agents",
+        if hasAny(["claude", "codex", "cursor", "gemini", "copilot", "vs code", "vscode", "visual studio",
+                   "agent", "agents",
                    "session", "sessions", "qu est ce qui se passe", "ou en est", "il fait quoi",
                    "what s happening", "whats happening"]) { return .agents }
         // Generic words.
@@ -68,7 +69,11 @@ enum VoiceQuery {
         if hasAny(["etoile", "etoiles", "star", "stars", "pull request", "pull requests", "pr", "prs",
                    "repo", "repos", "ci"]) { return .github }
         if hasAny(["deploiement", "deploiements", "deploy", "deploye", "deployment", "push", "pousse"]) { return .vercel }
-        if hasAny(["mail", "mails", "email", "emails"]) { return .resend }
+        // Generic "mails" means Resend stats only when asking about sent mail.
+        if hasAny(["mail", "mails", "email", "emails"]),
+           hasAny(["combien", "how many", "derniers", "dernier", "last", "envoyes", "envoye", "sent", "delivres", "delivered"]) {
+            return .resend
+        }
         if hasAny(["chanson", "musique", "titre", "morceau", "song", "track", "playing", "ecoute"]) { return .music }
         if hasAny(["pilule", "pilules", "pill", "pills"]) { return .pills }
         return nil
@@ -85,52 +90,372 @@ enum VoiceQuery {
         "ajoute", "ajouter", "ajoutes", "rajoute", "enleve", "enlever", "enleves", "retire", "retirer",
         "supprime", "supprimer", "mets", "mettre", "met", "lance", "lancer", "joue", "jouer",
         "remplace", "remplacer", "active", "activer", "desactive", "vire", "virer",
-        "envoie", "envoyer", "ouvre", "ouvrir", "add", "remove", "play", "open", "send",
+        "envoie", "envoyer", "envoies", "ecris", "ecrire", "redige", "rediger", "ouvre", "ouvrir",
+        "add", "remove", "play", "open", "send", "write", "compose", "draft", "email",
     ]
 
-    // MARK: Email: "envoie un mail à Tana", "envoie le fichier facture des téléchargements à Tana"
+    // MARK: Email
+    //
+    //   "envoie un mail à Tana"
+    //   "envoie le fichier facture octobre des téléchargements à Tana"
+    //   "il y a une image qui s'appelle Goku.png, envoie-la par mail à tana@gmail.com.
+    //    En objet, tu écris : Voilà votre image. En description : Image en 1980 × 1080."
+    //   "email the image called Goku.png to tana@gmail.com, subject Here you go, body …"
+    //   "write an email to Tana thanking her for yesterday"   (instruction → Coucou drafts)
 
     struct MailRequest: Equatable {
         var recipient: String
         var file: String?
         var folder: Folder?
-        enum Folder: String, Equatable { case downloads, desktop, documents }
+        var subject: String? = nil
+        var body: String? = nil
+        /// What the mail should say when no body was dictated ("thanking her…"):
+        /// Coucou drafts the body from it.
+        var instruction: String? = nil
+        enum Folder: String, Equatable { case downloads, desktop, documents, pictures }
     }
 
+    private static let sendVerbs: Set<String> = [
+        "envoie", "envoyer", "envoies", "envoyes", "ecris", "ecrire", "ecrit", "redige", "rediger",
+        "send", "email", "mail", "write", "compose", "draft",
+    ]
+    private static let mailWords: Set<String> = ["mail", "email", "mel", "courriel", "emails", "mails"]
+    private static let fileWords: Set<String> = ["fichier", "image", "photo", "document", "pdf", "file",
+                                                 "picture", "screenshot", "capture", "video"]
+    private static let subjectMarkers = ["en objet", "comme objet", "avec l'objet", "avec pour objet", "objet",
+                                         "en titre", "sujet", "with the subject", "subject", "titled"]
+    private static let bodyMarkers = ["en description", "description", "corps du mail", "en texte", "avec le texte",
+                                      "pour lui dire que", "pour lui dire", "pour dire que", "en disant que",
+                                      "en disant", "qui dit", "with the text", "body", "saying that", "saying",
+                                      "that says", "to say that", "to say", "telling"]
+
     static func mail(of raw: String) -> MailRequest? {
-        let norm = IntentParser.normalise(raw)
-        let n = norm.split(separator: " ").map(String.init)
-        let r = rawWords(raw)
-        guard n.count == r.count, !n.isEmpty else { return nil }
-        let sendVerbs: Set<String> = ["envoie", "envoyer", "envoies", "ecris", "ecrire", "send", "email", "mail"]
-        guard let v = n.firstIndex(where: { sendVerbs.contains($0) }) else { return nil }
-        let rest = Array(n[(v + 1)...])
-        let isMail = rest.contains(where: { ["mail", "email", "mel", "courriel", "fichier", "file", "document", "pdf"].contains($0) })
-            || ["email", "mail"].contains(n[v])
-        guard isMail else { return nil }
-        // Recipient: after the last "à" / "to".
-        guard let to = n.lastIndex(where: { $0 == "a" || $0 == "to" }), to > v, to + 1 < n.count else { return nil }
-        let recipient = r[(to + 1)...].joined(separator: " ")
+        // 1. Subject and body are free text: cut them out of the raw string first.
+        let subj = firstMarker(subjectMarkers, in: raw)
+        let body = firstMarker(bodyMarkers, in: raw)
+        let cut  = [subj?.range.lowerBound, body?.range.lowerBound].compactMap { $0 }.min() ?? raw.endIndex
+        let head = String(raw[..<cut])
+        func segment(_ m: (range: Range<String.Index>, marker: String)?, other: (range: Range<String.Index>, marker: String)?) -> String? {
+            guard let m else { return nil }
+            var end = raw.endIndex
+            if let o = other, o.range.lowerBound > m.range.lowerBound { end = o.range.lowerBound }
+            return cleanFreeText(String(raw[m.range.upperBound..<end]))
+        }
+        let subject = segment(subj, other: body)
+        let bodyText = segment(body, other: subj)
+
+        // 2. Verb, recipient, file and folder from the head.
+        let n = IntentParser.normalise(head).split(separator: " ").map(String.init)
+        let r = rawWords(head)
+        guard n.count == r.count, !n.isEmpty,
+              let v = n.firstIndex(where: { sendVerbs.contains($0) }) else { return nil }
+        let isMail = n.contains(where: { mailWords.contains($0) }) || ["email", "mail"].contains(n[v])
+        guard isMail || n.contains(where: { fileWords.contains($0) }) else { return nil }
+
+        // No "à / to": a guided mail — Coucou asks who, the subject, the text, an attachment.
+        guard let to = n.lastIndex(where: { $0 == "a" || $0 == "to" }), to > v, to + 1 < n.count else {
+            guard isMail else { return nil }
+            return MailRequest(recipient: "", file: nil, folder: nil, subject: subject, body: bodyText)
+        }
+        let after = Array(r[(to + 1)...])
+        var recipientWords: [String] = []
+        var rest: [String] = []
+        if let first = after.first, first.contains("@") || isSpelledEmail(after) {
+            let joined = after.joined(separator: " ")
+            recipientWords = [joined]
+        } else {
+            // A contact name: the capitalised words right after "à" (or just the first one).
+            for (i, w) in after.enumerated() {
+                if i == 0 || (w.first?.isUppercase == true && rest.isEmpty) { recipientWords.append(w) }
+                else { rest = Array(after[i...]); break }
+            }
+        }
+        var recipient = recipientWords.joined(separator: " ")
             .trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+        if let email = spokenEmail(recipient) { recipient = email }
         guard !recipient.isEmpty else { return nil }
 
-        // Optional file: after "fichier"/"file"/"document", up to the folder words or "à".
-        var file: String? = nil
         var folder: MailRequest.Folder? = nil
-        let middle = Array(n[(v + 1)..<to])
-        if middle.contains(where: { ["telechargements", "telechargement", "downloads"].contains($0) }) { folder = .downloads }
-        else if middle.contains(where: { ["bureau", "desktop"].contains($0) }) { folder = .desktop }
-        else if middle.contains(where: { ["documents"].contains($0) }) { folder = .documents }
-        if let f = n[(v + 1)..<to].firstIndex(where: { ["fichier", "file", "document", "pdf"].contains($0) }) {
-            let stop: Set<String> = ["des", "du", "de", "dans", "from", "in", "telechargements", "telechargement",
-                                     "downloads", "bureau", "desktop", "documents", "mes", "my", "par", "en"]
-            var end = f + 1
-            while end < to && !(stop.contains(n[end]) && end > f + 1) { end += 1 }
-            let name = r[(f + 1)..<end].joined(separator: " ")
-            if !name.isEmpty { file = name }
-            if n[f] == "pdf", file == nil { file = "pdf" }
+        if n.contains(where: { ["telechargements", "telechargement", "downloads"].contains($0) }) { folder = .downloads }
+        else if n.contains(where: { ["bureau", "desktop"].contains($0) }) { folder = .desktop }
+        else if n.contains(where: { ["documents"].contains($0) }) { folder = .documents }
+        else if n.contains(where: { ["photos", "images", "pictures"].contains($0) }) { folder = .pictures }
+
+        var file: String? = nil
+        if let f = n.firstIndex(where: { fileWords.contains($0) }) {
+            let skip: Set<String> = ["qui", "s", "appelle", "appellent", "appelee", "appele", "nommee", "nomme",
+                                     "called", "named", "la", "le", "l", "the", "mon", "ma", "my", "intitule", "intitulee"]
+            let stop: Set<String> = ["des", "du", "de", "dans", "from", "in", "par", "en", "a", "to", "et", "and",
+                                     "pour", "que", "qu", "j", "je", "sur", "on", "mes", "my", "telechargements",
+                                     "telechargement", "downloads", "bureau", "desktop", "documents", "photos", "pictures"]
+            var i = f + 1
+            while i < n.count, skip.contains(n[i]) { i += 1 }
+            var parts: [String] = []
+            while i < n.count, !(stop.contains(n[i]) && !parts.isEmpty) {
+                if ["point", "dot"].contains(n[i]), i + 1 < n.count, ["png", "jpg", "jpeg", "pdf", "heic", "gif", "mov", "mp4", "docx", "zip", "txt"].contains(n[i + 1]) {
+                    if let last = parts.popLast() { parts.append(last + "." + n[i + 1]) }
+                    i += 2; continue
+                }
+                if stop.contains(n[i]) { break }
+                parts.append(r[i].trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!?")))
+                i += 1
+            }
+            let name = parts.joined(separator: " ")
+            if !name.isEmpty { file = name } else if n[f] == "pdf" { file = "pdf" }
         }
-        return MailRequest(recipient: recipient, file: file, folder: folder)
+
+        var instruction: String? = nil
+        if bodyText == nil {
+            let extra = rest.joined(separator: " ").trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+            if !extra.isEmpty { instruction = extra }
+        }
+        return MailRequest(recipient: recipient, file: file, folder: folder,
+                           subject: subject, body: bodyText, instruction: instruction)
+    }
+
+    // MARK: Guided email answers
+
+    /// "c'est Tana", "à tana arobase gmail point com", "send it to Paul" → "Tana" / "tana@gmail.com" / "Paul".
+    static func recipientAnswer(_ raw: String) -> String {
+        var t = stripLead(raw, ["envoie le à", "envoie-le à", "envoie la à", "envoie-la à", "send it to", "it's for",
+                                "c'est pour", "c'est", "c est", "it's", "its", "to", "à", "a", "pour", "for", "the", "le", "la"])
+        t = t.trimmingCharacters(in: CharacterSet(charactersIn: " .,;:!?"))
+        return spokenEmail(t) ?? t
+    }
+
+    /// "l'objet c'est Voilà votre image" → "Voilà votre image"; "pas d'objet" / "no subject" → "".
+    static func subjectAnswer(_ raw: String) -> String {
+        let n = IntentParser.normalise(raw)
+        if ["pas d objet", "aucun objet", "sans objet", "no subject", "none", "rien", "nothing", "pas d objet merci"].contains(n) { return "" }
+        return stripLead(raw, ["l'objet c'est", "l'objet est", "l'objet", "objet", "en objet", "the subject is", "subject is",
+                               "subject", "c'est", "it's", "mets", "put", "write"])
+            .trimmingCharacters(in: CharacterSet(charactersIn: " .,;:!?\"«»“”"))
+    }
+
+    /// The message text, or nil when it is a request to write it ("écris-lui que…", "write something nice").
+    static func bodyAnswer(_ raw: String) -> (body: String?, instruction: String?) {
+        let n = IntentParser.normalise(raw)
+        let draftLeads = ["ecris lui", "ecris", "redige", "redige lui", "dis lui", "write", "tell her", "tell him",
+                          "tell them", "say that", "fais un message", "fais lui", "make it", "draft"]
+        if draftLeads.contains(where: { n.hasPrefix($0 + " ") || n == $0 }) || n.contains("pour lui dire") {
+            let what = stripLead(raw, ["écris-lui un message pour lui dire", "écris-lui pour lui dire", "écris-lui que", "écris-lui",
+                                       "écris un message pour lui dire", "écris que", "écris", "ecris", "rédige-lui", "rédige",
+                                       "dis-lui que", "dis-lui", "write her that", "write him that", "write that", "write",
+                                       "tell her that", "tell him that", "tell her", "tell him", "say that", "draft"])
+            return (nil, what.isEmpty ? raw : what)
+        }
+        return (stripLead(raw, ["le message c'est", "le message", "message", "c'est", "the message is", "it says", "body"])
+            .trimmingCharacters(in: CharacterSet(charactersIn: " :;\"«»“”")), nil)
+    }
+
+    /// "oui, Goku.png" / "yes the file called invoice" → "Goku.png" / "invoice"; nil for "no".
+    static func attachmentAnswer(_ raw: String) -> String? {
+        var t = stripLead(raw, ["oui", "ouais", "yes", "yeah", "c'est", "it's", "le fichier qui s'appelle", "l'image qui s'appelle",
+                                "le fichier", "l'image", "la photo", "the file called", "the image called", "the file", "the image",
+                                "attach", "joins", "joint"])
+        t = t.trimmingCharacters(in: CharacterSet(charactersIn: " ,;:!?"))
+        if t.hasSuffix(".") && !t.dropLast().contains(".") { t.removeLast() }
+        // "goku point png" → "goku.png"
+        for ext in ["png", "jpg", "jpeg", "pdf", "heic", "gif", "mov", "mp4", "docx", "zip", "txt"] {
+            t = t.replacingOccurrences(of: " point \(ext)", with: ".\(ext)", options: .caseInsensitive)
+                 .replacingOccurrences(of: " dot \(ext)", with: ".\(ext)", options: .caseInsensitive)
+        }
+        return t.isEmpty ? nil : t
+    }
+
+    /// Drops the first matching lead phrase (case/diacritic-insensitive, whole words), repeatedly.
+    static func stripLead(_ raw: String, _ leads: [String]) -> String {
+        var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        var changed = true
+        while changed {
+            changed = false
+            t = t.trimmingCharacters(in: CharacterSet(charactersIn: " ,:;-–—").union(.whitespaces))
+            for l in leads.sorted(by: { $0.count > $1.count }) {
+                guard let r = t.range(of: l, options: [.caseInsensitive, .diacriticInsensitive, .anchored]) else { continue }
+                if r.upperBound == t.endIndex || !t[r.upperBound].isLetter {
+                    t = String(t[r.upperBound...]); changed = true; break
+                }
+            }
+        }
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// "tana arobase gmail point com" / "tana at gmail dot com" / "tana@gmail.com." → "tana@gmail.com".
+    static func spokenEmail(_ s: String) -> String? {
+        var t = " " + s.lowercased() + " "
+        for (a, b) in [(" arobase ", "@"), (" at ", "@"), (" point ", "."), (" dot ", "."), (" tiret ", "-"),
+                       (" underscore ", "_"), (" dash ", "-")] {
+            t = t.replacingOccurrences(of: a, with: b)
+        }
+        t = t.replacingOccurrences(of: " ", with: "").trimmingCharacters(in: CharacterSet(charactersIn: ".,;:!?"))
+        let ok = t.range(of: #"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$"#, options: .regularExpression) != nil
+        return ok ? t : nil
+    }
+
+    private static func isSpelledEmail(_ words: [String]) -> Bool {
+        let n = words.map { IntentParser.normalise($0) }
+        return n.contains("arobase") || (n.contains("at") && (n.contains("dot") || n.contains("point")))
+    }
+
+    private static func firstMarker(_ markers: [String], in raw: String) -> (range: Range<String.Index>, marker: String)? {
+        var best: (range: Range<String.Index>, marker: String)? = nil
+        for m in markers {
+            var from = raw.startIndex
+            while let r = raw.range(of: m, options: [.caseInsensitive, .diacriticInsensitive], range: from..<raw.endIndex) {
+                // Whole words only.
+                let beforeOK = r.lowerBound == raw.startIndex || !raw[raw.index(before: r.lowerBound)].isLetter
+                let afterOK  = r.upperBound == raw.endIndex || !raw[r.upperBound].isLetter
+                if beforeOK && afterOK {
+                    if best == nil || r.lowerBound < best!.range.lowerBound
+                        || (r.lowerBound == best!.range.lowerBound && r.upperBound > best!.range.upperBound) {
+                        best = (r, m)
+                    }
+                    break
+                }
+                from = r.upperBound
+            }
+        }
+        return best
+    }
+
+    /// ": tu écris : Voilà votre image." → "Voilà votre image"
+    private static func cleanFreeText(_ s: String) -> String? {
+        var t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lead = ["tu écris", "tu ecris", "tu mets", "écris", "ecris", "mets", "write", "put", "it's", "is", "c'est", "ce sera"]
+        var changed = true
+        while changed {
+            changed = false
+            t = t.trimmingCharacters(in: CharacterSet(charactersIn: " :,;-–—\"«»“”").union(.whitespaces))
+            for l in lead where t.lowercased().hasPrefix(l + " ") || t.lowercased().hasPrefix(l + ":") || t.lowercased() == l {
+                t = String(t.dropFirst(l.count)); changed = true; break
+            }
+        }
+        t = t.trimmingCharacters(in: CharacterSet(charactersIn: " .,;\"«»“”").union(.whitespacesAndNewlines))
+        for tail in [" et", " and", " puis"] where t.lowercased().hasSuffix(tail) { t = String(t.dropLast(tail.count)) }
+        return t.isEmpty ? nil : t
+    }
+
+    // MARK: Web search: "cherche sur internet qui a gagné hier", "search the web for…"
+
+    /// The question in an explicit web search, "" when nothing follows ("cherche sur
+    /// internet"), nil when the phrase is not a web search. Leading and trailing words
+    /// ("cherche", "sur internet", "for me"…) are removed; the rest keeps its spelling.
+    static func webQuery(of raw: String) -> String? {
+        let toks = tokens(raw)
+        let n = toks.map { $0.norm }
+        guard !n.isEmpty else { return nil }
+        let joined = " " + n.joined(separator: " ") + " "
+        let webWords = [" internet ", " web ", " google ", " googler ", " en ligne ", " online ", " look up ", " look it up "]
+        guard webWords.contains(where: { joined.contains($0) }) else { return nil }
+        let verbs: Set<String> = ["cherche", "cherches", "chercher", "recherche", "recherches", "rechercher",
+                                  "regarde", "regardes", "regarder", "trouve", "trouves", "trouver",
+                                  "search", "look", "find", "check", "fais", "faire"]
+        // "Google" is a verb only first ("Google the weather…"), not in "ouvre Google Chrome".
+        guard n.contains(where: { verbs.contains($0) }) || ["google", "googler"].contains(n[0]) else { return nil }
+
+        let heads: [[String]] = [
+            ["est", "ce", "que", "tu", "pourrais"], ["est", "ce", "que", "tu", "peux"], ["je", "veux", "que", "tu"],
+            ["i", "want", "you", "to"], ["tu", "pourrais"], ["pourrais", "tu"], ["tu", "peux"], ["peux", "tu"],
+            ["can", "you"], ["could", "you"], ["would", "you"],
+            ["ok"], ["okay"], ["coucou"], ["hey"], ["dis"], ["alors"], ["bon"], ["euh"], ["please"], ["stp"],
+            ["fais", "moi", "une", "recherche"], ["fais", "une", "recherche"], ["faire", "une", "recherche"],
+            ["fais", "des", "recherches"], ["do", "a", "web", "search"], ["do", "a", "search"],
+            ["recherche", "internet"], ["recherche"], ["recherches"], ["rechercher"],
+            ["cherche", "moi"], ["cherche"], ["cherches"], ["chercher"], ["regarde"], ["regardes"], ["regarder"],
+            ["trouve", "moi"], ["trouve"], ["trouver"], ["search"], ["look", "it", "up"], ["look", "up"],
+            ["google"], ["googler"], ["find", "out"], ["find"], ["check"],
+            ["sur", "internet"], ["sur", "le", "web"], ["sur", "google"], ["en", "ligne"], ["internet"],
+            ["on", "the", "internet"], ["on", "the", "web"], ["the", "internet"], ["the", "web"], ["online"],
+            ["on", "google"], ["le", "web"],
+            ["des", "informations", "sur"], ["des", "infos", "sur"], ["infos", "sur"], ["information", "about"],
+            ["info", "about"], ["info", "on"], ["for", "me"], ["pour", "moi"], ["moi"], ["me"], ["for"],
+            ["about"], ["sur"],
+        ]
+        let tails: [[String]] = [
+            ["sur", "internet"], ["sur", "le", "web"], ["sur", "google"], ["en", "ligne"], ["on", "the", "internet"],
+            ["on", "the", "web"], ["on", "internet"], ["on", "google"], ["online"], ["internet"],
+            ["s", "il", "te", "plait"], ["s", "il", "vous", "plait"], ["stp"], ["please"], ["pour", "moi"],
+            ["for", "me"], ["merci"], ["thanks"], ["thank", "you"],
+        ]
+        var h = 0, t = n.count
+        var changed = true
+        while changed && h < t {
+            changed = false
+            for seq in heads where h + seq.count <= t && Array(n[h..<(h + seq.count)]) == seq {
+                h += seq.count; changed = true; break
+            }
+            for seq in tails where t - seq.count >= h && Array(n[(t - seq.count)..<t]) == seq {
+                t -= seq.count; changed = true; break
+            }
+        }
+        guard h < t else { return "" }
+        return String(raw[toks[h].range.lowerBound..<toks[t - 1].range.upperBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+    }
+
+    /// A question rather than a command: "qui a gagné hier ?", "what's the capital of…",
+    /// "c'est quoi…". Requests ("tu peux…", "can you…") are not questions.
+    static func looksLikeQuestion(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        var n = IntentParser.normalise(trimmed).split(separator: " ").map(String.init)
+        while let f = n.first, n.count > 1,
+              ["ok", "okay", "coucou", "hey", "alors", "bon", "euh", "et", "and", "so", "mais", "but"].contains(f) {
+            n.removeFirst()
+        }
+        guard let first = n.first else { return false }
+        let joined = n.joined(separator: " ")
+        let requests = ["tu peux", "peux tu", "est ce que tu peux", "est ce que tu pourrais", "tu pourrais",
+                        "pourrais tu", "can you", "could you", "would you", "will you", "please"]
+        if requests.contains(where: { joined == $0 || joined.hasPrefix($0 + " ") }) { return false }
+        if trimmed.hasSuffix("?") || trimmed.hasSuffix("？") { return true }
+        let starters: Set<String> = ["what", "who", "when", "where", "why", "how", "which", "whose",
+                                     "is", "are", "was", "were", "does", "did",
+                                     "qui", "quoi", "quand", "pourquoi", "comment", "combien",
+                                     "quel", "quelle", "quels", "quelles", "explain", "explique", "raconte"]
+        if starters.contains(first) { return true }
+        let phrases = ["qu est ce", "c est quoi", "c est qui", "est ce que", "est ce qu", "tell me", "dis moi",
+                       "parle moi", "ou est", "ou sont", "ou se", "ou en est"]
+        return phrases.contains(where: { joined == $0 || joined.hasPrefix($0 + " ") })
+    }
+
+    /// Text Coucou can say aloud: no markdown, links, URLs, citation marks or bullets.
+    static func spokenText(_ s: String) -> String {
+        var t = s
+        func sub(_ pattern: String, _ with: String) {
+            t = t.replacingOccurrences(of: pattern, with: with, options: .regularExpression)
+        }
+        sub(#"\[([^\]]+)\]\((?:[^)]*)\)"#, "$1")         // [text](url) → text
+        sub(#"https?://\S+"#, "")                          // bare URLs
+        sub(#"\[\d+(?:,\s*\d+)*\]"#, "")                // [1], [2, 3]
+        sub(#"(?m)^\s{0,3}#{1,6}\s*"#, "")                 // headings
+        sub(#"(?m)^\s*(?:[-*•]|\d+[.)])\s+"#, "")          // bullets, numbered lists
+        sub(#"\*\*|__|\*|`"#, "")                          // bold, italics, code
+        sub(#"\s*\n+\s*"#, " ")
+        sub(#"\s{2,}"#, " ")
+        sub(#"\s+([.,;:!?])"#, "$1")
+        return t.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Words of `raw` split like IntentParser.normalise, each with its normalised form and
+    /// its range in `raw` (to cut the original text, apostrophes and accents kept).
+    static func tokens(_ raw: String) -> [(norm: String, range: Range<String.Index>)] {
+        var out: [(norm: String, range: Range<String.Index>)] = []
+        var start: String.Index? = nil
+        var i = raw.startIndex
+        func close(_ end: String.Index) {
+            guard let s = start else { return }
+            let norm = IntentParser.normalise(String(raw[s..<end]))
+            if !norm.isEmpty { out.append((norm, s..<end)) }
+            start = nil
+        }
+        while i < raw.endIndex {
+            let c = raw[i]
+            if c == " " || c == "'" || c == "\u{2019}" || c == "-" || c.isNewline { close(i) }
+            else if start == nil { start = i }
+            i = raw.index(after: i)
+        }
+        close(raw.endIndex)
+        return out
     }
 
     // MARK: Open an app: "ouvre Figma", "open Safari"

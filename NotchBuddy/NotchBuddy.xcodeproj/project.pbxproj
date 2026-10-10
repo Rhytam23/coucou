@@ -71,6 +71,8 @@
 		326971DDA23F331116E5A628 /* VoiceBrain.swift in Sources */ = {isa = PBXBuildFile; fileRef = C563E55884A7750B40EC9A01 /* VoiceBrain.swift */; };
 		3451DB0668FAEEF09503D808 /* WakePhrase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A12EC8F605BBC37F8223D7AA /* WakePhrase.swift */; };
 		36EBFB9A047DEBAC43E5D0CC /* VoiceCaptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A8FB03801C49690C3789EFD /* VoiceCaptionManager.swift */; };
+		6D21DDD51A255B1E3061D81F /* ElevenLabsTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE24076E9F3476A814C87964 /* ElevenLabsTTS.swift */; };
+		34B22D329FA5D24C00A6EF91 /* ElevenLabsTTS.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE24076E9F3476A814C87964 /* ElevenLabsTTS.swift */; };
 		D08B378612B4CB0C8811925B /* VoiceDataSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C300BDBDD5FB8403291892 /* VoiceDataSources.swift */; };
 		A51E53A7BF9F23535F3A8B15 /* VoiceDataSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C300BDBDD5FB8403291892 /* VoiceDataSources.swift */; };
 		968932802E8017E2C23FF473 /* VoiceQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62762B5BCD2B2209EAF89A7A /* VoiceQuery.swift */; };
@@ -136,6 +138,7 @@
 		6FC65C190ED614C664C9BC17 /* SafeWebURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */; };
 		714B5BB7FFB0C8491AF67AD1 /* VoiceTranscriptHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE925A6844FE3E3C09131CE0 /* VoiceTranscriptHistory.swift */; };
 		718410ED630AE3AC5DF59A95 /* VoiceSpeaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD11C7925B0A7831BFC2199C /* VoiceSpeaker.swift */; };
+		9BAD96406059597681D89A92 /* VoiceGenderNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16BF6539981E9EEF2397D061 /* VoiceGenderNames.swift */; };
 		71CBD1D39A6668BF454CA1C5 /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		724E602A05FE5A6D58218E27 /* CoucouControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C406C508A86E215B3CBE3FC /* CoucouControl.swift */; };
 		725365FA4E184D970E7BB8B4 /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
@@ -307,6 +310,7 @@
 		F6CA56F362902839EF9A3E2E /* PhoneAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 60401D1023D17C3FD30D7113 /* PhoneAssets.xcassets */; };
 		F6D57EEBD7E937EFD2B715CF /* ClaudeHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */; };
 		F7162101509D8CAE59711602 /* VoiceSpeaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD11C7925B0A7831BFC2199C /* VoiceSpeaker.swift */; };
+		D166CDFE3CBAF1310E7EC1F7 /* VoiceGenderNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16BF6539981E9EEF2397D061 /* VoiceGenderNames.swift */; };
 		F8F95EAD88F70E0A147D1662 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		F9445A71BBF9E4D20224238E /* QuestionPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6993B34A0FFF8E3D454ADC /* QuestionPayload.swift */; };
 		F9685A58729FE64B23FCCFC5 /* VoiceResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C432FE1286945E42D3E11D7 /* VoiceResultView.swift */; };
@@ -387,6 +391,7 @@
 		38BEAB5F20A13E5806A42EC9 /* ApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalCard.swift; sourceTree = "<group>"; };
 		3A27178AA6007F7B56901750 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		3A8FB03801C49690C3789EFD /* VoiceCaptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCaptionManager.swift; sourceTree = "<group>"; };
+		DE24076E9F3476A814C87964 /* ElevenLabsTTS.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElevenLabsTTS.swift; sourceTree = "<group>"; };
 		F2C300BDBDD5FB8403291892 /* VoiceDataSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDataSources.swift; sourceTree = "<group>"; };
 		62762B5BCD2B2209EAF89A7A /* VoiceQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceQuery.swift; sourceTree = "<group>"; };
 		3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSettingsFile.swift; sourceTree = "<group>"; };
@@ -470,6 +475,7 @@
 		C563E55884A7750B40EC9A01 /* VoiceBrain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceBrain.swift; sourceTree = "<group>"; };
 		C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreetingCanvasView.swift; sourceTree = "<group>"; };
 		CD11C7925B0A7831BFC2199C /* VoiceSpeaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceSpeaker.swift; sourceTree = "<group>"; };
+		16BF6539981E9EEF2397D061 /* VoiceGenderNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceGenderNames.swift; sourceTree = "<group>"; };
 		D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHost.swift; sourceTree = "<group>"; };
 		D1A7C62058BB0C9D0DF58DCB /* VoiceIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceIntent.swift; sourceTree = "<group>"; };
 		D1D96E57E8DADE6B82628E3E /* OpenLeadMochiIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLeadMochiIntent.swift; sourceTree = "<group>"; };
@@ -737,6 +743,7 @@
 				A87F39805C78722F614295B4 /* VoiceAudio.swift */,
 				C563E55884A7750B40EC9A01 /* VoiceBrain.swift */,
 				3A8FB03801C49690C3789EFD /* VoiceCaptionManager.swift */,
+				DE24076E9F3476A814C87964 /* ElevenLabsTTS.swift */,
 				F2C300BDBDD5FB8403291892 /* VoiceDataSources.swift */,
 				62762B5BCD2B2209EAF89A7A /* VoiceQuery.swift */,
 				B328028D18F590D6680B8A2B /* VoiceEngine.swift */,
@@ -745,6 +752,7 @@
 				7C432FE1286945E42D3E11D7 /* VoiceResultView.swift */,
 				D4543CB771E0B723783F529E /* VoiceSettings.swift */,
 				CD11C7925B0A7831BFC2199C /* VoiceSpeaker.swift */,
+				16BF6539981E9EEF2397D061 /* VoiceGenderNames.swift */,
 				DE925A6844FE3E3C09131CE0 /* VoiceTranscriptHistory.swift */,
 				ABD7A2C29B15EFFAF67FF2DE /* VoiceWakeFilter.swift */,
 				A12EC8F605BBC37F8223D7AA /* WakePhrase.swift */,
@@ -1050,6 +1058,7 @@
 				88A8F2E4E754FAFABF6B1960 /* VoiceAudio.swift in Sources */,
 				326971DDA23F331116E5A628 /* VoiceBrain.swift in Sources */,
 				525FB188F09F68D26A9D587D /* VoiceCaptionManager.swift in Sources */,
+				6D21DDD51A255B1E3061D81F /* ElevenLabsTTS.swift in Sources */,
 				D08B378612B4CB0C8811925B /* VoiceDataSources.swift in Sources */,
 				968932802E8017E2C23FF473 /* VoiceQuery.swift in Sources */,
 				BDEFF4223DA949E2B8AB85A7 /* VoiceEngine.swift in Sources */,
@@ -1058,6 +1067,7 @@
 				CE5ACDD856C76B717ABA295F /* VoiceResultView.swift in Sources */,
 				502F2B0D607C511DD3B836B3 /* VoiceSettings.swift in Sources */,
 				718410ED630AE3AC5DF59A95 /* VoiceSpeaker.swift in Sources */,
+				9BAD96406059597681D89A92 /* VoiceGenderNames.swift in Sources */,
 				189811F4DB3C4F6030043643 /* VoiceTranscriptHistory.swift in Sources */,
 				BBCA973A1AE1385BBE79A834 /* VoiceWakeFilter.swift in Sources */,
 				C2212AA8BF5834B62308235B /* WakePhrase.swift in Sources */,
@@ -1239,6 +1249,7 @@
 				64FE8055CCAD30B44FE398E7 /* VoiceAudio.swift in Sources */,
 				273B404F55739D661D9489D8 /* VoiceBrain.swift in Sources */,
 				36EBFB9A047DEBAC43E5D0CC /* VoiceCaptionManager.swift in Sources */,
+				34B22D329FA5D24C00A6EF91 /* ElevenLabsTTS.swift in Sources */,
 				A51E53A7BF9F23535F3A8B15 /* VoiceDataSources.swift in Sources */,
 				EEDE0A39D216069D77F097C8 /* VoiceQuery.swift in Sources */,
 				80B0B3C777A9DC8C82952FD2 /* VoiceEngine.swift in Sources */,
@@ -1247,6 +1258,7 @@
 				F9685A58729FE64B23FCCFC5 /* VoiceResultView.swift in Sources */,
 				035F9A85BF71B21F9AA5E004 /* VoiceSettings.swift in Sources */,
 				F7162101509D8CAE59711602 /* VoiceSpeaker.swift in Sources */,
+				D166CDFE3CBAF1310E7EC1F7 /* VoiceGenderNames.swift in Sources */,
 				714B5BB7FFB0C8491AF67AD1 /* VoiceTranscriptHistory.swift in Sources */,
 				8DE75D1E260A1314D1C47885 /* VoiceWakeFilter.swift in Sources */,
 				3451DB0668FAEEF09503D808 /* WakePhrase.swift in Sources */,
