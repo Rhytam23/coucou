@@ -75,7 +75,7 @@ the provider, the PC streams the answer back. Protocol stays v1; old phones and 
 
 ## 4. What is not possible (be honest)
 
-- Away from the home Wi-Fi: the link is local-network only. It works over a VPN that puts the phone on the PC's network (stage G docs), not otherwise. No relay.
+- Away from the home Wi-Fi: the link is local-network only. It works over a VPN that puts the phone on the PC's network by itself, not otherwise. No relay.
 - The PC must be on, awake and running Coucou with the phone link on; if it sleeps the chat stops (the phone shows "computer not reachable").
 - No file or window context, no images, no voice, no PC-side chat history shown on the phone, and no web search choice (Anthropic's web search is part of
   the PC's Claude chat; it would run for the phone too, which costs more per question: the plan below asks you whether to turn it off for the phone).

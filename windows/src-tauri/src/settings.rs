@@ -89,8 +89,6 @@ pub struct Settings {
     pub phone_diffs: bool,
     /// Show the Claude and Codex plan usage on the phone (cap `usage`). Off by default; owned by Rust like the other phone switches.
     pub phone_usage: bool,
-    /// Accept phones that reach this computer through a VPN such as Tailscale (100.64.0.0/10). Off by default; owned by Rust like the other phone switches.
-    pub phone_vpn: bool,
     /// The service pills whose cards the phone may see, by pill id (cap `services`). None by default; owned by Rust like the other phone switches.
     pub phone_services: Vec<String>,
 }
@@ -155,7 +153,6 @@ impl Default for Settings {
             phone_answers: false,
             phone_diffs: false,
             phone_usage: false,
-            phone_vpn: false,
             phone_services: Vec::new(),
         }
     }
@@ -441,7 +438,6 @@ mod tests {
   "phoneAnswers": true,
   "phoneDiffs": true,
   "phoneUsage": true,
-  "phoneVpn": true,
   "phoneServices": ["integration_stripe"]
 }"##;
 
@@ -601,14 +597,6 @@ mod tests {
         assert!(!parse(&custom_with("phoneDiffs", None)).unwrap().phone_diffs);
         assert!(parse(&custom_with("phoneDiffs", Some(serde_json::json!(true)))).unwrap().phone_diffs);
         assert!(!parse(&custom_with("phoneDiffs", Some(serde_json::json!("yes")))).unwrap().phone_diffs, "a wrong type does not switch it on");
-    }
-
-    #[test]
-    fn a_file_from_before_phone_vpn_keeps_it_off() {
-        assert!(!Settings::default().phone_vpn);
-        assert!(!parse(&custom_with("phoneVpn", None)).unwrap().phone_vpn);
-        assert!(parse(&custom_with("phoneVpn", Some(serde_json::json!(true)))).unwrap().phone_vpn);
-        assert!(!parse(&custom_with("phoneVpn", Some(serde_json::json!("yes")))).unwrap().phone_vpn, "a wrong type does not switch it on");
     }
 
     #[test]
@@ -944,7 +932,6 @@ mod tests {
                 "phoneAnswers",
                 "phoneDiffs",
                 "phoneUsage",
-                "phoneVpn",
                 "phoneServices",
             ]
         );

@@ -58,10 +58,6 @@ pub trait Features: Send + Sync {
     fn usage(&self) -> bool {
         false
     }
-    /// Also accept phones that arrive through a VPN (the carrier-grade range 100.64.0.0/10 that Tailscale uses).
-    fn vpn(&self) -> bool {
-        false
-    }
     /// The services the user allowed for the phone (their ids); empty: none.
     fn services(&self) -> Vec<String> {
         Vec::new()
@@ -146,7 +142,7 @@ pub fn serve(listener: TcpListener, acceptor: TlsAcceptor, shared: Arc<Shared>) 
                     continue;
                 }
             };
-            if !admits(peer.ip(), shared.features.vpn()) {
+            if !is_local(peer.ip()) {
                 continue; // dropped before any byte is read
             }
             if shared.connections.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
@@ -175,23 +171,6 @@ pub fn is_local(ip: IpAddr) -> bool {
             let first = v6.segments()[0];
             v6.is_loopback() || (first & 0xfe00) == 0xfc00 /* fc00::/7 */ || (first & 0xffc0) == 0xfe80 /* fe80::/10 */
         }
-    }
-}
-
-/// Who may connect: the local network always, VPN addresses only when the user allowed them.
-pub fn admits(ip: IpAddr, vpn_allowed: bool) -> bool {
-    is_local(ip) || (vpn_allowed && is_vpn(ip))
-}
-
-/// A VPN address: 100.64.0.0/10, the range Tailscale and similar tools hand out. Only accepted when the user turned
-/// "Allow my phone through a VPN" on; it is never part of [`is_local`].
-pub fn is_vpn(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(v4) => {
-            let o = v4.octets();
-            o[0] == 100 && (o[1] & 0xc0) == 0x40
-        }
-        IpAddr::V6(v6) => v6.to_ipv4_mapped().is_some_and(|v4| is_vpn(IpAddr::V4(v4))),
     }
 }
 
@@ -419,30 +398,8 @@ mod tests {
         for ok in ["192.168.1.20", "10.0.0.5", "172.16.3.4", "172.31.255.255", "127.0.0.1", "169.254.7.7", "::1", "fd12:3456::1", "fe80::1", "::ffff:192.168.0.9"] {
             assert!(is_local(ok.parse().unwrap()), "{ok}");
         }
-        for no in ["8.8.8.8", "172.32.0.1", "100.64.0.1", "100.127.255.255", "2001:db8::1", "::ffff:8.8.8.8", "0.0.0.0"] {
+        for no in ["8.8.8.8", "172.32.0.1", "100.64.0.1", "2001:db8::1", "::ffff:8.8.8.8", "0.0.0.0"] {
             assert!(!is_local(no.parse().unwrap()), "{no}");
-        }
-    }
-
-    #[test]
-    fn a_vpn_address_is_admitted_only_when_the_user_allowed_it() {
-        let ip: IpAddr = "100.101.102.103".parse().unwrap();
-        assert!(!admits(ip, false));
-        assert!(admits(ip, true));
-        // The switch widens nothing else.
-        for other in ["8.8.8.8", "100.128.0.1", "2001:db8::1"] {
-            assert!(!admits(other.parse().unwrap(), true), "{other}");
-        }
-        assert!(admits("192.168.1.2".parse().unwrap(), false));
-    }
-
-    #[test]
-    fn the_vpn_range_is_exactly_100_64_to_100_127() {
-        for yes in ["100.64.0.1", "100.100.100.100", "100.127.255.255", "::ffff:100.101.1.1"] {
-            assert!(is_vpn(yes.parse().unwrap()), "{yes}");
-        }
-        for no in ["100.63.255.255", "100.128.0.1", "101.64.0.1", "192.168.1.1", "10.0.0.1", "8.8.8.8", "fd7a:115c:a1e0::1"] {
-            assert!(!is_vpn(no.parse().unwrap()), "{no}");
         }
     }
 }

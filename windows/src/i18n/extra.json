@@ -3723,39 +3723,6 @@
    "pt-BR": "Cada marcação permite que seu celular pareado veja o cartão desse serviço: um título e até três linhas curtas, somente leitura. Nada aparece até você marcar. Endereços, assuntos, links ou chaves nunca são enviados.",
    "ru": "Каждая отметка позволяет подключённому телефону видеть карточку сервиса: заголовок и до трёх коротких строк, только для чтения. Пока вы не отметите, ничего не показывается. Адреса, темы писем, ссылки и ключи не отправляются никогда.",
    "id": "Setiap centang memungkinkan ponsel Anda yang terhubung melihat kartu layanan itu: satu judul dan hingga tiga baris pendek, hanya-baca. Tidak ada yang ditampilkan sebelum Anda mencentangnya. Alamat, subjek, tautan, atau kunci tidak pernah dikirim."
-  },
-  "Also accept my phone through a VPN": {
-   "zh-Hans": "也允许通过 VPN 连接我的手机",
-   "hi": "VPN के ज़रिए भी मेरे फ़ोन को स्वीकार करें",
-   "es": "Aceptar también mi teléfono a través de una VPN",
-   "ar": "قبول هاتفي أيضًا عبر شبكة VPN",
-   "fr": "Accepter aussi mon téléphone via un VPN",
-   "bn": "VPN-এর মাধ্যমেও আমার ফোন গ্রহণ করুন",
-   "pt-BR": "Aceitar também meu celular por uma VPN",
-   "ru": "Принимать мой телефон также через VPN",
-   "id": "Terima juga ponsel saya lewat VPN"
-  },
-  "For when you are away from home: install Tailscale (or a similar VPN) on this computer and on the phone, turn this on, then pair again. Only your own VPN addresses are accepted, never the open internet, and the pairing code and pinned certificate are still required.": {
-   "zh-Hans": "适用于不在家时：在这台电脑和手机上安装 Tailscale（或类似的 VPN），打开此开关，然后重新配对。只接受您自己 VPN 的地址，绝不接受开放的互联网，并且仍需配对码和固定证书。",
-   "hi": "जब आप घर से दूर हों: इस कंप्यूटर और फ़ोन पर Tailscale (या ऐसा ही कोई VPN) इंस्टॉल करें, इसे चालू करें, फिर दोबारा पेयर करें। केवल आपके अपने VPN के पते स्वीकार होते हैं, खुला इंटरनेट कभी नहीं, और पेयरिंग कोड व पिन किया गया प्रमाणपत्र फिर भी ज़रूरी हैं।",
-   "es": "Para cuando estés fuera de casa: instala Tailscale (u otra VPN similar) en este ordenador y en el teléfono, activa esto y vuelve a emparejar. Solo se aceptan las direcciones de tu propia VPN, nunca internet abierto, y siguen siendo necesarios el código de emparejamiento y el certificado fijado.",
-   "ar": "للاستخدام خارج المنزل: ثبّت Tailscale (أو VPN مشابهة) على هذا الكمبيوتر وعلى الهاتف، ثم فعّل هذا الخيار وأعد الإقران. تُقبل عناوين شبكتك الافتراضية الخاصة فقط، وليس الإنترنت المفتوح أبدًا، ويظل رمز الإقران والشهادة المثبتة مطلوبين.",
-   "fr": "Pour quand vous êtes loin de chez vous : installez Tailscale (ou un VPN similaire) sur cet ordinateur et sur le téléphone, activez ceci, puis jumelez à nouveau. Seules les adresses de votre propre VPN sont acceptées, jamais l'internet ouvert, et le code de jumelage et le certificat épinglé restent requis.",
-   "bn": "বাড়ির বাইরে থাকলে: এই কম্পিউটার ও ফোনে Tailscale (বা অনুরূপ VPN) ইনস্টল করুন, এটি চালু করুন, তারপর আবার পেয়ার করুন। শুধু আপনার নিজের VPN-এর ঠিকানা গ্রহণ করা হয়, খোলা ইন্টারনেট কখনোই নয়, আর পেয়ারিং কোড ও পিন করা সার্টিফিকেট তবুও লাগবে।",
-   "pt-BR": "Para quando você está fora de casa: instale o Tailscale (ou uma VPN parecida) neste computador e no celular, ative isto e pareie de novo. Só os endereços da sua própria VPN são aceitos, nunca a internet aberta, e o código de pareamento e o certificado fixado continuam necessários.",
-   "ru": "Для случаев, когда вы вне дома: установите Tailscale (или похожий VPN) на этот компьютер и на телефон, включите это и свяжите устройства заново. Принимаются только адреса вашего собственного VPN, но не открытый интернет; код сопряжения и закреплённый сертификат по-прежнему нужны.",
-   "id": "Untuk saat Anda jauh dari rumah: pasang Tailscale (atau VPN serupa) di komputer ini dan di ponsel, aktifkan ini, lalu pasangkan ulang. Hanya alamat VPN Anda sendiri yang diterima, tidak pernah internet terbuka, dan kode pemasangan serta sertifikat yang disematkan tetap diperlukan."
-  },
-  "This computer's VPN address: {address}. The pairing code below uses it while this is on.": {
-   "zh-Hans": "这台电脑的 VPN 地址：{address}。此开关打开时，下方的配对码会使用该地址。",
-   "hi": "इस कंप्यूटर का VPN पता: {address}। यह चालू रहने पर नीचे का पेयरिंग कोड इसी का उपयोग करता है।",
-   "es": "Dirección VPN de este ordenador: {address}. El código de emparejamiento de abajo la usa mientras esto esté activado.",
-   "ar": "عنوان VPN لهذا الكمبيوتر: {address}. يستخدمه رمز الإقران أدناه ما دام هذا الخيار مفعّلًا.",
-   "fr": "Adresse VPN de cet ordinateur : {address}. Le code de jumelage ci-dessous l'utilise tant que ceci est activé.",
-   "bn": "এই কম্পিউটারের VPN ঠিকানা: {address}। এটি চালু থাকলে নিচের পেয়ারিং কোড এটিই ব্যবহার করে।",
-   "pt-BR": "Endereço VPN deste computador: {address}. O código de pareamento abaixo o usa enquanto isto estiver ativado.",
-   "ru": "VPN-адрес этого компьютера: {address}. Код сопряжения ниже использует его, пока это включено.",
-   "id": "Alamat VPN komputer ini: {address}. Kode pemasangan di bawah memakainya selama ini aktif."
   }
  }
 }
