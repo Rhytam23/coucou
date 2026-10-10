@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff | usage | services
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | relayonly | chatstate | askquestion | outfit | diff | usage | services
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -120,6 +120,15 @@ class DebugPillReceiver : BroadcastReceiver() {
             // phone has to find the computer by itself (needs a paired computer with the phone link on).
             //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange
             "addrchange" -> model.debugAddressChanged()
+            // Try the relay path without leaving the home Wi-Fi: the direct link is skipped, so the connection must go
+            // through the relay (the pairing must include one). `--ez on false` goes back to the normal order.
+            //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind relayonly --ez on true
+            //   adb logcat -s CoucouRelay        (route and issue only, never an address or a key)
+            "relayonly" -> {
+                val on = intent.getBooleanExtra("on", true)
+                android.util.Log.d("CoucouRelay", "relay only: $on")
+                model.debugRelayOnly(on)
+            }
             // Each state of the Chat tab without a computer, then open the Chat tab:
             //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind chatstate --es state offline
             // state = notpaired | offline | off | nomodels | ready | real (back to the real state)

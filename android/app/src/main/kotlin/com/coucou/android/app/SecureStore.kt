@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.coucou.android.link.PairingPayload
+import com.coucou.android.link.PairingCodec
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -33,7 +34,8 @@ class SecureStore(context: Context) {
     }
 
     fun savePairing(p: PairingPayload) {
-        val plain = listOf(p.host, p.port.toString(), p.certSha256, p.token, p.desktopName).joinToString("\n")
+        // K and the relay's access key are inside the same Keystore-encrypted blob as the token: never in clear on the disk.
+        val plain = PairingCodec.encode(p)
         val c = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         val ct = c.doFinal(plain.toByteArray(Charsets.UTF_8))
         prefs.edit().putString(PREF, Base64.encodeToString(c.iv + ct, Base64.NO_WRAP)).apply()
@@ -46,8 +48,7 @@ class SecureStore(context: Context) {
             val c = Cipher.getInstance("AES/GCM/NoPadding").apply {
                 init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, raw, 0, IV_BYTES))
             }
-            val parts = String(c.doFinal(raw, IV_BYTES, raw.size - IV_BYTES), Charsets.UTF_8).split("\n")
-            PairingPayload(parts[0], parts[1].toInt(), parts[2], parts[3], parts.getOrElse(4) { "" })
+            PairingCodec.decode(String(c.doFinal(raw, IV_BYTES, raw.size - IV_BYTES), Charsets.UTF_8)) ?: error("unreadable pairing")
         } catch (_: Exception) {
             clearPairing() // unreadable (key lost, corrupted): start clean instead of crashing
             null

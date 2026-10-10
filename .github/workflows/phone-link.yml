@@ -107,7 +107,12 @@ jobs:
         run: node scripts/gen-strings.mjs --check
       - name: Relay test vectors are up to date
         run: node relay/tools/gen-vectors.mjs --check
+      - name: Relay dependencies (the Node twin that the Kotlin WebSocket tests talk to)
+        working-directory: android/relay
+        run: npm ci
       - name: Tests, debug build, lint
+        env:
+          COUCOU_NODE_RELAY: '1'
         run: ./gradlew test assembleDebug lint --console=plain
       - name: No ads, billing or analytics (condition of the author's permission)
         run: "! grep -rEi 'admob|play-services|billingclient|firebase|crashlytics|com.google.android.gms|mlkit' app/build.gradle.kts"

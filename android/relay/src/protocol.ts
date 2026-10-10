@@ -82,7 +82,15 @@ export async function joinVerifier(proof: string): Promise<string> {
 export class Bucket {
   private tokens: number;
   private last: number;
-  constructor(private readonly perSecond: number, private readonly burst: number, private readonly now: () => number = Date.now) {
+  private readonly perSecond: number;
+  private readonly burst: number;
+  private readonly now: () => number;
+  // Plain fields, not constructor parameter properties: the Node twin runs this file with Node's type stripping,
+  // which only accepts erasable syntax.
+  constructor(perSecond: number, burst: number, now: () => number = Date.now) {
+    this.perSecond = perSecond;
+    this.burst = burst;
+    this.now = now;
     this.tokens = burst;
     this.last = now();
   }

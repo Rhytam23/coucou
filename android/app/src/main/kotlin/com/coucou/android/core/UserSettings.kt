@@ -36,6 +36,8 @@ data class UserSettings(
     val quiet: QuietHours = QuietHours(false, 22 * 60, 8 * 60),
     /** Mochi's outfit on this phone: "computer" (follow the one chosen on the computer), "auto", "none" or an outfit. */
     val outfit: String = com.coucou.android.mochi.outfit.Wardrobe.FOLLOW,
+    /** Use the relay when the computer is not reachable on this network (only matters when the pairing includes one). */
+    val useRelay: Boolean = true,
 ) {
     companion object {
         private const val SOUND = "sound_on"
@@ -45,6 +47,7 @@ data class UserSettings(
         private const val Q_FROM = "quiet_from"
         private const val Q_TO = "quiet_to"
         private const val OUTFIT = "outfit_choice"
+        private const val RELAY = "use_relay"
 
         fun load(store: KeyValueStore): UserSettings {
             val d = UserSettings()
@@ -58,6 +61,7 @@ data class UserSettings(
                     QuietHours.wrap(store.getInt(Q_TO, d.quiet.toMin)),
                 ),
                 outfit = com.coucou.android.mochi.outfit.Wardrobe.parseLocal(store.getString(OUTFIT, d.outfit)),
+                useRelay = store.getBoolean(RELAY, d.useRelay),
             )
         }
 
@@ -69,6 +73,7 @@ data class UserSettings(
             store.put(Q_FROM, QuietHours.wrap(s.quiet.fromMin))
             store.put(Q_TO, QuietHours.wrap(s.quiet.toMin))
             store.put(OUTFIT, com.coucou.android.mochi.outfit.Wardrobe.parseLocal(s.outfit))
+            store.put(RELAY, s.useRelay)
         }
     }
 }

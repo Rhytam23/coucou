@@ -39,6 +39,13 @@ class UserSettingsTest {
         assertFalse(loaded.quiet.enabled)
     }
 
+    @Test fun theRelayIsUsedByDefaultAndTheChoiceSurvivesARestart() {
+        assertTrue("on by default: it only matters when the pairing has a relay", UserSettings.load(Memory()).useRelay)
+        val disk = Memory()
+        UserSettings.save(disk, UserSettings(useRelay = false))
+        assertFalse(UserSettings.load(disk).useRelay)
+    }
+
     @Test fun settingsSurviveARestart() {
         val disk = Memory()
         UserSettings.save(disk, UserSettings(soundOn = false, volume = 0.05f, notifyDone = false, quiet = QuietHours(true, 21 * 60, 7 * 60 + 30)))

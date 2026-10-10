@@ -39,7 +39,9 @@ import com.coucou.android.link.DiscoveryPolicy
 import com.coucou.android.link.DiscoveryState
 import com.coucou.android.link.PinnedProbe
 import com.coucou.android.link.DemoLink
+import com.coucou.android.link.Connector
 import com.coucou.android.link.DesktopLink
+import com.coucou.android.link.PinnedTls
 import com.coucou.android.link.LinkClient
 import com.coucou.android.link.LinkListener
 import com.coucou.android.link.LinkState
@@ -75,6 +77,17 @@ class AppModel(private val context: Context) : LinkListener {
     /** The pairing the running link uses (with the address in force); the token stays in memory only as long as the link does. */
     @Volatile private var currentPairing: PairingPayload? = null
     private val probeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "coucou-probe").apply { isDaemon = true } }
+    /** Which way the link reaches the computer now (null until connected), and why the relay failed, if it did. */
+    var route by mutableStateOf<com.coucou.android.link.Route?>(null); private set
+    var relayIssue by mutableStateOf(com.coucou.android.link.RelayIssue.NONE); private set
+    private val transport = com.coucou.android.link.TransportPolicy({ currentPairing?.relay != null && settings.useRelay })
+    @Volatile private var fallback: com.coucou.android.link.FallbackConnector? = null
+    @Volatile private var relayConnector: com.coucou.android.link.RelayConnector? = null
+
+    /** Whether the pairing in force includes a relay (shown in Settings > Away from home Wi-Fi). */
+    val hasRelay: Boolean get() = currentPairing?.relay != null
+    val relayHost: String? get() = currentPairing?.relay?.relayUrl()?.host
+
     private val netWatch = NetworkWatch(context) { up -> main.post { onNetworkChanged(up) } }
     private val finder = AddressFinder(
         source = NsdDiscovery(context), probe = PinnedProbe,
@@ -111,9 +124,12 @@ class AppModel(private val context: Context) : LinkListener {
     var settings by mutableStateOf(UserSettings.load(kv)); private set
 
     fun updateSettings(next: UserSettings) {
+        val relayChanged = next.useRelay != settings.useRelay
         settings = next
         UserSettings.save(kv, next)
         applySound()
+        // Switching the relay on or off rebuilds the connection with the right routes.
+        if (relayChanged) currentPairing?.let { restartLink(it) }
     }
 
     private fun applySound() {
@@ -400,7 +416,7 @@ class AppModel(private val context: Context) : LinkListener {
         mode = Mode.PAIRED
         desktopName = p.desktopName.ifBlank { p.host }
         currentPairing = p
-        link = LinkClient(p, Build.MODEL ?: "Android", this).also { it.start() }
+        link = newLink(p).also { it.start() }
         netWatch.start()
         LinkService.start(context)
     }
@@ -411,8 +427,30 @@ class AppModel(private val context: Context) : LinkListener {
         val q = Discovery.withAddress(p, host, port)
         store.savePairing(q)
         currentPairing = q
+        restartLink(q)
+    }
+
+    /** A link for this pairing: the direct connection, and the relay behind it when the pairing has one and the user allows it. */
+    private fun newLink(p: PairingPayload): LinkClient {
+        val lan = PinnedTls.connector(p)
+        val relay = p.relay
+        fallback?.stop()
+        val connector: Connector = if (relay != null && settings.useRelay) {
+            val rc = com.coucou.android.link.RelayConnector(relay)
+            relayConnector = rc
+            com.coucou.android.link.FallbackConnector(lan, rc, transport, onRoute = { r -> main.post { route = r } }).also { fallback = it }
+        } else {
+            relayConnector = null
+            fallback = null
+            route = null
+            lan
+        }
+        return LinkClient(p, Build.MODEL ?: "Android", this, connector = connector)
+    }
+
+    private fun restartLink(p: PairingPayload) {
         link?.stop()
-        link = LinkClient(q, Build.MODEL ?: "Android", this).also { it.start() }
+        link = newLink(p).also { it.start() }
     }
 
     /** A computer matching the paired fingerprint answered with the pinned certificate (checked by a bare TLS handshake). */
@@ -425,6 +463,7 @@ class AppModel(private val context: Context) : LinkListener {
     private fun onNetworkChanged(wifiUp: Boolean) {
         if (mode != Mode.PAIRED) return
         if (!wifiUp) { finder.stop(); return } // no Wi-Fi: nothing to scan
+        fallback?.networkChanged() // on the relay: is the computer on this network? Then move back to the direct link
         link?.retryNow() // do not wait out the backoff on a new network
         if (mayDiscover()) finder.networkChanged()
     }
@@ -438,6 +477,12 @@ class AppModel(private val context: Context) : LinkListener {
         if (currentPairing == null) return false
         useAddress(host, port)
         return true
+    }
+
+    /** Debug only (see DebugPillReceiver): skip the direct link so the relay path can be tried on the home Wi-Fi. */
+    fun debugRelayOnly(on: Boolean) {
+        transport.relayOnly = on
+        currentPairing?.let { restartLink(it) }
     }
 
     /** Debug only (see DebugPillReceiver): pretend the computer's address changed, so the search has to repair it. */
@@ -465,6 +510,11 @@ class AppModel(private val context: Context) : LinkListener {
         closeDiff()
         usage = null
         services = emptyList()
+        fallback?.stop()
+        fallback = null
+        relayConnector = null
+        route = null
+        relayIssue = com.coucou.android.link.RelayIssue.NONE
         finder.stop()
         netWatch.stop()
         currentPairing = null
@@ -520,6 +570,7 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onState(state: LinkState) {
         main.post {
             linkState = state
+            relayIssue = relayConnector?.issue ?: com.coucou.android.link.RelayIssue.NONE
             if (state == LinkState.CONNECTED) finder.connected() // found it (or never lost it): stop looking
             // A card for a request we can no longer answer would only produce "no longer pending".
             if (state != LinkState.CONNECTED && mode == Mode.PAIRED) dropApprovals()
@@ -706,6 +757,19 @@ class AppModel(private val context: Context) : LinkListener {
             removeQuestion(fingerprint)
             removeApproval(fingerprint)
             if (wantAllow == fingerprint) wantAllow = null
+        }
+    }
+
+    /** The computer replaced the relay's access key: this phone follows it (kept encrypted) and reconnects with it. */
+    override fun onRelayAccess(access: String) {
+        main.post {
+            val p = currentPairing ?: return@post
+            val r = p.relay ?: return@post
+            if (r.access == access) return@post
+            val q = p.copy(relay = r.copy(access = access))
+            store.savePairing(q)
+            currentPairing = q
+            restartLink(q)
         }
     }
 

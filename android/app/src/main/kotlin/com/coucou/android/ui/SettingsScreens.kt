@@ -47,6 +47,9 @@ import com.coucou.android.app.Mode
 import com.coucou.android.core.HistoryDays
 import com.coucou.android.core.HomeText
 import com.coucou.android.core.QuietHours
+import com.coucou.android.core.RelayLineKind
+import com.coucou.android.core.RelayStatus
+import com.coucou.android.link.LinkState
 import com.coucou.android.sound.SoundVolume
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -160,6 +163,11 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
                     )
                 }
             }
+        }
+
+        if (model.mode == Mode.PAIRED) {
+            item { SectionHeading(stringResource(R.string.settings_section_away)) }
+            item { RelayCard(model) }
         }
 
         item { SectionHeading(stringResource(R.string.settings_section_display)) }
@@ -285,5 +293,37 @@ fun HistoryScreen(model: AppModel, onBack: () -> Unit) {
             item { PillButton(stringResource(R.string.history_clear), { model.clearDecisions() }, Modifier.fillMaxWidth(), PillKind.DANGER) }
         }
         item { Spacer(Modifier.height(Gutter)) }
+    }
+}
+
+/**
+ * "Away from home Wi-Fi": whether this phone also reaches the computer through the relay, and which way it is connected
+ * right now. The switch is shown only when the pairing includes a relay (the computer's switch was on when it was paired).
+ */
+@Composable
+private fun RelayCard(model: AppModel) {
+    val t = tokens()
+    val s = model.settings
+    val kind = RelayStatus.kind(model.hasRelay, s.useRelay, model.linkState == LinkState.CONNECTED, model.route, model.relayIssue)
+    val line = when (kind) {
+        RelayLineKind.NO_RELAY_IN_PAIRING -> stringResource(R.string.relay_line_none)
+        RelayLineKind.SWITCHED_OFF -> stringResource(R.string.relay_line_off)
+        RelayLineKind.DIRECT -> stringResource(R.string.relay_line_direct)
+        RelayLineKind.VIA_RELAY -> stringResource(R.string.relay_line_via, model.relayHost.orEmpty())
+        RelayLineKind.WAITING -> stringResource(R.string.relay_line_waiting)
+        RelayLineKind.ACCESS_REFUSED -> stringResource(R.string.relay_line_access)
+        RelayLineKind.ROOM_TAKEN -> stringResource(R.string.relay_line_taken)
+        RelayLineKind.RATE_LIMITED -> stringResource(R.string.relay_line_rate)
+        RelayLineKind.UNREACHABLE -> stringResource(R.string.relay_line_unreachable)
+        RelayLineKind.COMPUTER_AWAY -> stringResource(R.string.relay_line_away)
+    }
+    Panel {
+        if (model.hasRelay) {
+            SettingSwitch(stringResource(R.string.relay_use), stringResource(R.string.relay_use_hint), s.useRelay) {
+                model.updateSettings(s.copy(useRelay = it))
+            }
+            RowDivider()
+        }
+        Text(line, Modifier.padding(Spacing.INSIDE.dp), style = TypeScale.SECONDARY.style(t.textDim.c()))
     }
 }

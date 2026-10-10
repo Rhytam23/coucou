@@ -272,7 +272,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | R1 | Relay service **(done)** | `android/relay/` Worker + `Room` object, `wrangler.toml` (observability off, no secrets), `dev-relay.mjs` (Node twin for tests/self-host), deploy README | **vitest + miniflare** (`@cloudflare/vitest-pool-workers`): routing by id, bad ids refused before object creation, join proof, replacement rules, size limit 1009, token bucket, peer hints, no buffering when the peer is absent, **no storage calls**, no plaintext handling. `tsc` clean. |
 | R2 | Secure channel core **(done)** | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
 | R3 | PC client **(done)** | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
-| R4 | Android client | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
+| R4 | Android client **(done)** | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
 | R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
 | R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
 
@@ -381,3 +381,35 @@ no permission is ever approved without an explicit click and the phone's screen-
 - A test that replays a recorded frame, flips a frame and sends frames sealed under old session keys shows each one ends the
   conversation and gives the slot back.
 - Not tested here: a real Cloudflare relay (R5 runs the real Worker under `wrangler dev`) and a real phone (R4).
+
+### Findings while building R4
+
+- **The WebSocket client is ours (D2)**: `link/WebSocket.kt`, about 350 lines, no library. Tests for framing (RFC 6455 section 5.7 examples, every
+  length boundary), masking (fresh mask per frame, an unmasked client frame is a bug), fragmentation (with a ping in between, a UTF-8
+  character split across fragments), oversize (a header claiming 1 GiB is refused before anything is allocated; a message over the limit
+  even in small fragments), the server rules (reserved bits, masked server frames, fragmented or long control frames, unknown opcodes,
+  bad close codes), a truncated stream, 30,000 random inputs and 20,000 bit-flipped valid streams (only a protocol error or end of stream
+  may come out), and the upgrade (RFC accept value, header injection, every wrong response). Six mutations (no masking, masked server
+  frames accepted, no size limit, no relay-first window, an accept for another init, partial relay fields accepted) are each caught.
+  OkHttp stays the fallback; `RelayGuardsTest` fails if any WebSocket library is added to Gradle without this decision being revisited.
+- **Checked against someone else's WebSocket**: `RelayNodeTwinTest` talks to the relay's Node twin (the `ws` package, a separate
+  implementation of the RFC): both directions, five 40 KB lines in a row, the unchanged `LinkClient` hello/welcome, a wrong access key
+  (401), a wrong pairing key in a room in use, a computer that is not there, one that joins later, one that leaves, and a second phone
+  replacing the first. It runs when `COUCOU_NODE_RELAY=1` (CI does `npm ci` in `android/relay` first); everything else runs everywhere.
+- The Node twin refused to start on Node 22 because `Bucket` used a constructor parameter property, which Node's type stripping does not
+  allow although the file said "erasable TypeScript only". Fixed in `src/protocol.ts` (plain fields); the relay's own tests still pass.
+- **`LinkClient` did not change** except for the new capability: the relay is a `Connector` returning a `Socket` whose bytes are the
+  encrypted lines (`RelayStreamSocket`). A test runs the real `LinkClient` over it (hello, welcome, approval, decision).
+- **Selection rules** are pure (`TransportPolicy`, tested with a fake clock): LAN first with a 2.5 s timeout, the relay when the LAN does
+  not answer, the relay first for 60 s after a LAN failure (with the LAN as fallback if the relay fails too), a LAN probe every 90 s
+  and on a network change while on the relay, and a switch back as soon as the LAN answers. The probe is one pinned TLS handshake that
+  is closed at once; it runs only while the link is on the relay.
+- A failure to write `init` hid the relay's close reason (the connection was already gone): the connector now reads the close frame
+  after a failed write, so "room is taken" is told apart from "network dropped". Found by a test.
+- The pairing, K and the access key stay in the same Keystore-encrypted blob as the token (`PairingCodec`; a pairing saved by an older
+  build loads as LAN-only). Nothing in the new code logs, and a test fails if a log line in `AppModel` names a relay secret.
+- New Settings card "Away from home Wi-Fi" (a switch, on by default, shown only when the pairing has a relay, and one sentence saying
+  how the phone is connected right now or why not). Debug only: `adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver
+  --es kind relayonly --ez on true` skips the direct link so the relay path can be tried at home; `adb logcat -s CoucouRelay`.
+- Not tested here: Compose and lint (CI only), a real phone, the Doze behaviour and battery cost of the foreground-service WebSocket, and
+  real Cloudflare. R5 runs the Rust PC against the Kotlin phone through the real Worker.

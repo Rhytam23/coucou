@@ -18,7 +18,7 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs", "usage", "services")
+    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs", "usage", "services", "relay")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
@@ -32,6 +32,8 @@ object Protocol {
     const val CAP_USAGE = "usage"
     /** Read-only cards of the services the user ticked on the computer (Stripe, GitHub...). */
     const val CAP_SERVICES = "services"
+    /** The computer's relay switch is on: it sends the new access key when the user replaces it (docs/RELAY_LINK.md). */
+    const val CAP_RELAY = "relay"
     const val MAX_SERVICES = 7
     const val MAX_SERVICE_ITEMS = 3
     const val MAX_SERVICE_TEXT = 80
@@ -121,6 +123,8 @@ sealed interface ServerMsg {
     data class Question(val request: QuestionRequest) : ServerMsg
     /** What Mochi wears on the computer: "auto" or an outfit, exactly one of [com.coucou.android.mochi.outfit.Wardrobe.SELECTIONS]. */
     data class Prefs(val outfit: String) : ServerMsg
+    /** The relay's access key was replaced on the computer (only with the `relay` capability). */
+    data class RelayAccess(val access: String) : ServerMsg
     /** The service cards the user allowed; an empty list takes them away. */
     data class Services(val cards: List<ServiceCard>) : ServerMsg
     /** The plan usage; both null means the computer has nothing to say any more. */
@@ -206,6 +210,7 @@ object Wire {
                 "services" -> ServerMsg.Services(services(o.getJSONArray("services")))
                 "usage" -> ServerMsg.Usage(UsageSnapshot(plan(o.optJSONObject("claude")), plan(o.optJSONObject("codex"))))
                 "prefs" -> o.optString("outfit", "").takeIf { it in Wardrobe.SELECTIONS }?.let { ServerMsg.Prefs(it) }
+                "relayAccess" -> o.optString("access", "").takeIf(RelayPairing::isSecret)?.let { ServerMsg.RelayAccess(it) }
                 "pong" -> ServerMsg.Pong
                 "chatModels" -> ServerMsg.ChatModels(o.getJSONArray("models").objects().mapNotNull(::chatModel))
                 "chatDelta" -> ServerMsg.ChatDelta(chatId(o), o.getString("text"))
