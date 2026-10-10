@@ -34,6 +34,8 @@ data class UserSettings(
     val volume: Float = com.coucou.android.sound.SoundVolume.DEFAULT,
     val notifyDone: Boolean = true,
     val quiet: QuietHours = QuietHours(false, 22 * 60, 8 * 60),
+    /** Mochi's outfit on this phone: "computer" (follow the one chosen on the computer), "auto", "none" or an outfit. */
+    val outfit: String = com.coucou.android.mochi.outfit.Wardrobe.FOLLOW,
 ) {
     companion object {
         private const val SOUND = "sound_on"
@@ -42,6 +44,7 @@ data class UserSettings(
         private const val Q_ON = "quiet_on"
         private const val Q_FROM = "quiet_from"
         private const val Q_TO = "quiet_to"
+        private const val OUTFIT = "outfit_choice"
 
         fun load(store: KeyValueStore): UserSettings {
             val d = UserSettings()
@@ -54,6 +57,7 @@ data class UserSettings(
                     QuietHours.wrap(store.getInt(Q_FROM, d.quiet.fromMin)),
                     QuietHours.wrap(store.getInt(Q_TO, d.quiet.toMin)),
                 ),
+                outfit = com.coucou.android.mochi.outfit.Wardrobe.parseLocal(store.getString(OUTFIT, d.outfit)),
             )
         }
 
@@ -64,6 +68,7 @@ data class UserSettings(
             store.put(Q_ON, s.quiet.enabled)
             store.put(Q_FROM, QuietHours.wrap(s.quiet.fromMin))
             store.put(Q_TO, QuietHours.wrap(s.quiet.toMin))
+            store.put(OUTFIT, com.coucou.android.mochi.outfit.Wardrobe.parseLocal(s.outfit))
         }
     }
 }

@@ -153,6 +153,7 @@ fn interop_server() {
                     hub.kick_all("auth", "unpaired");
                 }
                 (Some("chat"), Some(state), _) => fake.on.store(state == "on", Ordering::SeqCst),
+                (Some("outfit"), Some(value), _) => hub.publish_outfit(value),
                 (Some("details"), Some(state), _) => switches.details.store(state == "on", Ordering::SeqCst),
                 (Some("quit"), _, _) => break,
                 _ => println!("? {line}"),

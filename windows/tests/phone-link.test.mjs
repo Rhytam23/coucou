@@ -274,3 +274,27 @@ test("the question is published when it appears and withdrawn when it is answere
   assert.equal(q().length, 3);
   assert.equal(q()[2].question, null);
 });
+
+test("the outfit is published when the link comes up and whenever the wardrobe changes, and not repeated", async () => {
+  dispose = registerPhoneLink(island);
+  await settle();
+  tick(250);
+  const p = () => sent("phone_link_publish_prefs");
+  assert.equal(p().length, 1);
+  assert.equal(p()[0].outfit, "auto", "the default of the wardrobe");
+
+  State.settings.mochiOutfit = "beanie";
+  State.notify();
+  tick(250);
+  assert.equal(p().length, 2);
+  assert.equal(p()[1].outfit, "beanie");
+
+  State.notify();
+  tick(250);
+  assert.equal(p().length, 2, "unchanged: not sent again");
+
+  State.settings.mochiOutfit = "topHat"; // a value no build knows: the wardrobe reads it as auto
+  State.notify();
+  tick(250);
+  assert.equal(p().at(-1).outfit, "auto");
+});

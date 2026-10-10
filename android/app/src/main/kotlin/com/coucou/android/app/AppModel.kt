@@ -120,6 +120,18 @@ class AppModel(private val context: Context) : LinkListener {
 
     init { applySound() }
 
+    /** What the computer says Mochi wears ("auto" or an outfit); the last one it told, kept for when it is away. */
+    var computerOutfit by mutableStateOf(com.coucou.android.mochi.outfit.Wardrobe.parse(kv.getString("computer_outfit", "")))
+        private set
+
+    /** The selection in force: the phone's own choice, or the computer's when the phone follows it. */
+    val outfitSelection: String
+        get() = com.coucou.android.mochi.outfit.Wardrobe.choose(settings.outfit, computerOutfit)
+
+    /** What Mochi wears today ("auto" resolved with the phone's calendar). */
+    fun dress(today: java.time.LocalDate = java.time.LocalDate.now()): com.coucou.android.mochi.outfit.Outfit =
+        com.coucou.android.mochi.outfit.Wardrobe.resolve(outfitSelection, today)
+
     /** The phone's own list of decisions. Never sent anywhere. */
     private val decisionLog = DecisionLog(kv)
     var decisions by mutableStateOf(decisionLog.all()); private set
@@ -499,6 +511,16 @@ class AppModel(private val context: Context) : LinkListener {
             chatOffered = Protocol.CAP_CHAT in caps
             detailsOffered = Protocol.CAP_DETAILS in caps
         }
+    }
+
+    override fun onPrefs(outfit: String) {
+        main.post { setComputerOutfit(outfit) }
+    }
+
+    fun setComputerOutfit(outfit: String) {
+        val v = com.coucou.android.mochi.outfit.Wardrobe.parse(outfit)
+        computerOutfit = v
+        kv.put("computer_outfit", v)
     }
 
     override fun onChatModels(models: List<ChatModel>) {

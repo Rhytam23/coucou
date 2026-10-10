@@ -446,6 +446,15 @@ pub fn phone_link_publish_question(link: State<PhoneLink>, question: Option<hub:
     link.hub.publish_question(question, server::now_ms());
 }
 
+/// What Mochi wears on the computer, for phones that asked for `prefs`.
+#[tauri::command]
+pub fn phone_link_publish_prefs(link: State<PhoneLink>, outfit: String) {
+    if link.running.lock().unwrap().is_none() {
+        return;
+    }
+    link.hub.publish_outfit(&outfit);
+}
+
 /// The island's picture of its sessions and of the request waiting for an answer.
 #[tauri::command]
 pub fn phone_link_publish(link: State<PhoneLink>, sessions: Vec<SessionIn>, approval: Option<ApprovalIn>) {

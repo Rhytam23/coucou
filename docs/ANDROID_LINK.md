@@ -151,6 +151,23 @@ phone never hears of a question and cannot answer one (its `answer` messages are
   logged about what was picked, on either side.
 - A permission request is still sent to every phone as an `approval`, unchanged.
 
+## Mochi's outfit (optional capability `prefs`)
+
+A phone that sends `caps: ["prefs"]` in its `hello` is offered `prefs` in `welcome.caps` (no switch on the computer: what
+Mochi wears is no secret and says nothing about the user's work). It is then sent what the island's wardrobe says, right
+after the first `sessions` and again whenever it changes:
+
+```json
+{"type":"prefs","outfit":"beanie"}
+```
+
+`outfit` is one of `auto`, `none`, `partyHat`, `beanie`, `crown`, `sunglasses`, `roundGlasses`, `bow`, `scarf`, `witchHat`,
+`pumpkin`, `santaHat`, `bunnyEars`: the PC's and the Mac's stored values, nothing else is ever sent (the computer checks the
+list; a test compares it with `windows/src/mochi/wardrobe.ts`). `auto` means "dress for the season": **the phone applies the
+seasons to its own calendar**, the computer sends no date. A phone ignores a value it does not know and keeps what it wore.
+The phone has its own choice too (Settings > Mochi's wardrobe): "Same as my computer" (default) or one outfit, which then wins.
+Nothing goes back to the computer.
+
 ## Finding the computer again (optional, still protocol v1)
 
 The pairing link holds the computer's address, and an address changes with every network (a home Wi-Fi, a hotspot, a

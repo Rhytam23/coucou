@@ -14,7 +14,17 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import com.coucou.android.mochi.outfit.ComposeGfx
+import com.coucou.android.mochi.outfit.Ctx2D
+import com.coucou.android.mochi.outfit.Outfit
+import com.coucou.android.mochi.outfit.OutfitState
+import com.coucou.android.mochi.outfit.PUMPKIN_BODY
+import com.coucou.android.mochi.outfit.Css
+import com.coucou.android.mochi.outfit.drawOutfitBehind
+import com.coucou.android.mochi.outfit.drawOutfitFront
+import com.coucou.android.mochi.outfit.makeHead
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -23,7 +33,7 @@ import kotlin.math.sin
 
 /**
  * Compose Canvas port of MochiEngine.draw() in windows/src/mochi/engine.ts.
- * Draws hands, body, blush, eyes, mouth, badge and particles. Outfits are not ported yet.
+ * Draws hands, body, blush, eyes, mouth, badge, particles and the outfits (mochi/outfit, checked against the PC's drawing).
  */
 object MochiPainter {
     private val INK = Color(26, 20, 18)
@@ -31,6 +41,8 @@ object MochiPainter {
 
     private fun Rgb.color(a: Double = 1.0) =
         Color(r.toFloat().coerceIn(0f, 1f), g.toFloat().coerceIn(0f, 1f), b.toFloat().coerceIn(0f, 1f), a.toFloat().coerceIn(0f, 1f))
+
+    private fun cssColor(s: String): Color = Css.parse(s).let { Color((it.r / 255).toFloat(), (it.g / 255).toFloat(), (it.b / 255).toFloat(), it.a.toFloat()) }
 
     private fun fillPaint(c: Color) = Paint().apply { color = c; isAntiAlias = true }
     private fun strokePaint(c: Color, w: Float) = Paint().apply {
@@ -56,12 +68,25 @@ object MochiPainter {
         val cy = h / 2 + e.particleOverhang / 2 + e.oy * r + r * 0.06
 
         drawIntoCanvas { c ->
+            // With an outfit on, a roll turns the whole character, hat included, as one piece.
+            c.save()
+            if (e.rigidRoll && abs(e.roll) > 0.001) {
+                c.translate(cx.toFloat(), cy.toFloat())
+                c.rotate((e.roll * 180 / PI).toFloat())
+                c.translate(-cx.toFloat(), -cy.toFloat())
+            }
             drawHandsBehind(c, e, nowSec, r, rx, ry, cx, cy)
 
             c.save()
             c.translate(cx.toFloat(), cy.toFloat())
             if (e.tilt != 0.0) c.rotate((e.tilt * 180 / PI).toFloat())
             c.scale(e.sx.toFloat(), e.sy.toFloat())
+
+            val dressed = !e.isMini && e.outfit != Outfit.NONE
+            val head = if (dressed) makeHead(r, e.yaw, e.pitch, e.physDx, e.physDy) else null
+            val outfitState = OutfitState(e.outfitPresence, e.morph)
+            val outfitCtx = if (head != null) Ctx2D(ComposeGfx(c, Rect(Offset(-w.toFloat(), -h.toFloat()), Offset(w.toFloat(), h.toFloat())))) else null
+            if (head != null && outfitCtx != null) drawOutfitBehind(outfitCtx, e.outfit, head, outfitState)
 
             val body = bodyPath(e, rx, ry, r)
             drawBody(c, e, body, r, rx, ry)
@@ -85,6 +110,9 @@ object MochiPainter {
 
             drawEyes(c, e, nowSec, body, r, rx, ry)
             if (e.morph > 0.05) drawMouth(c, e, body, r)
+
+            if (head != null && outfitCtx != null) drawOutfitFront(outfitCtx, e.outfit, head, outfitState)
+            c.restore()
             c.restore()
 
             val badge = e.badge
@@ -108,10 +136,27 @@ object MochiPainter {
             c.drawPath(body, p)
         }
 
+        // The pumpkin's orange comes and goes with the outfit; a flat-coloured body only gets the shading while it is a pumpkin.
+        val pumpkin = if (e.isMini || e.outfit != Outfit.PUMPKIN) 0.0 else min(1.0, e.outfitPresence * 2.5) * (1 - e.morph)
+        var tail = 1f
+        if (pumpkin > 0.001) {
+            val pg = Paint().apply {
+                isAntiAlias = true
+                alpha = pumpkin.toFloat().coerceIn(0f, 1f)
+                shader = LinearGradientShader(
+                    Offset((rx * 0.7).toFloat(), (-ry * 0.85).toFloat()), Offset((-rx * 0.8).toFloat(), (ry * 0.9).toFloat()),
+                    listOf(cssColor(PUMPKIN_BODY.first), cssColor(PUMPKIN_BODY.second)),
+                )
+            }
+            c.drawPath(body, pg)
+            if (bodyColor != null) tail = pumpkin.toFloat().coerceIn(0f, 1f)
+        }
+
         val effectiveTint = e.tint * (1 - e.morph)
         if (effectiveTint > 0.01) {
             val tg = Paint().apply {
                 isAntiAlias = true
+                alpha = tail
                 shader = LinearGradientShader(
                     Offset(0f, ry.toFloat()), Offset(0f, (-ry).toFloat()),
                     listOf(e.col.color(0.72 * effectiveTint), e.col.color(0.0)),
@@ -125,6 +170,7 @@ object MochiPainter {
         val shadeStart = ((r * 0.15 + 0.6 * (outer - r * 0.15)) / outer).toFloat()
         val sh = Paint().apply {
             isAntiAlias = true
+            alpha = tail
             shader = RadialGradientShader(
                 Offset.Zero, outer.toFloat(),
                 listOf(Color(0, 0, 0, 0), Color(0, 0, 0, 0), Color(0, 0, 0, 51)),
@@ -136,6 +182,7 @@ object MochiPainter {
         val hc = Offset((rx * 0.34).toFloat(), (-ry * 0.46).toFloat())
         val hl = Paint().apply {
             isAntiAlias = true
+            alpha = tail
             shader = RadialGradientShader(hc, (r * 0.42).toFloat(), listOf(Color(255, 255, 255, 140), Color(255, 255, 255, 0)))
         }
         c.drawPath(body, hl)
@@ -153,7 +200,8 @@ object MochiPainter {
 
         for (sd in intArrayOf(-1, 1)) {
             val eyeYaw = sd * MochiConst.EYE_SP + e.yaw
-            var eyePitch = MochiConst.EYE_P + e.pitch + e.roll
+            // Rolling with an outfit on, the whole body turns: the eyes must not roll again.
+            var eyePitch = MochiConst.EYE_P + e.pitch + (if (e.rigidRoll) 0.0 else e.roll)
             eyePitch = (((eyePitch + PI) % (PI * 2)) + PI * 2) % (PI * 2) - PI
             val cp = cos(eyePitch)
             if (cos(eyeYaw) * cp <= 0.04) continue

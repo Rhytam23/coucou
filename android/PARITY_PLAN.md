@@ -53,7 +53,7 @@ Already on par: states and 7 emotes, sounds file set, approval Allow/Deny with b
 - **A3. UI/UX polish. (done, to be tested)** Settings gear on Home, disconnect/gallery/overlay/About moved into Settings, human status text instead of raw tool names (Home card and island), "Step n of m", equal pill columns, narrower island that grows out of the camera hole, one gutter/gap rhythm, light theme contrast checked by test.
 - **B. Capabilities + session details. (done, to be tested)** `caps` handshake, `steps[]`, `finalLine`, `project`, `color`; session detail screen; PC Settings > Android phone gets one toggle per feature, all off. Rust + Kotlin interop tests, backward-compat tests both directions.
 - **C. Answer questions from the phone. (done, to be tested)** Cap `answers`, PC switch `phoneAnswers` (off by default), `question` / `answer` messages, exact-label validation on the PC, screen-lock confirm on the phone, nothing logged or stored. Debug: `--es kind askquestion`; fake desktop: `dev-desktop.mjs --answers`.
-- **D. Outfits and wardrobe** with `prefs{outfit}` from the PC and a phone-local override.
+- **D. Outfits and wardrobe. (done, to be tested)** The 11 outfits ported line by line (`mochi/outfit/`, compared call by call with the PC's TypeScript by `OutfitParityTest`), `prefs{outfit}` from the PC (cap `prefs`, no switch: it is no secret), Settings > Mochi's wardrobe with "Same as my computer" or a phone-only choice, the hero Mochi wears it. Debug: `--es kind outfit --es value beanie` / `--es local crown`.
 - **E. File changes and diffs** (separate toggle, on demand).
 - **F. Plan usage, then services cards** (read-only, per service).
 - **G. Away from home:** VPN support + docs; relay only if you and Louis want it.

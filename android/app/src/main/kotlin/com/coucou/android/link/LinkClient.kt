@@ -24,6 +24,8 @@ interface LinkListener {
     fun onApprovalResolved(fingerprint: String) {}
     /** A question to answer (only with the `answers` capability). It is removed by [onApprovalResolved] with the same fingerprint. */
     fun onQuestion(request: QuestionRequest) {}
+    /** What Mochi wears on the computer: "auto" or an outfit (only with the `prefs` capability). */
+    fun onPrefs(outfit: String) {}
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
@@ -100,6 +102,8 @@ class LinkClient(
     @Volatile private var fatal = false
     /** The computer's welcome offered `answers` on this connection. */
     @Volatile private var answersOffered = false
+    /** The computer's welcome offered `prefs` on this connection. */
+    @Volatile private var prefsOffered = false
     @Volatile private var socket: Socket? = null
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
@@ -210,6 +214,7 @@ class LinkClient(
             } finally {
                 out = null
                 answersOffered = false
+                prefsOffered = false
                 runCatching { socket?.close() }
                 socket = null
                 approvals.clear()
@@ -249,6 +254,7 @@ class LinkClient(
                     listener.onState(LinkState.CONNECTED)
                     listener.onWelcome(msg.desktopName, msg.os)
                     answersOffered = Protocol.CAP_ANSWERS in msg.caps
+                    prefsOffered = Protocol.CAP_PREFS in msg.caps
                     listener.onCaps(msg.caps)
                     // Told what it may use right away, so the Chat screen has its list when it opens.
                     if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
@@ -258,6 +264,7 @@ class LinkClient(
                 is ServerMsg.ApprovalResolved -> { approvals.resolve(msg.fingerprint); listener.onApprovalResolved(msg.fingerprint) }
                 // Only offered to a phone that asked and was offered `answers`; ignored from a computer that did not.
                 is ServerMsg.Question -> if (answersOffered && Protocol.CAP_ANSWERS in caps) listener.onQuestion(msg.request)
+                is ServerMsg.Prefs -> if (prefsOffered && Protocol.CAP_PREFS in caps) listener.onPrefs(msg.outfit)
                 ServerMsg.Pong -> {}
                 is ServerMsg.ChatModels -> listener.onChatModels(msg.models)
                 is ServerMsg.ChatDelta -> listener.onChatDelta(msg.id, msg.text)

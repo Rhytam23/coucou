@@ -96,7 +96,11 @@ class RustDesktopInteropTest {
         override fun onError(code: String, message: String) { errors.add(code) }
         val caps = LinkedBlockingQueue<Set<String>>()
         val chat = LinkedBlockingQueue<String>()
-        override fun onCaps(caps: Set<String>) { this.caps.add(caps) }
+        // "prefs" (the outfit) is offered to every app that asks, so the other tests leave it out; it has its own test.
+        override fun onCaps(caps: Set<String>) { this.caps.add(caps - Protocol.CAP_PREFS); allCaps.add(caps) }
+        val allCaps = LinkedBlockingQueue<Set<String>>()
+        val prefs = LinkedBlockingQueue<String>()
+        override fun onPrefs(outfit: String) { prefs.add(outfit) }
         override fun onChatModels(models: List<ChatModel>) { chat.add("models:" + models.joinToString(",") { it.id }) }
         override fun onChatDelta(id: String, text: String) { chat.add("delta:$id:$text") }
         override fun onChatDone(id: String, text: String?) { chat.add("done:$id:${text ?: "-"}") }
@@ -216,6 +220,31 @@ class RustDesktopInteropTest {
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
         } finally {
             client.stop()
+        }
+    }
+
+    // ── Mochi's outfit (cap prefs) ─────────────────────────────────────────────────
+
+    @Test fun theOutfitReachesAnAppThatAsksAndNobodyElse() {
+        val info = startDesktop()
+        command("outfit beanie")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        val old = Rec()
+        val oldClient = chatClient(info, old, caps = emptyList())
+        try {
+            assertEquals(setOf("prefs"), rec.allCaps.poll(15, TimeUnit.SECONDS))
+            assertEquals("beanie", rec.prefs.poll(10, TimeUnit.SECONDS))
+            command("outfit crown")
+            assertEquals("crown", rec.prefs.poll(10, TimeUnit.SECONDS))
+            command("outfit topHat") // not a wardrobe value: never sent
+            command("outfit auto")
+            assertEquals("auto", rec.prefs.poll(10, TimeUnit.SECONDS))
+            assertEquals(emptySet<String>(), old.allCaps.poll(15, TimeUnit.SECONDS))
+            assertNull("an app that did not ask hears nothing", old.prefs.poll(1, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+            oldClient.stop()
         }
     }
 

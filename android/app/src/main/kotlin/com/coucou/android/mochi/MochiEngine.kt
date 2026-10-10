@@ -1,5 +1,6 @@
 package com.coucou.android.mochi
 
+import com.coucou.android.mochi.outfit.Outfit
 import com.coucou.android.core.Ease
 import com.coucou.android.core.EaseFn
 import kotlin.math.PI
@@ -19,7 +20,7 @@ import kotlin.random.Random
  */
 fun interface SoundSink { fun play(name: String) }
 
-enum class Prop { YAW, PITCH, ROLL, TILT, OPEN, SX, SY, OY, OX, TINT, MORPH, HANDS, BLUSH, ES, BADGE_S }
+enum class Prop { YAW, PITCH, ROLL, TILT, OPEN, SX, SY, OY, OX, TINT, MORPH, HANDS, BLUSH, ES, BADGE_S, OUTFIT_PRESENCE }
 
 class TweenKey(val target: Double, val durationMs: Double, val ease: EaseFn)
 
@@ -57,13 +58,21 @@ class MochiEngine(
     var sx = 1.0; var sy = 1.0; var oy = 0.0; var ox = 0.0
     var tint = 0.0; var morph = 0.0; var hands = 0.0; var blush = 0.0; var es = 1.0; var badgeS = 0.0
 
-    // Spring lag of the soft parts, -1..1. Only meaningful once outfits exist.
+    // Outfit (the main Mochi only: minis never wear one). `outfit` is what is drawn; it changes only once the previous one has left.
+    var outfit: Outfit = Outfit.NONE
+        private set
+    /** 0 = gone, 1 = fully on. */
+    var outfitPresence = 0.0
+    private var outfitTarget: Outfit = Outfit.NONE
+
+    // Spring lag of the soft parts (pompoms, hat tips, scarf end), -1..1.
     var physDx = 0.0
     var physDy = 0.0
     private var physVx = 0.0
     private var physVy = 0.0
     private var prevYaw = 0.0
     private var prevOy = 0.0
+    private var prevRoll = 0.0
 
     var tgYaw = 0.0; var tgPitch = 0.0; var tgTilt = 0.0; var tgSy = 1.0; var tgSx = 1.0; var tgEs = 1.0
 
@@ -122,7 +131,7 @@ class MochiEngine(
         Prop.YAW -> yaw; Prop.PITCH -> pitch; Prop.ROLL -> roll; Prop.TILT -> tilt
         Prop.OPEN -> open; Prop.SX -> sx; Prop.SY -> sy; Prop.OY -> oy; Prop.OX -> ox
         Prop.TINT -> tint; Prop.MORPH -> morph; Prop.HANDS -> hands; Prop.BLUSH -> blush
-        Prop.ES -> es; Prop.BADGE_S -> badgeS
+        Prop.ES -> es; Prop.BADGE_S -> badgeS; Prop.OUTFIT_PRESENCE -> outfitPresence
     }
 
     private fun set(p: Prop, v: Double) {
@@ -130,7 +139,7 @@ class MochiEngine(
             Prop.YAW -> yaw = v; Prop.PITCH -> pitch = v; Prop.ROLL -> roll = v; Prop.TILT -> tilt = v
             Prop.OPEN -> open = v; Prop.SX -> sx = v; Prop.SY -> sy = v; Prop.OY -> oy = v; Prop.OX -> ox = v
             Prop.TINT -> tint = v; Prop.MORPH -> morph = v; Prop.HANDS -> hands = v; Prop.BLUSH -> blush = v
-            Prop.ES -> es = v; Prop.BADGE_S -> badgeS = v
+            Prop.ES -> es = v; Prop.BADGE_S -> badgeS = v; Prop.OUTFIT_PRESENCE -> outfitPresence = v
         }
     }
 
@@ -360,6 +369,35 @@ class MochiEngine(
         morph = 0.0
     }
 
+    /**
+     * Dresses Mochi. Animated: the old outfit leaves (180 ms), the new one drops in (350 ms) and Mochi does a
+     * little squash (BotEngine.setOutfit on the Mac, setOutfit in windows/src/mochi/engine.ts).
+     */
+    fun setOutfit(next: Outfit, animated: Boolean = true) {
+        if (next == outfitTarget) return
+        outfitTarget = next
+        tweens.remove(Prop.OUTFIT_PRESENCE)
+        locks.remove(Prop.OUTFIT_PRESENCE)
+        val enter = {
+            outfit = next
+            anim(Prop.OUTFIT_PRESENCE, keys(Triple(1.0, 350.0, Ease.inOut))) { squash() }
+        }
+        if (!animated) {
+            outfit = next
+            outfitPresence = if (next != Outfit.NONE) 1.0 else 0.0
+        } else if (next == Outfit.NONE) {
+            anim(Prop.OUTFIT_PRESENCE, keys(Triple(0.0, 180.0, Ease.inOut))) { outfit = Outfit.NONE }
+        } else if (outfit == Outfit.NONE) {
+            outfitPresence = 0.0
+            enter()
+        } else {
+            anim(Prop.OUTFIT_PRESENCE, keys(Triple(0.0, 180.0, Ease.inOut))) { enter() }
+        }
+    }
+
+    /** Wearing something visible: the body then turns as one piece when it rolls. */
+    val rigidRoll: Boolean get() = !isMini && outfit != Outfit.NONE && outfitPresence > 0.05
+
     /** True while anything is still moving, so the host can stop its frame loop. */
     val busy: Boolean
         get() = tweens.isNotEmpty() || scheduled.isNotEmpty() || _particles.isNotEmpty() ||
@@ -367,7 +405,8 @@ class MochiEngine(
             abs(tgYaw - yaw) > 0.002 || abs(tgPitch - pitch) > 0.002 || abs(tgTilt - tilt) > 0.002 ||
             abs(tgSy - sy) > 0.002 || abs(tgSx - sx) > 0.002 || abs(tgEs - es) > 0.002 ||
             slotH > 0.001 || abs(slotHVel) > 0.001 ||
-            abs(col.r - colT.r) > 0.003 || abs(col.g - colT.g) > 0.003 || abs(col.b - colT.b) > 0.003
+            abs(col.r - colT.r) > 0.003 || abs(col.g - colT.g) > 0.003 || abs(col.b - colT.b) > 0.003 ||
+            (outfit != Outfit.NONE && (abs(physVx) > 0.01 || abs(physVy) > 0.01))
 
     // ── Tweens ──────────────────────────────────────────────────────────────────
 
@@ -497,11 +536,15 @@ class MochiEngine(
         slotHVel += acc * dt
         slotH = max(0.0, slotH + slotHVel * dt)
 
-        // Soft-part spring (stiffness 60, damping 9); the values are only drawn once outfits exist.
+        // Soft-part spring: lags behind head turns, hops and rolls (stiffness 60, damping 9).
         if (dt > 0) {
             val yawVel = (yaw - prevYaw) / dt
             val oyVel = (oy - prevOy) / dt
-            val tDx = (-yawVel * 0.35 - tilt * 2).coerceIn(-1.0, 1.0)
+            // A finished roll snaps from 2*pi*turns back to 0: that jump is not motion.
+            val dRoll = roll - prevRoll
+            val rollVel = if (abs(dRoll) > PI) 0.0 else dRoll / dt
+            val centrifugal = if (rigidRoll) rollVel * 0.18 else 0.0
+            val tDx = (-yawVel * 0.35 - tilt * 2 + centrifugal).coerceIn(-1.0, 1.0)
             val tDy = (oyVel * 0.5).coerceIn(-1.0, 1.0)
             physVx += (60 * (tDx - physDx) - 9 * physVx) * dt
             physVy += (60 * (tDy - physDy) - 9 * physVy) * dt
@@ -510,6 +553,7 @@ class MochiEngine(
         }
         prevYaw = yaw
         prevOy = oy
+        prevRoll = roll
     }
 
     private fun doMiniBehaviorLoop() {

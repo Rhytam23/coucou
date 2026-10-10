@@ -225,6 +225,8 @@ where
     let asked = |cap: &str| hello["caps"].as_array().is_some_and(|c| c.iter().any(|x| x == cap));
     let details = asked("details") && shared.features.details();
     let answers = asked("answers") && shared.features.answers();
+    // The outfit is no secret and says nothing about the user's work: offered whenever the phone asks.
+    let prefs = asked("prefs");
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
         offered.push("chat");
@@ -235,12 +237,15 @@ where
     if answers {
         offered.push("answers");
     }
+    if prefs {
+        offered.push("prefs");
+    }
     let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
     if !offered.is_empty() {
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), details, answers);
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), details, answers, prefs);
 
     // 2. the conversation
     loop {

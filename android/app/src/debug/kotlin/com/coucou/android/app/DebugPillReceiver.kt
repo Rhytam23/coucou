@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -25,6 +25,10 @@ import com.coucou.android.mochi.BotState
  *   question / approval  stay until answered, expired or cleared
  *   clear     no sessions and no requests: the island goes up
  * `adb logcat -s CoucouIsland` prints every phase change.
+ *
+ * `outfit` dresses Mochi without a computer: `--es value beanie` is what the computer would say (auto, none,
+ * partyHat, beanie, crown, sunglasses, roundGlasses, bow, scarf, witchHat, pumpkin, santaHat, bunnyEars) and
+ * `--es local crown` is the phone's own choice from Settings > Mochi's wardrobe (`--es local computer` follows the computer).
  *
  * `history` adds three sample decisions to Settings > History (no agent needed).
  * With the app in the background, finished / error / question / ratelimit also post a quiet notice
@@ -124,6 +128,10 @@ class DebugPillReceiver : BroadcastReceiver() {
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
+            }
+            "outfit" -> {
+                intent.getStringExtra("value")?.let { model.setComputerOutfit(it) }
+                intent.getStringExtra("local")?.let { model.updateSettings(model.settings.copy(outfit = com.coucou.android.mochi.outfit.Wardrobe.parseLocal(it))) }
             }
             "history" -> {
                 val names = listOf("Gemini CLI" to "npm test", "Claude Code" to "git push origin main", "Codex" to "rm -rf build")

@@ -185,4 +185,23 @@
     <string name="pair_confirm_body">%1$s:%2$d on your network. Only pair with a computer you own.</string>
     <string name="pair_confirm_replace">This replaces the computer you are connected to now.</string>
     <string name="pair_confirm_ok">Pair</string>
+    <string name="wardrobe_title">Mochi\'s wardrobe</string>
+    <string name="wardrobe_note">Choose what Mochi wears on this phone.</string>
+    <string name="wardrobe_follow">Same as my computer</string>
+    <string name="wardrobe_follow_hint">Mochi wears what you chose in Coucou on your computer.</string>
+    <string name="wardrobe_auto_tag">AUTO</string>
+    <string name="wardrobe_selected">Selected</string>
+    <string name="outfit_auto">Auto (seasons)</string>
+    <string name="outfit_none">None</string>
+    <string name="outfit_partyHat">Party hat</string>
+    <string name="outfit_beanie">Beanie</string>
+    <string name="outfit_crown">Crown</string>
+    <string name="outfit_sunglasses">Sunglasses</string>
+    <string name="outfit_roundGlasses">Round glasses</string>
+    <string name="outfit_bow">Bow</string>
+    <string name="outfit_scarf">Scarf</string>
+    <string name="outfit_witchHat">Witch hat</string>
+    <string name="outfit_pumpkin">Pumpkin</string>
+    <string name="outfit_santaHat">Santa hat</string>
+    <string name="outfit_bunnyEars">Bunny ears</string>
 </resources>

@@ -159,4 +159,20 @@ class UserSettingsTest {
         assertEquals(listOf(HistoryDays.Day.TODAY, HistoryDays.Day.YESTERDAY, HistoryDays.Day.OTHER), groups.map { it.first.first })
         assertEquals(listOf(2, 1, 1), groups.map { it.second.size })
     }
+    @Test fun theOutfitChoiceIsKeptAndDefaultsToTheComputers() {
+        val m = Memory()
+        assertEquals("computer", UserSettings.load(m).outfit)
+        UserSettings.save(m, UserSettings(outfit = "crown"))
+        assertEquals("crown", UserSettings.load(m).outfit)
+        UserSettings.save(m, UserSettings(outfit = "auto"))
+        assertEquals("auto", UserSettings.load(m).outfit)
+    }
+
+    @Test fun anOutfitChoiceNoBuildKnowsFollowsTheComputer() {
+        val m = Memory()
+        m.map["outfit_choice"] = "topHat"
+        assertEquals("computer", UserSettings.load(m).outfit)
+        UserSettings.save(m, UserSettings(outfit = "<script>"))
+        assertEquals("computer", m.map["outfit_choice"])
+    }
 }

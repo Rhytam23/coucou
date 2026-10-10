@@ -104,6 +104,17 @@ pub struct ApprovalIn {
     pub command: String,
 }
 
+/// The values the island stores for Mochi's wardrobe ("auto" follows the seasons on the phone's own calendar).
+/// Same raw values as the Mac and the PC; anything else is not sent.
+pub const OUTFIT_CHOICES: [&str; 13] = [
+    "auto", "none", "partyHat", "beanie", "crown", "sunglasses", "roundGlasses",
+    "bow", "scarf", "witchHat", "pumpkin", "santaHat", "bunnyEars",
+];
+
+fn prefs_line(outfit: &str) -> String {
+    json!({ "type": "prefs", "outfit": outfit }).to_string()
+}
+
 /// One option of a question, as the island has it.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct OptionIn {
@@ -195,6 +206,8 @@ struct Sub {
     details: bool,
     /// The phone asked for `answers` and the user's switch was on when it connected.
     answers: bool,
+    /// The phone asked for `prefs` (the outfit Mochi wears on the computer).
+    prefs: bool,
 }
 
 #[derive(Default)]
@@ -202,6 +215,8 @@ struct Inner {
     sessions: Vec<Session>,
     approval: Option<Approval>,
     question: Option<Question>,
+    /// What Mochi wears on the computer: one of [`OUTFIT_CHOICES`]; None until the island has said.
+    outfit: Option<&'static str>,
     subs: Vec<Sub>,
     next_sub: u64,
 }
@@ -299,11 +314,11 @@ impl Hub {
     /// up to date: the sessions, then the request still waiting, if any.
     #[cfg(test)]
     pub fn subscribe(&self, tx: mpsc::Sender<Out>, now: u64, details: bool) -> (u64, Arc<AtomicBool>) {
-        self.subscribe_with(tx, now, details, false)
+        self.subscribe_with(tx, now, details, false, false)
     }
 
-    /// Like [`subscribe`], for a phone that may also have been offered `answers`.
-    pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, details: bool, answers: bool) -> (u64, Arc<AtomicBool>) {
+    /// Like [`subscribe`], for a phone that may also have been offered `answers` and `prefs`.
+    pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, details: bool, answers: bool, prefs: bool) -> (u64, Arc<AtomicBool>) {
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -318,8 +333,13 @@ impl Hub {
                 let _ = tx.try_send(Out::Line(question_line(q).into()));
             }
         }
+        if prefs {
+            if let Some(o) = inner.outfit {
+                let _ = tx.try_send(Out::Line(prefs_line(o).into()));
+            }
+        }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs });
         (id, evicted)
     }
 
@@ -370,6 +390,28 @@ impl Hub {
 }
 
 impl Hub {
+    /// What Mochi wears on the computer ("auto" or an outfit, see [`OUTFIT_CHOICES`]); anything else is ignored.
+    /// Only phones that have `prefs` hear of it, and a new one at once.
+    pub fn publish_outfit(&self, outfit: &str) {
+        let Some(choice) = OUTFIT_CHOICES.iter().find(|c| **c == outfit) else { return };
+        let mut inner = self.inner.lock().unwrap();
+        if inner.outfit == Some(*choice) {
+            return;
+        }
+        inner.outfit = Some(*choice);
+        let shared: Arc<str> = prefs_line(choice).into();
+        inner.subs.retain(|s| {
+            if !s.prefs {
+                return true;
+            }
+            let kept = s.tx.try_send(Out::Line(shared.clone())).is_ok();
+            if !kept {
+                s.evicted.store(true, Ordering::SeqCst);
+            }
+            kept
+        });
+    }
+
     /// The question waiting on the island (None: none). Only phones that have `answers` hear of it. One that
     /// does not fit the limits, or whose options cannot be told apart, stays on the island.
     pub fn publish_question(&self, question: Option<QuestionIn>, now: u64) {
@@ -1070,7 +1112,7 @@ mod tests {
         let rec = Arc::new(AnswerRecorder::default());
         let hub = Hub::new(rec.clone());
         let (tx, rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000, false, true);
+        hub.subscribe_with(tx, 1_000, false, true, false);
         (hub, rec, rx)
     }
 
@@ -1124,7 +1166,58 @@ mod tests {
         let (hub, _rec, _rx) = qhub();
         hub.publish_question(Some(ask("r1")), 1_000);
         let (tx, mut rx) = mpsc::channel(16);
-        hub.subscribe_with(tx, 1_000 + APPROVAL_TTL_MS + 1, false, true);
+        hub.subscribe_with(tx, 1_000 + APPROVAL_TTL_MS + 1, false, true, false);
         assert!(drain(&mut rx).iter().all(|l| l["type"] != "question"));
+    }
+    // ── prefs (the outfit) ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn a_phone_with_prefs_hears_the_outfit_when_it_connects_and_whenever_it_changes() {
+        let (hub, _) = hub();
+        hub.publish_outfit("beanie");
+        let (tx, mut rx) = mpsc::channel(16);
+        hub.subscribe_with(tx, 1_000, false, false, true);
+        let first = drain(&mut rx);
+        assert!(first.iter().any(|l| l["type"] == "prefs" && l["outfit"] == "beanie"), "{first:?}");
+        hub.publish_outfit("crown");
+        let next = drain(&mut rx);
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0], serde_json::json!({ "type": "prefs", "outfit": "crown" }));
+        hub.publish_outfit("crown"); // the same again: nothing new
+        assert!(drain(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn a_phone_without_prefs_never_hears_of_the_outfit() {
+        let (hub, _) = hub();
+        hub.publish_outfit("scarf");
+        let (tx, mut rx) = mpsc::channel(16);
+        hub.subscribe_with(tx, 1_000, true, true, false);
+        hub.publish_outfit("bow");
+        assert!(drain(&mut rx).iter().all(|l| l["type"] != "prefs"));
+    }
+
+    #[test]
+    fn only_the_known_wardrobe_values_are_sent() {
+        let (hub, _) = hub();
+        let (tx, mut rx) = mpsc::channel(16);
+        hub.subscribe_with(tx, 1_000, false, false, true);
+        drain(&mut rx);
+        for bad in ["", "topHat", "Beanie", "beanie ", "../../etc", "auto\nauto"] {
+            hub.publish_outfit(bad);
+        }
+        assert!(drain(&mut rx).is_empty());
+        for ok in OUTFIT_CHOICES {
+            hub.publish_outfit(ok);
+        }
+        assert_eq!(drain(&mut rx).len(), OUTFIT_CHOICES.len());
+    }
+
+    #[test]
+    fn the_outfit_list_is_the_one_of_the_island() {
+        let ts = include_str!("../../../src/mochi/wardrobe.ts");
+        let body = ts.split("export const OUTFIT_SELECTIONS = [").nth(1).unwrap().split("] as const").next().unwrap();
+        let ids: Vec<&str> = body.split('"').skip(1).step_by(2).collect();
+        assert_eq!(ids, OUTFIT_CHOICES.to_vec());
     }
 }

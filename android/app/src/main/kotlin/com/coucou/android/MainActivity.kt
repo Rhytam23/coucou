@@ -109,6 +109,7 @@ import com.coucou.android.ui.ApprovalSheet
 import com.coucou.android.ui.MessagePanel
 import com.coucou.android.ui.PairingScreen
 import com.coucou.android.ui.QuestionSheet
+import com.coucou.android.ui.WardrobeScreen
 import com.coucou.android.ui.HeroCard
 import com.coucou.android.ui.RecentPanel
 import com.coucou.android.ui.BarClearance
@@ -171,8 +172,9 @@ class MainActivity : ComponentActivity() {
                             Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onHistory = { screen = Screen.HISTORY },
-                                onGallery = { screen = Screen.GALLERY }, onOverlay = ::setOverlay,
+                                onGallery = { screen = Screen.GALLERY }, onWardrobe = { screen = Screen.WARDROBE }, onOverlay = ::setOverlay,
                             )
+                            Screen.WARDROBE -> WardrobeScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HOME -> if (model.mode == Mode.NONE) PairingScreen(model, onScan = { screen = Screen.SCAN }, onAbout = { screen = Screen.SETTINGS }) else Home(
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
@@ -315,6 +317,10 @@ private fun Home(
     val touch = touches.getOrPut(key) { MochiTouch(engine, model.sounds) { model.sessions.firstOrNull { it.pillId == key }?.state ?: BotState.IDLE } }
     val state = focus?.state ?: BotState.SLEEPING // no agent: a sleeping Mochi
     if (engine.state != state && !touch.dizzy) engine.setState(state)
+
+    // The hero wears what the computer says, or what the user picked here (a new engine starts dressed, a change animates).
+    val dressed = remember { HashSet<MochiEngine>() }
+    model.dress().let { outfit -> if (dressed.add(engine)) engine.setOutfit(outfit, animated = false) else engine.setOutfit(outfit) }
 
     // The hero's Mochi wears its agent's colour, like the small ones (never white by default).
     engine.bodyColor = focus?.let { HomePanel.colorHex(it) }?.let { HomePanel.rgb(it) }

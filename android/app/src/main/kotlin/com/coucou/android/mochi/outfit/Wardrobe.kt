@@ -15,6 +15,14 @@ object Wardrobe {
     )
     const val AUTO = "auto"
     const val DEFAULT = AUTO
+    /** The phone's own choice when it does not pick an outfit itself: wear what the computer says. */
+    const val FOLLOW = "computer"
+
+    /** A phone-local choice read from the preferences: "computer", "auto" or an outfit; anything else follows the computer. */
+    fun parseLocal(raw: String?): String = if (raw != null && (raw == FOLLOW || raw in SELECTIONS)) raw else FOLLOW
+
+    /** What is worn, as a selection: the phone's own choice, or the computer's when the phone follows it. */
+    fun choose(local: String, computer: String): String = if (local == FOLLOW) parse(computer) else parseLocal(local)
 
     /** The names shown to the user (the PC's English names). */
     val LABELS: Map<String, String> = mapOf(

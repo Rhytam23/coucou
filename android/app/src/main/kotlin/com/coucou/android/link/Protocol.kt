@@ -1,6 +1,7 @@
 package com.coucou.android.link
 
 import com.coucou.android.mochi.BotState
+import com.coucou.android.mochi.outfit.Wardrobe
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONException
@@ -17,12 +18,14 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details", "answers")
+    val CAPABILITIES = listOf("chat", "details", "answers", "prefs")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
     /** Answering the questions Claude Code asks, from the phone (each answer confirmed with the screen lock). */
     const val CAP_ANSWERS = "answers"
+    /** What Mochi wears on the computer (no switch there: it is no secret). */
+    const val CAP_PREFS = "prefs"
     const val MAX_QUESTIONS = 4
     const val MAX_OPTIONS = 8
     const val MAX_STEPS = 20
@@ -75,6 +78,8 @@ sealed interface ServerMsg {
     data class Approval(val request: ApprovalRequest) : ServerMsg
     data class ApprovalResolved(val fingerprint: String) : ServerMsg
     data class Question(val request: QuestionRequest) : ServerMsg
+    /** What Mochi wears on the computer: "auto" or an outfit, exactly one of [com.coucou.android.mochi.outfit.Wardrobe.SELECTIONS]. */
+    data class Prefs(val outfit: String) : ServerMsg
     data object Pong : ServerMsg
     data class ChatModels(val models: List<ChatModel>) : ServerMsg
     /** [text] is appended to the answer being written. */
@@ -143,6 +148,8 @@ object Wire {
                 )
                 "approvalResolved" -> ServerMsg.ApprovalResolved(o.getString("fingerprint"))
                 "question" -> question(o)?.let { ServerMsg.Question(it) }
+                // A value this build does not know is dropped rather than guessed: the phone keeps what it had.
+                "prefs" -> o.optString("outfit", "").takeIf { it in Wardrobe.SELECTIONS }?.let { ServerMsg.Prefs(it) }
                 "pong" -> ServerMsg.Pong
                 "chatModels" -> ServerMsg.ChatModels(o.getJSONArray("models").objects().mapNotNull(::chatModel))
                 "chatDelta" -> ServerMsg.ChatDelta(chatId(o), o.getString("text"))

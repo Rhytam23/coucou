@@ -9,6 +9,7 @@
 import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
 import { parseDiffStep } from "../core/diff";
 import { State } from "../core/state";
+import { parseOutfit } from "../mochi/wardrobe";
 import { dropPendingCard } from "./hooks";
 import type { Island } from "./island";
 
@@ -96,11 +97,14 @@ export function registerPhoneLink(island: Island): () => void {
   let last = "";
   /** What was last sent as the question; "" before anything was, so a link that comes up syncs the hub. */
   let lastQuestion = "";
+  /** The outfit last sent; "" before anything was. */
+  let lastOutfit = "";
   let timer: number | null = null;
 
   const publish = () => {
     timer = null;
     publishQuestion();
+    publishOutfit();
     const snapshot = linkSnapshot();
     const key = JSON.stringify(snapshot);
     if (key === last) return;
@@ -115,6 +119,13 @@ export function registerPhoneLink(island: Island): () => void {
     void Bridge.phoneLinkPublishQuestion(JSON.parse(key));
   };
 
+  const publishOutfit = () => {
+    const outfit = parseOutfit(State.settings.mochiOutfit);
+    if (outfit === lastOutfit) return;
+    lastOutfit = outfit;
+    void Bridge.phoneLinkPublishPrefs(outfit);
+  };
+
   const schedule = () => {
     if (!running || timer != null) return;
     timer = window.setTimeout(publish, DEBOUNCE_MS);
@@ -127,6 +138,7 @@ export function registerPhoneLink(island: Island): () => void {
     running = now;
     last = ""; // a link that has just come up needs the whole picture
     lastQuestion = "";
+    lastOutfit = "";
     if (running) schedule();
     else if (timer != null) {
       window.clearTimeout(timer);
