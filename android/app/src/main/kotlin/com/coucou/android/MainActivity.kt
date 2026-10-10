@@ -239,7 +239,7 @@ class MainActivity : ComponentActivity() {
     /** A coucou://pair link (from the camera app or a browser) or a tap on an approval notification. */
     private fun handle(i: Intent?) {
         i ?: return
-        Log.d("CoucouLaunch", "MainActivity intent: action=${i.action} allow=${i.getBooleanExtra(Notifications.EXTRA_ALLOW, false)} data=${i.data != null}")
+        Log.d("CoucouLaunch", "MainActivity intent: action=${i.action} data=${i.data != null}")
         i.data?.let { uri ->
             if (uri.scheme == "coucou") {
                 // Opened from the camera app or a browser: never paired without the user's OK.
@@ -247,9 +247,11 @@ class MainActivity : ComponentActivity() {
                 i.data = null // handled once: a rotation must not ask again
             }
         }
-        val fp = i.getStringExtra(Notifications.EXTRA_FP) ?: return
-        if (i.getBooleanExtra(Notifications.EXTRA_ALLOW, false)) {
-            i.removeExtra(Notifications.EXTRA_ALLOW)
+        // Never read from the intent: this activity is exported, any app could send these extras. The request comes
+        // from LaunchActivity (ours, not exported) through the model, once.
+        val launch = model.launch.take() ?: return
+        val fp = launch.fingerprint
+        if (launch.allow) {
             val request = model.approvals.firstOrNull { it.fingerprint == fp }
             when {
                 request != null -> approve(request)

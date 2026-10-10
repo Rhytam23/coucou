@@ -57,6 +57,9 @@ class AppModel(private val context: Context) : LinkListener {
     val sounds = SoundPlayer(context)
     val notifier = Notifications(context)
 
+    /** Set only by LaunchActivity (not exported), read by MainActivity: see [com.coucou.android.core.PendingLaunch]. */
+    val launch = com.coucou.android.core.PendingLaunch()
+
     var mode by mutableStateOf(Mode.NONE); private set
     var linkState by mutableStateOf(LinkState.DISCONNECTED); private set
     var desktopName by mutableStateOf<String?>(null); private set

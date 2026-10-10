@@ -43,6 +43,14 @@
             </intent-filter>
         </activity>
 
+        <!-- Not exported: only our own notification actions can start it (MainActivity must not trust intents from other apps). -->
+        <activity
+            android:name=".app.LaunchActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <service
             android:name=".app.LinkService"
             android:exported="false"

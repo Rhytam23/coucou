@@ -63,7 +63,8 @@ class Notifications(private val context: Context) {
     }
 
     private fun open(fp: String?, allow: Boolean, code: Int): PendingIntent {
-        val i = Intent(context, MainActivity::class.java)
+        // A request goes through LaunchActivity (not exported); a plain open needs no extras and goes straight to the app.
+        val i = Intent(context, if (fp != null) LaunchActivity::class.java else MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .apply { if (fp != null) { putExtra(EXTRA_FP, fp); putExtra(EXTRA_ALLOW, allow) } }
         return PendingIntent.getActivity(context, code, i, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
