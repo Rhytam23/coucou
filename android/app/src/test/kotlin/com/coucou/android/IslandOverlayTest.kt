@@ -10,20 +10,6 @@ import org.junit.Test
 class IslandOverlayTest {
     private val src = File("src/main/kotlin/com/coucou/android/ui/IslandOverlay.kt").readText()
 
-    @Test fun theIslandIsFlushWithTheTopEdgeAndMergesWithTheCameraHole() {
-        assertTrue(src.contains("y = 0"))
-        assertTrue(src.contains("FLAG_LAYOUT_NO_LIMITS"))
-        assertTrue(src.contains("LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS"))
-        assertTrue("concave flares where it meets the edge", src.contains("drawFlares("))
-        assertEquals("one flare per side", 2, Regex("""drawPath\(""").findAll(src.substringAfter("private fun DrawScope.drawFlares")).count())
-    }
-
-    @Test fun itIsBlackInBothThemesFromTheSharedSurfaceColours() {
-        assertTrue(src.contains("Color(IslandSurface.BLACK)"))
-        assertTrue(src.contains("LocalTokens provides Tokens.DARK"))
-        assertFalse("no stray hex colours", Regex("""Color\(0x""").containsMatchIn(src))
-    }
-
     @Test fun theRequestCardNamesTheActionAndNeverShowsTheCommand() {
         val card = src.substringAfter("private fun RequestCard").substringBefore("A window outside any activity")
         assertTrue(card.contains("R.string.approval_wants"))

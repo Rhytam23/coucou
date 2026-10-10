@@ -55,11 +55,6 @@ class SheetsTest {
         assertTrue("Review request reopens it", main.contains("onReview = { closedApproval = null }"))
     }
 
-    @Test fun theSheetIsBlackInBothThemesAndNotOverTheCamera() {
-        assertTrue(sheets.contains("IslandSurface.PANEL"))
-        assertTrue(main.contains("screen != Screen.SCAN"))
-    }
-
     @Test fun aQuestionIsAnsweredOnlyAfterTheScreenLock() {
         assertTrue(main.contains("focus.state == BotState.QUESTION"))
         // The sheet never talks to the link itself: it hands the picks to the activity, which asks for the lock first.

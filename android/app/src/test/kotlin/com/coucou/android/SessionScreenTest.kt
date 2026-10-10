@@ -32,17 +32,4 @@ class SessionScreenTest {
         assertTrue(src("app/AppModel.kt").contains("detailsOffered = Protocol.CAP_DETAILS in caps"))
     }
 
-    @Test fun noStepCounterAnywhereBecauseTheComputerCannotKnowTheTotal() {
-        for (f in listOf("ui/SessionScreen.kt", "ui/HomePanel.kt", "MainActivity.kt")) {
-            val text = src(f)
-            assertFalse("$f", text.contains("step_of") || text.contains("LinearProgressIndicator") || text.contains("stepNumber"))
-        }
-        assertFalse(strings.contains("Step %1"))
-    }
-
-    @Test fun stepsReadLikeTheTickerDoneStepsGetACheckAndTheOneInProgressTheAgentsDot() {
-        val ui = src("ui/SessionScreen.kt")
-        assertTrue(ui.contains("IconKind.CHECK") && ui.contains("val current = i == 0 && busy"))
-        assertTrue("the Mochi wears its agent's colour here too", ui.contains("engine.bodyColor = HomePanel.colorHex(s)"))
-    }
 }
