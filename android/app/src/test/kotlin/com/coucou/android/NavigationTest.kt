@@ -10,18 +10,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationTest {
-    @Test fun chatIsInTheBarOnlyWhenOfferedOrThereIsAConversation() {
-        assertEquals(listOf(Tab.HOME, Tab.SETTINGS), Nav.tabs(chatOffered = false, hasConversation = false))
-        assertEquals(listOf(Tab.HOME, Tab.CHAT, Tab.SETTINGS), Nav.tabs(true, false))
-        assertEquals(listOf(Tab.HOME, Tab.CHAT, Tab.SETTINGS), Nav.tabs(false, true))
-    }
-
-    @Test fun homeIsFirstAndSettingsLast() {
-        for (o in listOf(true, false)) for (c in listOf(true, false)) {
-            val t = Nav.tabs(o, c)
-            assertEquals(Tab.HOME, t.first())
-            assertEquals(Tab.SETTINGS, t.last())
-        }
+    @Test fun theBarAlwaysHasHomeChatAndSettingsInThatOrder() {
+        assertEquals(listOf(Tab.HOME, Tab.CHAT, Tab.SETTINGS), Nav.tabs())
     }
 
     @Test fun theBarShowsOnTheThreeRootsOnly() {
@@ -64,13 +54,5 @@ class NavigationTest {
 
     @Test fun everyTabLeadsToItsOwnScreen() {
         for (t in Tab.entries) assertEquals(t, Nav.tabOf(Nav.screenOf(t)))
-    }
-
-    @Test fun aVanishedChatTabSendsTheUserHome() {
-        val noChat = Nav.tabs(false, false)
-        assertEquals(Screen.HOME, Nav.resolve(Screen.CHAT, noChat))
-        assertEquals(Screen.SETTINGS, Nav.resolve(Screen.SETTINGS, noChat))
-        assertEquals(Screen.SCAN, Nav.resolve(Screen.SCAN, noChat))
-        assertEquals(Screen.CHAT, Nav.resolve(Screen.CHAT, Nav.tabs(true, false)))
     }
 }

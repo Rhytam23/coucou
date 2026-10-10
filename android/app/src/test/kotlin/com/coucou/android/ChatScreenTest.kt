@@ -39,10 +39,10 @@ class ChatScreenTest {
         assertTrue(src("app/AppModel.kt").contains("link?.chatReset()"))
     }
 
-    @Test fun chatIsATabOnlyWhenOfferedOrThereIsAConversationToRead() {
+    @Test fun chatIsAlwaysATabAndTheOldHomeCardIsGone() {
         val main = src("MainActivity.kt")
-        assertTrue(main.contains("Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())"))
-        assertTrue(main.contains("Screen.CHAT -> ChatScreen(model)"))
+        assertTrue("the tab is always there", main.contains("val tabs = Nav.tabs()"))
+        assertTrue(main.contains("Screen.CHAT -> ChatScreen(model, onHome = { screen = Screen.HOME }, onSettings = { screen = Screen.SETTINGS })"))
         assertFalse("the old card on Home is gone", main.contains("ChatEntry"))
         assertFalse(src("ui/ChatScreen.kt").contains("fun ChatEntry"))
     }
@@ -65,7 +65,7 @@ class ChatScreenTest {
         assertFalse("no blue bubbles any more", ui.contains("colorScheme.primary"))
         assertTrue("your messages sit on the lighter panel colour", ui.contains("background(tokens().panel2.c())"))
         assertTrue("send is a round icon button with a label for TalkBack", ui.contains("IconKind.SEND") && ui.contains("contentDescription = send"))
-        assertTrue("the title has no Back button: the bar is the navigation", ui.contains("stringResource(R.string.chat_title), null,"))
+        assertTrue("the title has no Back button: the bar is the navigation", ui.contains("stringResource(R.string.chat_title), null"))
         assertTrue("code uses the mono step", ui.contains("TypeScale.MONO"))
     }
 }

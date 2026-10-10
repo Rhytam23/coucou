@@ -92,8 +92,8 @@ class ScreenLayoutTest {
         assertTrue("the camera screen is black in both themes", src("ui/ScanScreen.kt").contains("background(Color(IslandSurface.BLACK))"))
     }
 
-    @Test fun askAndRecentAreOnHome() {
-        assertTrue(main.contains("if (model.chatOffered) item") && main.contains("AskBar(onAsk)"))
+    @Test fun recentIsOnHome() {
+        assertFalse("the Ask pill is gone: Chat is a tab", main.contains("AskBar") || homePanel.contains("fun AskBar"))
         assertTrue(main.contains("RecentPanel(model.decisions, onHistory)"))
     }
 

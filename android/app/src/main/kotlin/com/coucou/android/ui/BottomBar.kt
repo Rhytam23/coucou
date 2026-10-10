@@ -25,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.coucou.android.R
+import com.coucou.android.core.BarFit
 import com.coucou.android.core.IconKind
 import com.coucou.android.core.Tab
 import com.coucou.android.core.TypeScale
@@ -64,9 +65,9 @@ fun BottomBar(tabs: List<Tab>, selected: Tab?, onSelect: (Tab) -> Unit, alert: B
                     .selectable(selected = on, role = Role.Tab, onClick = { onSelect(tab) }),
                 contentAlignment = Alignment.Center,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(Modifier.padding(horizontal = BarFit.ITEM_SIDE_PADDING_DP.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CoucouIcon(tab.icon(), tint = if (on) t.text.c() else t.textDim.c(), size = 22.dp)
-                    Text(stringResource(tab.label()), style = TypeScale.LABEL.style(if (on) t.text.c() else t.textDim.c()), maxLines = 1)
+                    Text(stringResource(tab.label()), style = TypeScale.LABEL.style(if (on) t.text.c() else t.textDim.c()), maxLines = 1, softWrap = false)
                 }
                 if (alert && tab == Tab.HOME) {
                     val amber = MochiConst.STATES[BotState.APPROVAL]?.color?.let(::rgbColor) ?: Color(0xFFF5A524)

@@ -67,6 +67,12 @@ import com.coucou.android.R
 import com.coucou.android.app.AppModel
 import com.coucou.android.core.ChatMessage
 import com.coucou.android.core.ChatReasons
+import com.coucou.android.core.ChatTab
+import com.coucou.android.core.ChatTabState
+import com.coucou.android.core.Screen
+import com.coucou.android.mochi.BotState
+import com.coucou.android.mochi.MochiEngine
+import com.coucou.android.mochi.MochiView
 import com.coucou.android.core.ChatRole
 import com.coucou.android.core.ChatSession
 import com.coucou.android.core.ChatStatus
@@ -96,13 +102,57 @@ private fun reasonText(code: String?): String = stringResource(
     },
 )
 
+internal fun chatStateTitle(state: ChatTabState): Int = when (state) {
+    ChatTabState.NOT_PAIRED -> R.string.chat_off_not_paired_title
+    ChatTabState.NOT_CONNECTED -> R.string.chat_off_offline_title
+    ChatTabState.CHAT_OFF -> R.string.chat_off_title
+    ChatTabState.NO_MODELS -> R.string.chat_nomodel_title
+    ChatTabState.READY -> R.string.chat_title
+}
+
+internal fun chatStateBody(state: ChatTabState): Int = when (state) {
+    ChatTabState.NOT_PAIRED -> R.string.chat_off_not_paired_body
+    ChatTabState.NOT_CONNECTED -> R.string.chat_off_offline_body
+    ChatTabState.CHAT_OFF, ChatTabState.NO_MODELS -> R.string.chat_off_hint
+    ChatTabState.READY -> R.string.chat_title
+}
+
+/** The Chat tab with nothing to chat with: a sleeping Mochi, what is wrong in plain words, and the one button that helps (if any). */
+@Composable
+private fun ChatEmpty(state: ChatTabState, onHome: () -> Unit, onSettings: () -> Unit) {
+    val t = tokens()
+    val engine = remember { MochiEngine({ android.os.SystemClock.elapsedRealtimeNanos() / 1e6 }).apply { setState(BotState.SLEEPING, force = true) } }
+    Column(Modifier.fillMaxSize().padding(horizontal = Gutter)) {
+        ScreenTitle(stringResource(R.string.chat_title), null)
+        Column(
+            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+        ) {
+            MochiView(engine, Modifier.size(120.dp))
+            Text(
+                stringResource(chatStateTitle(state)), Modifier.padding(top = 16.dp),
+                style = TypeScale.TITLE.style(t.text.c()).copy(textAlign = TextAlign.Center),
+            )
+            Text(
+                stringResource(chatStateBody(state)), Modifier.padding(top = 8.dp, bottom = 20.dp),
+                style = TypeScale.BODY.style(t.textDim.c()).copy(textAlign = TextAlign.Center),
+            )
+            when (ChatTab.action(state)) {
+                Screen.HOME -> PillButton(stringResource(R.string.chat_go_pair), onHome, Modifier.fillMaxWidth(), PillKind.PRIMARY)
+                Screen.SETTINGS -> PillButton(stringResource(R.string.chat_go_settings), onSettings, Modifier.fillMaxWidth(), PillKind.PRIMARY)
+                else -> {}
+            }
+        }
+    }
+}
+
 /**
  * Chat with the computer's AI providers, like the PC's chat panel: your messages on the right, the
  * answers as plain light Markdown, three dots while waiting, the model above the box. The computer's
  * API key is used on the computer; this screen only ever has text.
  */
 @Composable
-fun ChatScreen(model: AppModel) {
+fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     var refusal by remember { mutableStateOf<ChatSession.Refusal?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
@@ -114,6 +164,13 @@ fun ChatScreen(model: AppModel) {
     val lastLength = messages.lastOrNull()?.text?.length ?: 0
     LaunchedEffect(messages.size, lastLength) {
         if (messages.isNotEmpty()) listState.scrollToItem(messages.size - 1)
+    }
+
+    val tabState = model.chatTabState
+    // Nothing to chat with and nothing to read: say why, calmly, with the one thing to do about it.
+    if (tabState != ChatTabState.READY && messages.isEmpty()) {
+        ChatEmpty(tabState, onHome, onSettings)
+        return
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = Gutter)) {
@@ -134,8 +191,12 @@ fun ChatScreen(model: AppModel) {
             style = TypeScale.SECONDARY.style(tokens().textDim.c()),
         )
         if (!model.chatAvailable) {
+            // The conversation stays readable; the reason sits above it.
             Panel(Modifier.padding(vertical = 4.dp)) {
-                Text(stringResource(R.string.chat_unavailable), Modifier.padding(Gutter), style = TypeScale.SECONDARY.style(tokens().textDim.c()))
+                Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(chatStateTitle(tabState)), style = TypeScale.HEADLINE.style(tokens().text.c()))
+                    Text(stringResource(chatStateBody(tabState)), style = TypeScale.SECONDARY.style(tokens().textDim.c()))
+                }
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {

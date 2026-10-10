@@ -8,17 +8,13 @@ enum class Screen { HOME, CHAT, SETTINGS, HISTORY, GALLERY, DESIGN, SESSION, SCA
 
 /**
  * Where the user is and where Back goes (android/UX_PLAN.md, section 2). Pure, so every rule is a unit test:
- * - the bar has Home and Settings, plus Chat only while the computer offers it or there is a conversation to read;
+ * - the bar always has Home, Chat and Settings (Chat shows why it cannot chat yet when that is the case);
  * - the bar shows on the three tab roots, and hides on every page below them and while the keyboard is open;
  * - Back goes up one level; on Home it is the system's (leave the app).
  */
 object Nav {
-    fun tabs(chatOffered: Boolean, hasConversation: Boolean): List<Tab> =
-        buildList {
-            add(Tab.HOME)
-            if (chatOffered || hasConversation) add(Tab.CHAT)
-            add(Tab.SETTINGS)
-        }
+    /** Home, Chat and Settings, always: Chat explains itself when the computer does not offer it. */
+    fun tabs(): List<Tab> = listOf(Tab.HOME, Tab.CHAT, Tab.SETTINGS)
 
     fun screenOf(tab: Tab): Screen = when (tab) {
         Tab.HOME -> Screen.HOME
@@ -43,11 +39,5 @@ object Nav {
         Screen.CHAT, Screen.SETTINGS, Screen.SESSION, Screen.SCAN -> Screen.HOME
         Screen.HISTORY, Screen.GALLERY -> Screen.SETTINGS
         Screen.DESIGN -> Screen.GALLERY
-    }
-
-    /** The chat tab can vanish (the computer stopped offering it): never leave the user on a screen with no tab. */
-    fun resolve(screen: Screen, tabs: List<Tab>): Screen {
-        val tab = tabOf(screen) ?: return screen
-        return if (tab in tabs) screen else Screen.HOME
     }
 }

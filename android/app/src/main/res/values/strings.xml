@@ -42,7 +42,6 @@
     <string name="home_running">%1$d running</string>
     <string name="home_empty_title">Nothing is running</string>
     <string name="home_empty_hint">Start an agent on your computer and it shows up here.</string>
-    <string name="ask_placeholder">Ask your AI…</string>
     <string name="recent_title">Recent</string>
     <string name="recent_all">See all</string>
     <string name="status_looking">Looking for your computer…</string>
@@ -54,6 +53,15 @@
     <string name="address_hint">For example 192.168.1.20 or 192.168.1.20:47821. Your pairing stays as it is: only the address changes.</string>
     <string name="address_save">Use this address</string>
     <string name="address_bad">That is not a valid address.</string>
+    <string name="chat_off_not_paired_title">Not connected</string>
+    <string name="chat_off_not_paired_body">Pair your computer first, then you can chat through it.</string>
+    <string name="chat_off_offline_title">Not connected</string>
+    <string name="chat_off_offline_body">Your computer cannot be reached right now. Check that it is on, with Coucou running, on the same Wi-Fi.</string>
+    <string name="chat_off_title">Chat is off on your computer</string>
+    <string name="chat_nomodel_title">Your computer has no model allowed for the phone yet</string>
+    <string name="chat_off_hint">On your computer open Coucou &gt; Settings &gt; Android phone, turn on \"Let the phone chat with my AI providers\" and tick a model.</string>
+    <string name="chat_go_pair">Connect to your computer</string>
+    <string name="chat_go_settings">Open Settings</string>
     <string name="tab_home">Home</string>
     <string name="tab_chat">Chat</string>
     <string name="tab_settings">Settings</string>
@@ -129,7 +137,6 @@
     <string name="chat_clear_body">This removes the conversation from this phone and tells your computer to forget it.</string>
     <string name="chat_model">Model: %1$s</string>
     <string name="chat_count">%1$d / %2$d</string>
-    <string name="chat_unavailable">Chat is not available right now. Your computer must be on and connected, with chat allowed for the phone in its Settings.</string>
     <string name="chat_ref_too_long">That message is too long.</string>
     <string name="chat_ref_no_model">Pick a model first.</string>
     <string name="chat_ref_busy">Wait for the answer to finish, or stop it.</string>

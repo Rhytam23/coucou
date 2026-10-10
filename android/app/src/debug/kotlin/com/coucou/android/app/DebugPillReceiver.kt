@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -108,6 +108,19 @@ class DebugPillReceiver : BroadcastReceiver() {
             // phone has to find the computer by itself (needs a paired computer with the phone link on).
             //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind addrchange
             "addrchange" -> model.debugAddressChanged()
+            // Each state of the Chat tab without a computer, then open the Chat tab:
+            //   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind chatstate --es state offline
+            // state = notpaired | offline | off | nomodels | ready | real (back to the real state)
+            "chatstate" -> model.debugChatState(
+                when (intent.getStringExtra("state")) {
+                    "notpaired" -> com.coucou.android.core.ChatTabState.NOT_PAIRED
+                    "offline" -> com.coucou.android.core.ChatTabState.NOT_CONNECTED
+                    "off" -> com.coucou.android.core.ChatTabState.CHAT_OFF
+                    "nomodels" -> com.coucou.android.core.ChatTabState.NO_MODELS
+                    "ready" -> com.coucou.android.core.ChatTabState.READY
+                    else -> null
+                },
+            )
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }

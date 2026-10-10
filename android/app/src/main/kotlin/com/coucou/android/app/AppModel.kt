@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.coucou.android.R
+import com.coucou.android.core.ChatTab
+import com.coucou.android.core.ChatTabState
 import com.coucou.android.core.Decision
 import com.coucou.android.core.DecisionLog
 import com.coucou.android.core.KeyValueStore
@@ -155,8 +157,19 @@ class AppModel(private val context: Context) : LinkListener {
     /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
     private var chatForced = false
 
+    /** Debug builds only: shows one state of the Chat tab without a computer (see [debugChatState]). */
+    private var chatStateOverride by mutableStateOf<ChatTabState?>(null)
+
+    /** What the Chat tab shows: not paired, not reachable, chat off on the computer, no model allowed, or ready. */
+    val chatTabState: ChatTabState get() = chatStateOverride ?: ChatTab.state(
+        paired = mode == Mode.PAIRED, connected = linkState == LinkState.CONNECTED, offered = chatOffered,
+        modelCount = chatModels.size, forcedReady = chatForced,
+    )
+
+    internal fun debugChatState(state: ChatTabState?) { chatStateOverride = state }
+
     /** Chat is usable: offered, at least one model allowed, connected. */
-    val chatAvailable: Boolean get() = chatForced || (chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED)
+    val chatAvailable: Boolean get() = chatStateOverride?.let { it == ChatTabState.READY } ?: (chatForced || (chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED))
 
     /** Debug receiver only: fake models and a sample conversation, no computer needed. Nothing can be sent in this mode. */
     internal fun debugSeedChat(models: List<ChatModel>, messages: List<ChatMessage>) {

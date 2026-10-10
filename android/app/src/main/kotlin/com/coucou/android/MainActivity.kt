@@ -108,7 +108,6 @@ import com.coucou.android.ui.ApprovalSheet
 import com.coucou.android.ui.MessagePanel
 import com.coucou.android.ui.PairingScreen
 import com.coucou.android.ui.QuestionSheet
-import com.coucou.android.ui.AskBar
 import com.coucou.android.ui.HeroCard
 import com.coucou.android.ui.RecentPanel
 import com.coucou.android.ui.BarClearance
@@ -153,9 +152,7 @@ class MainActivity : ComponentActivity() {
                 SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && !(screen == Screen.SCAN || screen == Screen.HOME && model.mode != Mode.NONE) }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.fillMaxSize().windowInsetsPadding(if (screen == Screen.HOME || screen == Screen.SCAN) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom) else WindowInsets.safeDrawing)) {
-                        val tabs = Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())
-                        // The computer stopped offering chat while it was open: back to Home, never a screen with no tab.
-                        LaunchedEffect(tabs, screen) { Nav.resolve(screen, tabs).let { if (it != screen) screen = it } }
+                        val tabs = Nav.tabs()
                         val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
                         val barVisible = Nav.barVisible(screen, keyboardOpen)
                         BackHandler(enabled = Nav.back(screen) != null) { Nav.back(screen)?.let { screen = it } }
@@ -167,7 +164,7 @@ class MainActivity : ComponentActivity() {
                                 // True if it was a pairing code: the camera is released and the user is asked to confirm.
                                 onText = { text -> model.requestPairing(text).also { if (it) screen = Screen.HOME } },
                             )
-                            Screen.CHAT -> ChatScreen(model)
+                            Screen.CHAT -> ChatScreen(model, onHome = { screen = Screen.HOME }, onSettings = { screen = Screen.SETTINGS })
                             Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
                             Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS }, onDesign = { screen = Screen.DESIGN })
                             Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })
@@ -180,7 +177,7 @@ class MainActivity : ComponentActivity() {
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN }, onReview = { closedApproval = null }, onQuestion = { questionPill = it },
-                                onAsk = { screen = Screen.CHAT }, onHistory = { screen = Screen.HISTORY },
+                                onHistory = { screen = Screen.HISTORY },
                             )
                         }
                         }
@@ -272,7 +269,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Home(
     model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit,
-    onScan: () -> Unit, onAsk: () -> Unit, onHistory: () -> Unit, onReview: () -> Unit, onQuestion: (String) -> Unit,
+    onScan: () -> Unit, onHistory: () -> Unit, onReview: () -> Unit, onQuestion: (String) -> Unit,
 ) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
@@ -358,8 +355,6 @@ private fun Home(
             }
         }
 
-        // The way into chat, only when the computer offers it (the Chat tab is the same place).
-        if (model.chatOffered) item { Box(Modifier.padding(horizontal = Gutter)) { AskBar(onAsk) } }
         item { Box(Modifier.padding(horizontal = Gutter)) { RecentPanel(model.decisions, onHistory) } }
 
         // Only when the switch is on but Android still refuses: the one thing Home must say about it.

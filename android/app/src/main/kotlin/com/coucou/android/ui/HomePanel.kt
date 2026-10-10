@@ -168,22 +168,6 @@ fun AgentRows(others: List<SessionInfo>, engineFor: (SessionInfo) -> MochiEngine
     }
 }
 
-/** The way into chat from Home: a pill that looks like the message box. Only drawn when the computer offers chat. */
-@Composable
-fun AskBar(onClick: () -> Unit) {
-    val t = tokens()
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(CircleShape).background(t.panel.c()).border(1.dp, t.line.c(), CircleShape)
-            .clickable(role = Role.Button, onClick = onClick).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(stringResource(R.string.ask_placeholder), Modifier.weight(1f), style = TypeScale.BODY.style(t.textFaint.c()), maxLines = 1)
-        Row(Modifier.size(40.dp).clip(CircleShape).background(t.primaryButton.c()), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            CoucouIcon(IconKind.SEND, tint = t.onPrimaryButton.c(), size = 18.dp)
-        }
-    }
-}
-
 /** The last few things you allowed or denied, in plain words, with "See all" to the full list. */
 @Composable
 fun RecentPanel(decisions: List<Decision>, onAll: () -> Unit) {

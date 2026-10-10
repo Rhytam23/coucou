@@ -235,7 +235,7 @@ I would do U0, then U1 to U3 first (the screens you look at most), then the rest
    always shows the exact command, so Allow is never blind.
 4. **Order:** U0 (design system), then U1 to U3, then the rest.
 5. **Island (U7):** keep the position logic, change only the shape; no always-visible "peek" for now.
-6. **Chat tab:** hidden when the computer does not offer chat.
+6. **Chat tab:** ~~hidden when the computer does not offer chat~~ changed by the user: **always in the bar** (Home | Chat | Settings); when chat cannot be used it shows why: not connected (with a button to pairing or Settings), chat off on the computer, or no model allowed, the last two with the two-line hint.
 7. **Agent colours** (user's note): each agent keeps its own colour on the main card too (section 4.1); tapping an agent makes it the main one.
 
 No release, no upload, nothing sent to upstream. Each stage ends with tests, CI green and what was not seen on a device.
