@@ -546,6 +546,12 @@ class AppModel(private val context: Context) : LinkListener {
         main.post { services = cards }
     }
 
+    /** Debug receiver only: samples, as if the computer had sent them. */
+    internal fun applyServices(cards: List<com.coucou.android.link.ServiceCard>) { services = cards }
+
+    /** Debug receiver only: a sample, as if the computer had sent it. */
+    internal fun applyUsage(usage: com.coucou.android.link.UsageSnapshot?) { this.usage = usage }
+
     override fun onPrefs(outfit: String) {
         main.post { applyComputerOutfit(outfit) }
     }
