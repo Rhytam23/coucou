@@ -15,11 +15,6 @@ class EnglishOnlyTest {
         assertTrue(Regex("""resourceConfigurations\s*\+=\s*listOf\("en"\)""").containsMatchIn(gradle))
     }
 
-    @Test fun lintDoesNotCompareTheKeptTranslationsWithEnglish() {
-        val gradle = read("build.gradle.kts")
-        assertTrue(gradle.contains("MissingTranslation") && gradle.contains("ExtraTranslation"))
-    }
-
     @Test fun thereIsNoLanguageChoiceAnywhere() {
         assertFalse(read("src/main/AndroidManifest.xml").contains("localeConfig"))
         assertFalse(File("src/main/res/xml/locales_config.xml").exists())
@@ -31,14 +26,14 @@ class EnglishOnlyTest {
 
     @Test fun englishStringsAreTheSingleSourceOfTruth() {
         val source = read("../i18n/app-strings.json")
-        assertTrue(Regex(""""_englishOnly":\s*true""").containsMatchIn(source))
         val english = Regex("""name="([a-z_0-9]+)"""").findAll(read("src/main/res/values/strings.xml")).map { it.groupValues[1] }.toSet()
         val declared = Regex("""^\s{4}"([a-z_0-9]+)":""", RegexOption.MULTILINE).findAll(source.substringAfter(""""strings"""")).map { it.groupValues[1] }.toSet()
         assertEquals(declared, english)
     }
 
-    @Test fun theOtherLanguagesAreKeptInTheRepoForLater() {
-        assertTrue(File("src/main/res/values-fr/strings.xml").exists())
-        assertTrue(File("../i18n/extra.json").exists())
+    @Test fun thereAreNoOtherLanguagesInTheRepo() {
+        val folders = File("src/main/res").listFiles().orEmpty().map { it.name }.filter { it.startsWith("values") }
+        assertEquals(listOf("values"), folders.sorted())
+        assertFalse(File("../i18n/extra.json").exists())
     }
 }

@@ -136,7 +136,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: '22' }
       - uses: gradle/actions/setup-gradle@v5
-      - name: Translations are up to date
+      - name: English strings are up to date
         run: node scripts/gen-strings.mjs --check
       - name: Relay test vectors are up to date
         run: node relay/tools/gen-vectors.mjs --check
