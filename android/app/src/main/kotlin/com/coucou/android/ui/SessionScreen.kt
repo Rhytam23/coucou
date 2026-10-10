@@ -10,13 +10,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import com.coucou.android.core.HomeText
+import com.coucou.android.core.IconKind
+import com.coucou.android.core.TypeScale
+import com.coucou.android.mochi.MochiConst
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,7 +36,6 @@ import com.coucou.android.R
 import com.coucou.android.app.AppModel
 import com.coucou.android.core.HomePanel
 import com.coucou.android.core.Pills
-import com.coucou.android.core.Summary
 import com.coucou.android.core.ToolLabels
 import com.coucou.android.mochi.BotState
 import com.coucou.android.mochi.MochiEngine
@@ -51,74 +54,72 @@ fun SessionScreen(model: AppModel, pillId: String, onBack: () -> Unit) {
     if (s == null) {
         Column(Modifier.fillMaxSize().padding(horizontal = Gutter)) {
             ScreenTitle(stringResource(R.string.session_details), onBack)
-            Text(stringResource(R.string.session_ended), Modifier.padding(Gutter), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.session_ended), Modifier.padding(Gutter), style = TypeScale.BODY.style(tokens().textDim.c()))
         }
         return
     }
     if (engine.state != s.state) engine.setState(s.state)
+    // Its own colour, like on Home: the Mochi's body, the glow's state colour stays Louis's.
+    engine.bodyColor = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }
     val name = s.agent.ifBlank { Pills.byId(s.pillId)?.name.orEmpty() }
-    val accent = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }?.let(::rgbColor) ?: MaterialTheme.colorScheme.primary
+    val accent = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }?.let(::rgbColor) ?: tokens().text.c()
+    val t = tokens()
+    val busy = s.state == BotState.WORKING || s.state == BotState.THINKING || s.state == BotState.SEARCHING
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
         item { ScreenTitle(name, onBack) }
         item {
-            CoucouCard {
-                Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically) {
+            Panel(wash = MochiConst.STATES[s.state]?.color?.let(::rgbColor)) {
+                Row(Modifier.padding(Gutter), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Gutter)) {
                     MochiView(engine, Modifier.size(96.dp))
-                    Spacer(Modifier.width(Gutter))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        s.project?.let {
-                            Text(stringResource(R.string.session_project, it), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(8.dp).clip(CircleShape).background(accent))
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(stateLabel(s.state)), style = MaterialTheme.typography.bodyMedium)
-                        }
-                        val step = Summary.stepNumber(s.stepIndex, s.stepCount)
-                        if (step != null) {
-                            Text(stringResource(R.string.step_of, step, s.stepCount), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            LinearProgressIndicator(
-                                progress = { Summary.progress(s.stepIndex, s.stepCount) },
-                                modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                                color = accent, trackColor = MaterialTheme.colorScheme.outline,
-                            )
-                        }
+                        Text(
+                            HomeText.line(s) ?: stringResource(stateLabel(s.state)), style = TypeScale.HEADLINE.style(t.text.c()),
+                            maxLines = 3, overflow = TextOverflow.Ellipsis,
+                        )
+                        s.project?.let { Chip(stringResource(R.string.session_project, it)) }
                     }
                 }
             }
         }
         if (!s.finalLine.isNullOrBlank()) {
-            item { SectionTitle(stringResource(R.string.session_last)) }
+            item { SectionHeading(stringResource(R.string.session_last)) }
             item {
-                CoucouCard {
-                    SelectionContainer { Text(s.finalLine, Modifier.padding(Gutter), style = MaterialTheme.typography.bodyMedium) }
+                Panel(wash = MochiConst.STATES[BotState.FINISHED]?.color?.let(::rgbColor)) {
+                    SelectionContainer { Text(s.finalLine, Modifier.padding(Gutter), style = TypeScale.BODY.style(t.text.c())) }
                 }
             }
         }
-        item { SectionTitle(stringResource(R.string.session_steps)) }
+        item { SectionHeading(stringResource(R.string.session_steps)) }
         val steps = HomePanel.stepsNewestFirst(s)
         if (steps.isEmpty()) {
             item {
-                CoucouCard {
+                Panel {
                     Text(
                         stringResource(if (model.detailsOffered) R.string.session_no_steps else R.string.session_hint),
-                        Modifier.padding(Gutter), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Modifier.padding(Gutter), style = TypeScale.SECONDARY.style(t.textDim.c()),
                     )
                 }
             }
         } else {
             item {
-                CoucouCard {
+                Panel {
                     SelectionContainer {
-                        Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column {
                             steps.forEachIndexed { i, step ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Box(Modifier.padding(top = 6.dp).size(6.dp).clip(CircleShape).background(if (i == 0) accent else MaterialTheme.colorScheme.outline))
-                                    Spacer(Modifier.width(10.dp))
+                                if (i > 0) RowDivider()
+                                val current = i == 0 && busy
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = Gutter, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    // Done steps carry a check; the one being worked on carries the agent's dot.
+                                    if (current) StateDot(accent, Modifier.padding(horizontal = 7.dp))
+                                    else CoucouIcon(IconKind.CHECK, tint = if (i == 0) StatusColors.online else t.textFaint.c(), size = 22.dp)
                                     Text(
-                                        ToolLabels.label(step), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (i == 0) FontWeight.SemiBold else FontWeight.Normal, maxLines = 4, overflow = TextOverflow.Ellipsis,
+                                        ToolLabels.label(step), Modifier.weight(1f),
+                                        style = TypeScale.BODY.style(if (i == 0) t.text.c() else t.textDim.c()).copy(fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal),
+                                        maxLines = 4, overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }

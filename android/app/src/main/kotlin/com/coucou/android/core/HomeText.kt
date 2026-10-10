@@ -19,6 +19,10 @@ object HomeText {
     /** "Allowed: edit files" or "Denied: run a command", for the Recent list. */
     fun recent(allowed: Boolean, tool: String): String = (if (allowed) "Allowed: " else "Denied: ") + ToolLabels.action(tool)
 
+    /** "You allowed Claude Code to run a command": a decision in a sentence, with no command and no path. */
+    fun decision(allowed: Boolean, agent: String, tool: String): String =
+        "You ${if (allowed) "allowed" else "denied"} ${agent.ifBlank { "an agent" }} to ${ToolLabels.action(tool)}"
+
     /** How many agents are busy (working, thinking or searching), for "2 running". */
     fun running(sessions: List<SessionInfo>): Int = sessions.count { it.state in BUSY }
 }

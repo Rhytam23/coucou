@@ -61,17 +61,3 @@ val CardShape = RoundedCornerShape(14.dp)
 /** The gutter at the side of every screen, and the gap between cards (one rhythm everywhere). */
 val Gutter = 16.dp
 val Gap = 12.dp
-
-/** The website's `.card`: a flat surface with a one-pixel border; [emphasis] draws it in the accent colour. */
-@Composable
-fun CoucouCard(modifier: Modifier = Modifier, emphasis: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val line = if (emphasis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-    Card(
-        modifier.fillMaxWidth(),
-        shape = CardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, line),
-        elevation = CardDefaults.cardElevation(0.dp),
-        content = content,
-    )
-}

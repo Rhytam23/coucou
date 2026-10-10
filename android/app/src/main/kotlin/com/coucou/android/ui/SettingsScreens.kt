@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,6 +45,7 @@ import com.coucou.android.R
 import com.coucou.android.app.AppModel
 import com.coucou.android.app.Mode
 import com.coucou.android.core.HistoryDays
+import com.coucou.android.core.HomeText
 import com.coucou.android.core.QuietHours
 import com.coucou.android.sound.SoundVolume
 import java.time.ZoneId
@@ -229,6 +231,10 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
     }
 }
 
+/**
+ * What you allowed or denied, in sentences (never the command or a path), grouped by day. Kept only on the
+ * phone. The same list as Home's "Recent", in full.
+ */
 @Composable
 fun HistoryScreen(model: AppModel, onBack: () -> Unit) {
     val zone = remember { ZoneId.systemDefault() }
@@ -236,22 +242,17 @@ fun HistoryScreen(model: AppModel, onBack: () -> Unit) {
     val groups = HistoryDays.group(model.decisions, now, zone)
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
     val timeFormat = remember { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT) }
+    val t = tokens()
     LazyColumn(Modifier.padding(horizontal = Gutter), verticalArrangement = Arrangement.spacedBy(Gap)) {
         item { ScreenTitle(stringResource(R.string.history_title), onBack) }
-        item {
-            Text(stringResource(R.string.history_note), Modifier.padding(horizontal = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        item { Text(stringResource(R.string.history_note), Modifier.padding(horizontal = 4.dp), style = TypeScale.SECONDARY.style(t.textDim.c())) }
         if (groups.isEmpty()) {
-            item {
-                CoucouCard {
-                    Text(stringResource(R.string.history_empty), Modifier.padding(Gutter), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            item { Panel { Text(stringResource(R.string.history_empty), Modifier.padding(Gutter), style = TypeScale.BODY.style(t.textDim.c())) } }
         }
         for ((key, list) in groups) {
             val (day, date) = key
             item {
-                SectionTitle(
+                SectionHeading(
                     when (day) {
                         HistoryDays.Day.TODAY -> stringResource(R.string.history_today)
                         HistoryDays.Day.YESTERDAY -> stringResource(R.string.history_yesterday)
@@ -259,33 +260,27 @@ fun HistoryScreen(model: AppModel, onBack: () -> Unit) {
                     },
                 )
             }
-            items(list) { d ->
-                CoucouCard {
-                    Column(Modifier.padding(Gutter), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                if (d.allowed) stringResource(R.string.history_allowed) else stringResource(R.string.history_denied),
-                                style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1,
-                                color = if (d.allowed) StatusColors.online else MaterialTheme.colorScheme.error,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(d.agent, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(Modifier.width(8.dp))
+            item {
+                Panel {
+                    list.forEachIndexed { i, d ->
+                        if (i > 0) RowDivider()
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = Spacing.INSIDE.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.GAP.dp), verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            StateDot(if (d.allowed) StatusColors.online else t.danger.c())
+                            Text(HomeText.decision(d.allowed, d.agent, d.tool), Modifier.weight(1f), style = TypeScale.BODY.style(t.text.c()), maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text(
                                 timeFormat.format(java.time.Instant.ofEpochMilli(d.atMs).atZone(zone).toLocalTime()),
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                                style = TypeScale.SECONDARY.style(t.textDim.c()), maxLines = 1,
                             )
                         }
-                        Text(
-                            "${d.tool}: ${d.command}", style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }
         }
         if (groups.isNotEmpty()) {
-            item { TextButton(onClick = { model.clearDecisions() }) { Text(stringResource(R.string.history_clear), color = MaterialTheme.colorScheme.error) } }
+            item { PillButton(stringResource(R.string.history_clear), { model.clearDecisions() }, Modifier.fillMaxWidth(), PillKind.DANGER) }
         }
         item { Spacer(Modifier.height(Gutter)) }
     }

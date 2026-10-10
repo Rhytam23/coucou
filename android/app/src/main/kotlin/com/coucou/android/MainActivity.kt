@@ -90,7 +90,14 @@ import com.coucou.android.mochi.BotEmote
 import com.coucou.android.mochi.BotState
 import com.coucou.android.mochi.MochiEngine
 import com.coucou.android.mochi.MochiView
-import com.coucou.android.ui.CoucouCard
+import com.coucou.android.ui.Panel
+import com.coucou.android.ui.c
+import com.coucou.android.ui.style
+import com.coucou.android.ui.tokens
+import com.coucou.android.core.TypeScale
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentRows
@@ -357,10 +364,14 @@ private const val HOME_KEY = "home"
 
 @Composable
 private fun OverlayHint(onOverlay: (Boolean) -> Unit) {
-    CoucouCard {
-        Row(Modifier.padding(start = Gutter, top = 4.dp, bottom = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.overlay_missing), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = { onOverlay(true) }) { Text(stringResource(R.string.overlay_allow), maxLines = 1) }
+    Panel {
+        Row(Modifier.padding(start = Gutter), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.overlay_missing), Modifier.weight(1f).padding(vertical = 12.dp), style = TypeScale.SECONDARY.style(tokens().textDim.c()))
+            Text(
+                stringResource(R.string.overlay_allow),
+                Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { onOverlay(true) }.padding(horizontal = 16.dp, vertical = 14.dp),
+                style = TypeScale.LABEL.style(tokens().text.c()), maxLines = 1,
+            )
         }
     }
 }

@@ -103,4 +103,10 @@ class ScreenLayoutTest {
             assertFalse("$file: use Gutter/Gap", Regex("""padding\(horizontal = 1[0-5]\.dp\)""").containsMatchIn(text))
         }
     }
+
+    @Test fun activityShowsSentencesNeverTheCommand() {
+        val history = settings.substringAfter("fun HistoryScreen")
+        assertTrue(history.contains("HomeText.decision("))
+        assertFalse("no raw command or tool: command line", history.contains("d.command") || history.contains("Monospace"))
+    }
 }

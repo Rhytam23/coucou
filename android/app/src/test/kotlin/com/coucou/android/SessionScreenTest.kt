@@ -35,4 +35,19 @@ class SessionScreenTest {
     @Test fun theDebugKindShowsDetailsWithoutAComputer() {
         assertTrue(File("src/debug/kotlin/com/coucou/android/app/DebugPillReceiver.kt").readText().contains("\"details\" -> {"))
     }
+
+    @Test fun noStepCounterAnywhereBecauseTheComputerCannotKnowTheTotal() {
+        for (f in listOf("ui/SessionScreen.kt", "ui/HomePanel.kt", "MainActivity.kt")) {
+            val text = src(f)
+            assertFalse("$f", text.contains("step_of") || text.contains("LinearProgressIndicator") || text.contains("stepNumber"))
+        }
+        assertFalse(strings.contains("Step %1"))
+        assertFalse(src("core/Summary.kt").contains("fun progress") || src("core/Summary.kt").contains("fun stepNumber"))
+    }
+
+    @Test fun stepsReadLikeTheTickerDoneStepsGetACheckAndTheOneInProgressTheAgentsDot() {
+        val ui = src("ui/SessionScreen.kt")
+        assertTrue(ui.contains("IconKind.CHECK") && ui.contains("val current = i == 0 && busy"))
+        assertTrue("the Mochi wears its agent's colour here too", ui.contains("engine.bodyColor = HomePanel.colorHex(s)"))
+    }
 }

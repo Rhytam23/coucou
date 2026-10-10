@@ -69,8 +69,9 @@ class DesignSystemTest {
         assertTrue("Home uses the hero", src("ui/HomePanel.kt").contains("HeroPanel(") && src("ui/HomePanel.kt").contains("Panel {"))
         assertFalse("no stock Material switch or slider in Settings", settings.contains("Slider(") && !settings.contains("CoucouSlider("))
         assertFalse(Regex("""\bSwitch\(""").containsMatchIn(settings))
-        for (file in listOf("ui/SessionScreen.kt")) {
-            assertFalse("$file already uses the new panel", Regex("""\bPanel[ (]""").containsMatchIn(src(file)))
+        // every screen has moved by U6: none of them may still draw the old bordered card
+        for (file in listOf("MainActivity.kt", "ui/HomePanel.kt", "ui/SettingsScreens.kt", "ui/SessionScreen.kt", "ui/ChatScreen.kt")) {
+            assertFalse("$file still uses CoucouCard", src(file).contains("CoucouCard("))
         }
     }
 }

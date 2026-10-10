@@ -71,7 +71,7 @@
     <string name="quiet_hint">No sound and no pill for finished or failed agents. Requests and questions still come through.</string>
     <string name="quiet_from">From</string>
     <string name="quiet_to">To</string>
-    <string name="history_title">History</string>
+    <string name="history_title">Activity</string>
     <string name="history_empty">Your decisions will appear here. They stay on this phone.</string>
     <string name="history_today">Today</string>
     <string name="history_yesterday">Yesterday</string>
@@ -98,7 +98,6 @@
     <string name="state_dizzy">Dizzy</string>
     <string name="agent_kind">Agent</string>
     <string name="link_pair">Pair with your computer</string>
-    <string name="step_of">Step %1$d of %2$d</string>
     <string name="link_approval">Review request</string>
     <string name="overlay_missing">Allow “display over other apps” so the island can show.</string>
     <string name="overlay_allow">Allow</string>

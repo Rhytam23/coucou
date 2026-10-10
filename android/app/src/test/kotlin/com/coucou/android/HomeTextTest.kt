@@ -48,4 +48,10 @@ class HomeTextTest {
         assertEquals(3, HomeText.running(all))
         assertEquals(0, HomeText.running(emptyList()))
     }
+
+    @Test fun aDecisionIsASentenceWithNoCommand() {
+        assertEquals("You allowed Claude Code to run a command", HomeText.decision(true, "Claude Code", "Bash"))
+        assertEquals("You denied Codex to edit files", HomeText.decision(false, "Codex", "Edit"))
+        assertEquals("You allowed an agent to read files", HomeText.decision(true, " ", "Read"))
+    }
 }
