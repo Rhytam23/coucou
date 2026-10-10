@@ -305,7 +305,7 @@ simply keeps using the saved address.**
   cannot switch it on). While off, nothing listens, nothing is published and no timer runs.
 - It listens on `0.0.0.0` (port 47821, else any free port) but drops every peer that is not on the
   local network (private, loopback, link-local). At most 8 connections; 10 s to say hello (3 s when the pool is
-  filling up); 90 s idle. Unauthenticated connections are limited, see "Admission" below.
+  filling up); 20 min idle (a sleeping phone cannot ping every 20 s, see "Keeping the link alive"). Unauthenticated connections are limited, see "Admission" below.
 - The certificate (ECDSA P-256, self-signed) is generated once; its key and the pairing token live in
   the OS keystore (Credential Manager / Secret Service) and nowhere else. Without a keystore the link
   does not start.
@@ -350,3 +350,34 @@ every connection). The conversation itself is unchanged and runs inside an end-t
 relay; the wire is in `docs/RELAY_LINK.md`. When the user replaces the relay's access key, each phone that negotiated `relay`
 is sent `{"type":"relayAccess","access":"<43 base64url characters>"}` and follows the new key. A phone that did not negotiate
 `relay` is never sent it.
+
+## Keeping the link alive while the phone sleeps
+
+What actually happens when the screen is off, as found and fixed (Galaxy A12s, Android 13):
+
+- **A foreground service keeps the process alive, not the connection.** `LinkService` is what stops Android from killing the app, but
+  the app's own timers (the 20-second ping, every timeout) are stopped with the CPU in Doze, and the network of an app that is not
+  exempt from battery optimisation is restricted while the phone is idle. So the phone could not ping, the computer (which allowed only 90 s of
+  silence) closed the connection, and the phone found out only when it woke up and sent something: a new connection from the phone's
+  address at wake time.
+- **The computer is more patient**: an authenticated phone may be silent for 20 minutes (`IDLE_TIMEOUT` in `server.rs`). A conversation
+  whose phone disappeared without saying goodbye (its address changed) holds one of the 8 places until then.
+- **The phone has a heartbeat that works in Doze**: an alarm every 4 minutes (`AlarmManager.setAndAllowWhileIdle`, no exact-alarm
+  permission). Android may run it later (about every 9 minutes in Doze, or in a maintenance window), never more often. Each time, the
+  app asks the computer for a pong and drops the connection (so it reconnects) if nothing comes within 8 s, or reconnects at once if the
+  link was down. The check holds a wake lock for at most 15 seconds, only so the question and its answer can cross; nothing is held between checks.
+- **Other triggers**, all through one rule table (`ReconnectPolicy`): the screen turning on or the phone being unlocked, a new
+  default network (Wi-Fi joined, Wi-Fi to mobile data), and the connection dying (the usual reconnect with backoff). Connected: ask for a
+  pong. Not connected: reconnect now, if there is a network to use.
+- **What is not possible**: while Doze restricts the network of an app that is *not* exempt, nothing can reach or leave the app until the
+  next maintenance window, whatever the app does. The only reliable fix is the user's: set the app's battery usage to **Unrestricted** (on
+  Samsung also: not in Sleeping apps or Deep sleeping apps). The app suggests it, calmly, only after a connection that ended on its own after
+  the screen had been off, and only opens Android's screen: it cannot change the setting itself and does not ask for the permission that
+  would allow a one-tap request (Google restricts it on its store). Push notifications (FCM) would work without this setting, but need Google's
+  servers and a Google account of the app; they are not used (decision D6 of the relay plan).
+- Home says what happened ("Connection lost 2 min ago, reconnecting", and why: the computer stopped answering / closed the connection /
+  the network dropped). **Settings > Computer > "Can't connect?"** checks, in order, the phone's network, the saved address, whether the
+  computer announces itself, the pinned certificate, the pairing code and version, and the relay if the pairing has one. Its copyable
+  report names the checks and what they found, and never contains the pairing code, the certificate fingerprint, the computer's name or
+  the full address.
+

@@ -9,7 +9,7 @@
 //   * anyone who is not on the local network (private, loopback, link-local);
 //   * a first message that is not a valid `hello` within a few seconds;
 //   * a wrong token or protocol version (after a short pause, so guessing is slow);
-//   * a line over 64 KiB, or silence for 90 s (the phone pings every 20 s);
+//   * a line over 64 KiB, or silence for 20 minutes (the phone pings every 20 s while it is awake, and checks in every few minutes while it sleeps);
 //   * more than a handful of connections at once, and more than two silent ones from one address: see
 //     admission.rs (strangers share a small pool, a phone that authenticated before keeps its place, and the
 //     TLS handshake and the hello get less time when the pool is filling up).
@@ -39,7 +39,22 @@ use super::pairing::Identity;
 pub const PROTOCOL: u64 = 1;
 pub const MAX_LINE: usize = 64 * 1024;
 const HELLO_TIMEOUT: Duration = Duration::from_secs(10);
-const IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+/// An authenticated phone may be silent this long. A sleeping phone cannot ping every 20 s (its timers stop with the CPU), so a
+/// short limit here dropped it after 90 s and it only noticed on waking. Its alarm checks in every few minutes (Doze may stretch that
+/// to about 15), so the limit is well above that. A conversation whose phone vanished without a goodbye (its address changed)
+/// holds one of the 8 places until then.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+
+#[cfg(test)]
+mod idle_tests {
+    #[test]
+    fn the_idle_limit_is_well_above_what_a_sleeping_phone_needs() {
+        // The phone's alarm asks for a check every 4 minutes and Doze can stretch that to about 15 (KeepAlivePolicy.kt).
+        assert!(super::IDLE_TIMEOUT >= std::time::Duration::from_secs(16 * 60));
+        // But not unbounded: a vanished phone must not hold a place for hours.
+        assert!(super::IDLE_TIMEOUT <= std::time::Duration::from_secs(30 * 60));
+    }
+}
 /// Pause before answering a wrong token.
 const AUTH_PENALTY: Duration = Duration::from_millis(400);
 
