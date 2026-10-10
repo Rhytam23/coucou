@@ -1,6 +1,6 @@
 # Stage C-chat: chat on the phone through the PC
 
-Status: plan approved with the defaults below. **C1 done** (PC protocol core, fake provider tests). **C2 done** (real providers behind it, Settings switch and model checklist on the PC). **C3 done** (Android client: caps, chat messages, `ChatSession`, private history file, `dev-desktop.mjs --fake-chat`, Kotlin interop against the Node fake and the real Rust server). **C4 done** (Chat screen, Home entry, Markdown-light, Clear, debug sample screen).
+Status: plan approved with the defaults below. **C1 done** (PC protocol core, fake provider tests). **C2 done** (real providers behind it, Settings switch and model checklist on the PC). **C3 done** (Android client: caps, chat messages, `ChatSession`, private history file, `dev-desktop.mjs --fake-chat`, Kotlin interop against the Node fake and the real Rust server). **C4 done** (Chat screen, Markdown-light, Clear, debug sample screen). The Chat tab is always in the bottom bar (no Home entry any more); when chat cannot be used the screen says why (not paired / not connected / chat off on the computer / no model allowed).
 
 Decision by the user: the earlier "no chat on the phone" is reversed. The phone chats with the LLM
 providers the PC is set up for. **The API key never leaves the PC**: the phone sends text, the PC calls
