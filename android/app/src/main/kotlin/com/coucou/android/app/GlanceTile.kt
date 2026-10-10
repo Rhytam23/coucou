@@ -1,5 +1,6 @@
 package com.coucou.android.app
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Intent
@@ -17,6 +18,8 @@ import com.coucou.android.core.Glance
 class GlanceTile : TileService() {
     override fun onStartListening() = paint(this)
 
+    // Below Android 14 only the Intent form exists; lint flags the call although it is behind the version check.
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         val open = Intent(this, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
