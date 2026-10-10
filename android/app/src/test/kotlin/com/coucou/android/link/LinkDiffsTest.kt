@@ -24,8 +24,10 @@ class LinkDiffsTest {
     private val parts = CopyOnWriteArrayList<ServerMsg.Diff>()
     private val welcome = CountDownLatch(1)
     private val gotPart = CountDownLatch(1)
+    private val capsKnown = CountDownLatch(1)
     private val listener = object : LinkListener {
         override fun onWelcome(desktopName: String, os: String) { welcome.countDown() }
+        override fun onCaps(caps: Set<String>) { capsKnown.countDown() }
         override fun onDiff(part: ServerMsg.Diff) { parts.add(part); gotPart.countDown() }
     }
 
@@ -58,6 +60,8 @@ class LinkDiffsTest {
         client = c
         c.start()
         assertTrue(welcome.await(5, TimeUnit.SECONDS))
+        // The welcome is told before the offered capabilities are stored: wait for them too.
+        assertTrue(capsKnown.await(5, TimeUnit.SECONDS))
         return c
     }
 

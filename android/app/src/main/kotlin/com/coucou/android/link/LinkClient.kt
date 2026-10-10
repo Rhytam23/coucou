@@ -273,13 +273,14 @@ class LinkClient(
             when (msg) {
                 is ServerMsg.Welcome -> {
                     if (msg.version != Protocol.VERSION) { listener.onError("version", "desktop speaks v${msg.version}"); fatal = true; return }
-                    listener.onState(LinkState.CONNECTED)
-                    listener.onWelcome(msg.desktopName, msg.os)
+                    // Stored before anyone is told, so a listener that reacts to the welcome can already use what was offered.
                     answersOffered = Protocol.CAP_ANSWERS in msg.caps
                     prefsOffered = Protocol.CAP_PREFS in msg.caps
                     diffsOffered = Protocol.CAP_DIFFS in msg.caps
                     usageOffered = Protocol.CAP_USAGE in msg.caps
                     servicesOffered = Protocol.CAP_SERVICES in msg.caps
+                    listener.onState(LinkState.CONNECTED)
+                    listener.onWelcome(msg.desktopName, msg.os)
                     listener.onCaps(msg.caps)
                     // Told what it may use right away, so the Chat screen has its list when it opens.
                     if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
