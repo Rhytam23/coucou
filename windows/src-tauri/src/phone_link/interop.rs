@@ -22,7 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::chat::{BoxFuture, ChatBackend, ChatConfig, ChatFail, ChatLink, ModelOption};
-use super::hub::{ApprovalIn, DiffIn, FileIn, Host, Hub, SessionIn};
+use super::hub::{ApprovalIn, DiffIn, FileIn, Host, Hub, PlanIn, SessionIn, UsageIn, WindowIn};
 use super::server::Features;
 use super::pairing::{self, tests::MemStore};
 use super::server;
@@ -42,6 +42,7 @@ impl Host for Printing {
 struct Switches {
     details: AtomicBool,
     diffs: AtomicBool,
+    usage: AtomicBool,
 }
 impl Features for Switches {
     fn details(&self) -> bool {
@@ -49,6 +50,9 @@ impl Features for Switches {
     }
     fn diffs(&self) -> bool {
         self.diffs.load(Ordering::SeqCst)
+    }
+    fn usage(&self) -> bool {
+        self.usage.load(Ordering::SeqCst)
     }
 }
 
@@ -111,7 +115,7 @@ fn interop_server() {
         let token = std::env::var("COUCOU_INTEROP_TOKEN").unwrap_or_else(|_| "interop-token-0123456789abcdef".into());
         let hub = Hub::new(Arc::new(Printing));
         let fake = Arc::new(FakeChat { on: AtomicBool::new(false) });
-        let switches = Arc::new(Switches { details: AtomicBool::new(false), diffs: AtomicBool::new(false) });
+        let switches = Arc::new(Switches { details: AtomicBool::new(false), diffs: AtomicBool::new(false), usage: AtomicBool::new(false) });
         let shared = server::Shared::with_features(
             hub.clone(), token.clone(), "Rust desktop".into(), Some(ChatLink::new(fake.clone())), switches.clone(),
         );
@@ -164,6 +168,11 @@ fn interop_server() {
                     hub.kick_all("auth", "unpaired");
                 }
                 (Some("chat"), Some(state), _) => fake.on.store(state == "on", Ordering::SeqCst),
+                (Some("usage"), Some(state), _) => switches.usage.store(state == "on", Ordering::SeqCst),
+                (Some("usagepct"), Some(pct), _) => hub.publish_usage(UsageIn {
+                    claude: Some(PlanIn { five_hour: Some(WindowIn { used_pct: pct.parse().unwrap_or(0.0), resets_at: 1_900_000_000_000 }), plan_type: Some("max".into()), ..PlanIn::default() }),
+                    codex: None,
+                }),
                 (Some("diffs"), Some(state), _) => switches.diffs.store(state == "on", Ordering::SeqCst),
                 (Some("diff"), Some(conn), Some(lines)) => {
                     // `lines` is how many sample lines to send (to try the limits and the parts).

@@ -54,6 +54,8 @@ class DevDesktopInteropTest {
         override fun onApproval(request: ApprovalRequest) { approvals.add(request) }
         override fun onApprovalResolved(fingerprint: String) { resolved.add(fingerprint) }
         override fun onError(code: String, message: String) { errors.add(code) }
+        val usages = LinkedBlockingQueue<UsageSnapshot>()
+        override fun onUsage(usage: UsageSnapshot) { usages.add(usage) }
         val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
         override fun onDiff(part: ServerMsg.Diff) { diffParts.add(part) }
         val questions = LinkedBlockingQueue<QuestionRequest>()
@@ -154,6 +156,21 @@ class DevDesktopInteropTest {
             assertEquals(2, seen.count { it.startsWith("ANSWER refused") })
             assertTrue(seen.any { it.startsWith("ANSWER accepted") })
             assertTrue("the picked labels must not be logged", seen.none { it.contains("Build") || it.contains("develop") })
+        } finally {
+            client.stop()
+        }
+    }
+
+    @Test fun theUsageComesWithTheSwitchOnTheNodeDesktop() {
+        val info = startDesktop("--usage")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            client.start()
+            assertEquals(setOf("usage"), rec.caps.poll(10, TimeUnit.SECONDS))
+            val u = rec.usages.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(21, u.claude!!.sevenDay!!.pct)
+            assertEquals(2, u.codex!!.resetCredits)
         } finally {
             client.stop()
         }

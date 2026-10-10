@@ -155,8 +155,88 @@ pub const OUTFIT_CHOICES: [&str; 13] = [
     "bow", "scarf", "witchHat", "pumpkin", "santaHat", "bunnyEars",
 ];
 
+fn window_json(w: &WindowIn) -> Option<serde_json::Value> {
+    if !w.used_pct.is_finite() || w.resets_at == 0 {
+        return None;
+    }
+    Some(json!({ "pct": w.used_pct.clamp(0.0, 100.0).round() as u32, "resetsAt": w.resets_at }))
+}
+
+fn plan_json(p: &PlanIn) -> Option<serde_json::Value> {
+    let mut v = json!({});
+    if let Some(w) = p.five_hour.as_ref().and_then(window_json) {
+        v["fiveHour"] = w;
+    }
+    if let Some(w) = p.seven_day.as_ref().and_then(window_json) {
+        v["sevenDay"] = w;
+    }
+    if v.as_object().is_some_and(|o| o.is_empty()) {
+        return None;
+    }
+    if let Some(n) = p.reset_credits {
+        v["resetCredits"] = json!(n.min(99));
+    }
+    // "plus", "pro", "max 5x": letters, digits, spaces and dashes only, short.
+    if let Some(name) = p.plan_type.as_deref() {
+        let clean: String = name.chars().filter(|c| c.is_ascii_alphanumeric() || *c == ' ' || *c == '-').take(20).collect();
+        if !clean.trim().is_empty() {
+            v["plan"] = json!(clean.trim());
+        }
+    }
+    if p.updated_at > 0 {
+        v["updatedAt"] = json!(p.updated_at);
+    }
+    Some(v)
+}
+
+/// None when the island has no number for either plan.
+fn usage_line(u: &UsageIn) -> Option<Arc<str>> {
+    let claude = u.claude.as_ref().and_then(plan_json);
+    let codex = u.codex.as_ref().and_then(plan_json);
+    if claude.is_none() && codex.is_none() {
+        return None;
+    }
+    let mut v = json!({ "type": "usage" });
+    if let Some(c) = claude {
+        v["claude"] = c;
+    }
+    if let Some(c) = codex {
+        v["codex"] = c;
+    }
+    Some(v.to_string().into())
+}
+
 fn prefs_line(outfit: &str) -> String {
     json!({ "type": "prefs", "outfit": outfit }).to_string()
+}
+
+/// One window of a plan (5 hours or the week): how much is used and when it resets.
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WindowIn {
+    pub used_pct: f64,
+    /// Epoch milliseconds.
+    pub resets_at: u64,
+}
+
+/// What the island knows of one plan (Claude or Codex).
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PlanIn {
+    pub five_hour: Option<WindowIn>,
+    pub seven_day: Option<WindowIn>,
+    pub reset_credits: Option<u32>,
+    pub plan_type: Option<String>,
+    /// When the numbers arrived (epoch ms).
+    pub updated_at: u64,
+}
+
+/// The plan usage the island shows in its header (cap `usage`).
+#[derive(Debug, Clone, PartialEq, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct UsageIn {
+    pub claude: Option<PlanIn>,
+    pub codex: Option<PlanIn>,
 }
 
 /// One option of a question, as the island has it.
@@ -256,6 +336,8 @@ struct Sub {
     prefs: bool,
     /// The phone asked for `diffs` and the user's switch was on when it connected.
     diffs: bool,
+    /// The phone asked for `usage` and the user's switch was on when it connected.
+    usage: bool,
     /// When this phone asked for a diff lately (ms), to keep it from flooding the island.
     diff_asks: Vec<u64>,
 }
@@ -267,6 +349,7 @@ pub struct Caps {
     pub answers: bool,
     pub prefs: bool,
     pub diffs: bool,
+    pub usage: bool,
 }
 
 #[derive(Default)]
@@ -276,6 +359,8 @@ struct Inner {
     question: Option<Question>,
     /// What Mochi wears on the computer: one of [`OUTFIT_CHOICES`]; None until the island has said.
     outfit: Option<&'static str>,
+    /// The last `usage` line (None: the island has nothing to say).
+    usage: Option<Arc<str>>,
     subs: Vec<Sub>,
     next_sub: u64,
 }
@@ -379,7 +464,7 @@ impl Hub {
 
     /// Like [`subscribe`], for a phone that may also have been offered `answers` and `prefs`.
     pub fn subscribe_with(&self, tx: mpsc::Sender<Out>, now: u64, caps: Caps) -> (u64, Arc<AtomicBool>) {
-        let Caps { details, answers, prefs, diffs } = caps;
+        let Caps { details, answers, prefs, diffs, usage } = caps;
         let mut inner = self.inner.lock().unwrap();
         expire(&mut inner, now);
         let id = inner.next_sub;
@@ -399,8 +484,13 @@ impl Hub {
                 let _ = tx.try_send(Out::Line(prefs_line(o).into()));
             }
         }
+        if usage {
+            if let Some(line) = &inner.usage {
+                let _ = tx.try_send(Out::Line(line.clone()));
+            }
+        }
         let evicted = Arc::new(AtomicBool::new(false));
-        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, diff_asks: Vec::new() });
+        inner.subs.push(Sub { id, tx, evicted: evicted.clone(), details, answers, prefs, diffs, usage, diff_asks: Vec::new() });
         (id, evicted)
     }
 
@@ -451,6 +541,28 @@ impl Hub {
 }
 
 impl Hub {
+    /// The plan usage the island shows (percentages and reset times, nothing else). Only phones that have `usage`
+    /// hear of it, and a new one at once; two identical pictures are sent once.
+    pub fn publish_usage(&self, usage: UsageIn) {
+        let line = usage_line(&usage);
+        let mut inner = self.inner.lock().unwrap();
+        if inner.usage.as_deref() == line.as_deref() {
+            return;
+        }
+        inner.usage = line.clone();
+        let shared: Arc<str> = line.unwrap_or_else(|| json!({ "type": "usage" }).to_string().into());
+        inner.subs.retain(|s| {
+            if !s.usage {
+                return true;
+            }
+            let kept = s.tx.try_send(Out::Line(shared.clone())).is_ok();
+            if !kept {
+                s.evicted.store(true, Ordering::SeqCst);
+            }
+            kept
+        });
+    }
+
     /// A phone asked for a file's diff. Passed on to the island only if the phone has `diffs` and is not asking too often.
     pub fn request_diff(&self, sub_id: u64, pill_id: &str, file_id: u64, now: u64) {
         {
@@ -1495,7 +1607,7 @@ mod tests {
     #[test]
     fn a_phone_without_diffs_is_never_sent_one_and_cannot_ask() {
         let (hub, host) = hub();
-        let (id, mut rx) = sub_with(&hub, Caps { details: true, answers: true, prefs: true, diffs: false });
+        let (id, mut rx) = sub_with(&hub, Caps { details: true, answers: true, prefs: true, ..Caps::default() });
         drain(&mut rx);
         hub.request_diff(id, "integration_claude", 3, 1_000);
         assert!(host.1.lock().unwrap().is_empty());
@@ -1523,5 +1635,69 @@ mod tests {
         hub.unsubscribe(id);
         drop(rx);
         hub.send_diff(id, diff_in(lines(3))); // must not panic
+    }
+    // ── plan usage (cap `usage`) ────────────────────────────────────────────────────
+
+    fn win(pct: f64, at: u64) -> Option<WindowIn> {
+        Some(WindowIn { used_pct: pct, resets_at: at })
+    }
+
+    fn usage_in() -> UsageIn {
+        UsageIn {
+            claude: Some(PlanIn { five_hour: win(42.4, 1_900_000_000_000), seven_day: win(7.0, 1_900_500_000_000), updated_at: 5, ..PlanIn::default() }),
+            codex: Some(PlanIn { seven_day: win(99.6, 1_900_500_000_000), reset_credits: Some(2), plan_type: Some("plus\n<b>".into()), ..PlanIn::default() }),
+        }
+    }
+
+    #[test]
+    fn a_phone_with_usage_gets_rounded_percentages_and_only_those() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
+        let (_, mut other) = sub_with(&hub, Caps { details: true, diffs: true, answers: true, prefs: true, usage: false });
+        drain(&mut rx);
+        drain(&mut other);
+        hub.publish_usage(usage_in());
+        let u = drain(&mut rx);
+        assert_eq!(u.len(), 1);
+        assert_eq!(u[0]["type"], "usage");
+        assert_eq!(u[0]["claude"]["fiveHour"], serde_json::json!({ "pct": 42, "resetsAt": 1_900_000_000_000u64 }));
+        assert_eq!(u[0]["claude"]["updatedAt"], 5);
+        assert_eq!(u[0]["codex"]["sevenDay"]["pct"], 100);
+        assert!(u[0]["codex"].get("fiveHour").is_none());
+        assert_eq!(u[0]["codex"]["resetCredits"], 2);
+        assert_eq!(u[0]["codex"]["plan"], "plusb", "only letters, digits, spaces and dashes");
+        assert!(drain(&mut other).is_empty(), "a phone without usage never hears of it");
+    }
+
+    #[test]
+    fn a_new_phone_is_brought_up_to_date_and_a_repeat_is_not_sent() {
+        let (hub, _) = hub();
+        hub.publish_usage(usage_in());
+        let (_, mut rx) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
+        assert!(drain(&mut rx).iter().any(|l| l["type"] == "usage" && l["claude"].is_object()));
+        hub.publish_usage(usage_in());
+        assert!(drain(&mut rx).is_empty());
+    }
+
+    #[test]
+    fn nothing_known_clears_it_and_junk_numbers_are_left_out() {
+        let (hub, _) = hub();
+        let (_, mut rx) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
+        hub.publish_usage(usage_in());
+        drain(&mut rx);
+        hub.publish_usage(UsageIn::default());
+        let cleared = drain(&mut rx);
+        assert_eq!(cleared, vec![serde_json::json!({ "type": "usage" })]);
+        let junk = UsageIn { claude: Some(PlanIn { five_hour: win(f64::NAN, 5), seven_day: win(10.0, 0), ..PlanIn::default() }), codex: None };
+        hub.publish_usage(junk);
+        assert!(drain(&mut rx).is_empty(), "nothing usable: still cleared, nothing new to say");
+        hub.publish_usage(UsageIn { claude: Some(PlanIn { five_hour: win(-20.0, 7), ..PlanIn::default() }), codex: None });
+        assert_eq!(drain(&mut rx)[0]["claude"]["fiveHour"]["pct"], 0);
+        let (_, mut late) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
+        assert!(drain(&mut late).iter().any(|l| l["claude"]["fiveHour"]["pct"] == 0), "a new phone is told what there is");
+        hub.publish_usage(UsageIn::default());
+        assert_eq!(drain(&mut late), vec![serde_json::json!({ "type": "usage" })]);
+        let (_, mut after) = sub_with(&hub, Caps { usage: true, ..Caps::default() });
+        assert!(drain(&mut after).iter().all(|l| l["type"] != "usage"), "after a clear a new phone is told nothing");
     }
 }

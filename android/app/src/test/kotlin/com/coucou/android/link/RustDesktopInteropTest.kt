@@ -100,6 +100,8 @@ class RustDesktopInteropTest {
         override fun onCaps(caps: Set<String>) { this.caps.add(caps - Protocol.CAP_PREFS); allCaps.add(caps) }
         val allCaps = LinkedBlockingQueue<Set<String>>()
         val prefs = LinkedBlockingQueue<String>()
+        val usages = LinkedBlockingQueue<UsageSnapshot>()
+        override fun onUsage(usage: UsageSnapshot) { usages.add(usage) }
         val diffParts = LinkedBlockingQueue<ServerMsg.Diff>()
         override fun onDiff(part: ServerMsg.Diff) { diffParts.add(part) }
         override fun onPrefs(outfit: String) { prefs.add(outfit) }
@@ -220,6 +222,43 @@ class RustDesktopInteropTest {
             assertNotNull(rec.welcome.poll(15, TimeUnit.SECONDS))
             command("repair brand-new-token-0123456789")
             assertEquals("auth", rec.errors.poll(10, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+        }
+    }
+
+    // ── Plan usage (cap usage) ──────────────────────────────────────────────────────
+
+    @Test fun theRealServerSendsTheUsageToAnAppThatAsksWhileTheSwitchIsOn() {
+        val info = startDesktop()
+        command("usage on")
+        command("usagepct 62.6")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        val old = Rec()
+        val oldClient = chatClient(info, old, caps = emptyList())
+        try {
+            assertEquals(setOf("prefs", "usage"), rec.allCaps.poll(15, TimeUnit.SECONDS))
+            val first = rec.usages.poll(10, TimeUnit.SECONDS)!!
+            assertEquals(PlanWindow(63, 1_900_000_000_000), first.claude!!.fiveHour)
+            assertEquals("max", first.claude!!.plan)
+            command("usagepct 80")
+            assertEquals(80, rec.usages.poll(10, TimeUnit.SECONDS)!!.claude!!.fiveHour!!.pct)
+            assertNull("an app that did not ask hears nothing", old.usages.poll(1, TimeUnit.SECONDS))
+        } finally {
+            client.stop()
+            oldClient.stop()
+        }
+    }
+
+    @Test fun withTheSwitchOffTheRealServerOffersNoUsage() {
+        val info = startDesktop()
+        command("usagepct 50")
+        val rec = Rec()
+        val client = chatClient(info, rec)
+        try {
+            assertEquals(emptySet<String>(), rec.caps.poll(15, TimeUnit.SECONDS))
+            assertNull(rec.usages.poll(2, TimeUnit.SECONDS))
         } finally {
             client.stop()
         }

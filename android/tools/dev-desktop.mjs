@@ -2,7 +2,7 @@
 // A pretend Coucou desktop for developing and testing the Android app without the real one.
 // Speaks docs/ANDROID_LINK.md (v1): TLS with a self-signed certificate, newline-delimited JSON.
 //
-//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details] [--answers] [--diffs]
+//   node android/tools/dev-desktop.mjs [--host IP] [--port N] [--name "My PC"] [--step MS] [--once] [--fake-chat] [--details] [--answers] [--diffs] [--usage]
 //
 // --details offers the "details" capability: the sessions then carry steps, finalLine, project (a folder
 // name) and color, like the real desktop with "Show session details on the phone" turned on. A phone that
@@ -16,6 +16,9 @@
 // long one of 250 lines that is cut to 200 and sent in two parts, file 3 too large to show) and `getDiff` is answered
 // like the real desktop does (kinds + - space @, 400 characters a line, parts of 100). Asking for any other file
 // is answered `gone`.
+//
+// --usage offers the "usage" capability: a Claude plan (5 hours 63 %, week 21 %) and a Codex plan (week 31 %, 2 free
+// resets) sent when the phone connects and every few steps with the percentages moving, like the real desktop's pills.
 //
 // --fake-chat offers the "chat" capability with a FAKE provider, so the phone's Chat screen can be tried
 // without a key and without spending anything. Models: fake/echo, fake/other. Special messages:
@@ -170,6 +173,7 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
   let details = false;
   let answers = false;
   let diffs = false;
+  let usage = false;
   let asked = null; // { fingerprint, questions }
   const sessionsMsg = (list) => ({ type: "sessions", sessions: diffs ? withFiles(details ? withDetails(list) : list) : details ? withDetails(list) : list });
   let run = null; // { id, timer }
@@ -218,7 +222,18 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
     streamWords(id, `Fake answer to: ${text}`.split(" "), 60, () => done());
   };
 
+  const sendUsage = () => {
+    if (!usage) return;
+    const bump = (step * 7) % 30;
+    send({
+      type: "usage",
+      claude: { fiveHour: { pct: 40 + bump, resetsAt: Date.now() + 95 * 60_000 }, sevenDay: { pct: 21, resetsAt: Date.now() + 3 * 86_400_000 }, plan: "max", updatedAt: Date.now() },
+      codex: { sevenDay: { pct: 31, resetsAt: Date.now() + 2 * 86_400_000 }, resetCredits: 2, plan: "plus", updatedAt: Date.now() },
+    });
+  };
+
   const advance = () => {
+    sendUsage();
     const entries = script(Date.now());
     const e = entries[step % entries.length];
     step++;
@@ -259,7 +274,8 @@ const server = tls.createServer({ key, cert, minVersion: "TLSv1.2" }, (sock) => 
       details = flag("details") && Array.isArray(m.caps) && m.caps.includes("details");
       answers = flag("answers") && Array.isArray(m.caps) && m.caps.includes("answers");
       diffs = flag("diffs") && Array.isArray(m.caps) && m.caps.includes("diffs");
-      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : []), ...(answers ? ["answers"] : []), ...(diffs ? ["diffs"] : [])];
+      usage = flag("usage") && Array.isArray(m.caps) && m.caps.includes("usage");
+      const offered = [...(chat ? ["chat"] : []), ...(details ? ["details"] : []), ...(answers ? ["answers"] : []), ...(diffs ? ["diffs"] : []), ...(usage ? ["usage"] : [])];
       send({ type: "welcome", v: V, desktop: NAME, os: process.platform, ...(offered.length ? { caps: offered } : {}) });
       advance();
       timer = setInterval(advance, STEP_MS);

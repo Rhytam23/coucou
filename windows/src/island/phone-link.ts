@@ -6,8 +6,9 @@
 // Rust (which answers the waiting hook) and only the card on the island is
 // closed here. While the link is off nothing is computed and no timer runs.
 
-import { Bridge, onEvent, type PhoneLinkApproval, type PhoneLinkDiff, type PhoneLinkFile, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
+import { Bridge, onEvent, type PhoneLinkPlan, type PhoneLinkUsage, type PhoneLinkApproval, type PhoneLinkDiff, type PhoneLinkFile, type PhoneLinkQuestion, type PhoneLinkSession } from "../core/bridge";
 import { fileName, parseDiffStep, type FileDiff } from "../core/diff";
+import type { PlanUsage, CodexPlanUsage } from "../core/plan";
 import { State } from "../core/state";
 import { parseOutfit } from "../mochi/wardrobe";
 import { dropPendingCard } from "./hooks";
@@ -42,6 +43,22 @@ export function folderName(path: string | null | undefined): string | undefined 
 function stepText(step: string): string {
   const diff = parseDiffStep(step);
   return diff ? diff.filename : step;
+}
+
+/** One plan as the phone gets it: the percentages and reset times the pills show, and nothing else. */
+function planFor(u: PlanUsage | CodexPlanUsage | null | undefined): PhoneLinkPlan | null {
+  if (!u || (!u.fiveHour && !u.sevenDay)) return null;
+  const plan: PhoneLinkPlan = { updatedAt: u.updatedAt };
+  if (u.fiveHour) plan.fiveHour = { usedPct: u.fiveHour.usedPct, resetsAt: u.fiveHour.resetsAt };
+  if (u.sevenDay) plan.sevenDay = { usedPct: u.sevenDay.usedPct, resetsAt: u.sevenDay.resetsAt };
+  const codex = u as CodexPlanUsage;
+  if (typeof codex.resetCredits === "number") plan.resetCredits = codex.resetCredits;
+  if (codex.planType) plan.planType = codex.planType;
+  return plan;
+}
+
+export function linkUsage(): PhoneLinkUsage {
+  return { claude: planFor(State.planUsage), codex: planFor(State.codexPlanUsage) };
 }
 
 /** The files a session changed, newest last, by name and counts only (the lines are sent when a phone asks). */
@@ -123,12 +140,15 @@ export function registerPhoneLink(island: Island): () => void {
   let lastQuestion = "";
   /** The outfit last sent; "" before anything was. */
   let lastOutfit = "";
+  /** The plan usage last sent, as JSON; "" before anything was. */
+  let lastUsage = "";
   let timer: number | null = null;
 
   const publish = () => {
     timer = null;
     publishQuestion();
     publishOutfit();
+    publishUsage();
     const snapshot = linkSnapshot();
     const key = JSON.stringify(snapshot);
     if (key === last) return;
@@ -150,6 +170,14 @@ export function registerPhoneLink(island: Island): () => void {
     void Bridge.phoneLinkPublishPrefs(outfit);
   };
 
+  const publishUsage = () => {
+    const usage = linkUsage();
+    const key = JSON.stringify(usage);
+    if (key === lastUsage) return;
+    lastUsage = key;
+    void Bridge.phoneLinkPublishUsage(usage);
+  };
+
   const schedule = () => {
     if (!running || timer != null) return;
     timer = window.setTimeout(publish, DEBOUNCE_MS);
@@ -163,6 +191,7 @@ export function registerPhoneLink(island: Island): () => void {
     last = ""; // a link that has just come up needs the whole picture
     lastQuestion = "";
     lastOutfit = "";
+    lastUsage = "";
     if (running) schedule();
     else if (timer != null) {
       window.clearTimeout(timer);

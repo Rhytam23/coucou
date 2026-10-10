@@ -215,4 +215,16 @@
     <string name="file_empty">Nothing to show.</string>
     <string name="file_close">Close</string>
     <string name="file_summary">+%1$d added, −%2$d removed</string>
+    <string name="usage_title">Plan usage</string>
+    <string name="usage_claude">Claude</string>
+    <string name="usage_codex">Codex</string>
+    <string name="usage_five_hours">5 hours</string>
+    <string name="usage_week">Week</string>
+    <string name="usage_pct">%1$d%%</string>
+    <string name="usage_resets_now">Resetting…</string>
+    <string name="usage_resets_hm">Resets in %1$d h %2$d</string>
+    <string name="usage_resets_m">Resets in %1$d min</string>
+    <string name="usage_resets_week">Resets %1$s</string>
+    <string name="usage_credits">%1$d free resets available</string>
+    <string name="usage_desc">%1$s, %2$s: %3$d percent used</string>
 </resources>

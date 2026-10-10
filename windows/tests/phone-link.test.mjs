@@ -345,3 +345,32 @@ test("a phone's request is answered to that phone only, and not while the link i
   assert.equal(sentDiffs[0].conn, 5);
   assert.equal(sentDiffs[0].diff.fileId, id);
 });
+
+test("only the percentages and reset times of the plans are published, and not repeated", async () => {
+  const { linkUsage } = await import("../src/island/phone-link.ts");
+  State.planUsage = null;
+  State.codexPlanUsage = null;
+  assert.deepEqual(linkUsage(), { claude: null, codex: null });
+
+  State.planUsage = { fiveHour: { usedPct: 40, resetsAt: 2e12 }, updatedAt: 5 };
+  State.codexPlanUsage = { sevenDay: { usedPct: 10, resetsAt: 2e12 }, resetCredits: 2, planType: "plus", updatedAt: 6 };
+  dispose = registerPhoneLink(island);
+  await settle();
+  tick(250);
+  const p = () => sent("phone_link_publish_usage");
+  assert.equal(p().length, 1);
+  assert.deepEqual(p()[0].usage.claude, { updatedAt: 5, fiveHour: { usedPct: 40, resetsAt: 2e12 } });
+  assert.equal(p()[0].usage.codex.resetCredits, 2);
+  assert.equal(p()[0].usage.codex.planType, "plus");
+
+  State.notify();
+  tick(250);
+  assert.equal(p().length, 1, "unchanged: not sent again");
+  State.planUsage = { fiveHour: { usedPct: 55, resetsAt: 2e12 }, updatedAt: 9 };
+  State.notify();
+  tick(250);
+  assert.equal(p().length, 2);
+  assert.equal(p()[1].usage.claude.fiveHour.usedPct, 55);
+  State.planUsage = null;
+  State.codexPlanUsage = null;
+});

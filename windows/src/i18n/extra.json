@@ -3646,6 +3646,28 @@
    "pt-BR": "O celular lista os arquivos que cada agente alterou e, ao tocar em um, mostra o que mudou nele (200 linhas no máximo, linhas longas são cortadas). Os nomes e as linhas vão só para o seu celular pareado, pelo link criptografado e fixado, e só quando ele pede.",
    "ru": "Телефон показывает список файлов, изменённых каждым агентом, а при нажатии на файл — что в нём изменилось (не более 200 строк, длинные строки обрезаются). Имена файлов и строки отправляются только на ваш подключённый телефон, по защищённому зашифрованному каналу и только по его запросу.",
    "id": "Ponsel menampilkan daftar file yang diubah tiap agen dan, saat Anda mengetuk salah satu, apa yang berubah di dalamnya (maksimal 200 baris, baris panjang dipotong). Nama file dan baris hanya dikirim ke ponsel Anda yang terhubung, lewat tautan terenkripsi yang disematkan, dan hanya saat ponsel memintanya."
+  },
+  "Show my plan usage on the phone": {
+   "zh-Hans": "在手机上显示我的套餐用量",
+   "hi": "फ़ोन पर मेरे प्लान का उपयोग दिखाएँ",
+   "es": "Mostrar en el teléfono el uso de mi plan",
+   "ar": "عرض استهلاك خطتي على الهاتف",
+   "fr": "Afficher sur le téléphone l'utilisation de mon forfait",
+   "bn": "ফোনে আমার প্ল্যানের ব্যবহার দেখান",
+   "pt-BR": "Mostrar no celular o uso do meu plano",
+   "ru": "Показывать на телефоне использование моего тарифа",
+   "id": "Tampilkan penggunaan paket saya di ponsel"
+  },
+  "The phone shows how much of your Claude and Codex plans is used and when they reset: the same percentages as the pills here, nothing else.": {
+   "zh-Hans": "手机会显示您的 Claude 和 Codex 套餐已用多少以及何时重置：与这里的药丸显示的百分比相同，不包含其他内容。",
+   "hi": "फ़ोन दिखाता है कि आपके Claude और Codex प्लान का कितना उपयोग हुआ और वे कब रीसेट होंगे: वही प्रतिशत जो यहाँ की पिल में दिखते हैं, और कुछ नहीं।",
+   "es": "El teléfono muestra cuánto se ha usado de tus planes de Claude y Codex y cuándo se restablecen: los mismos porcentajes que las píldoras de aquí, nada más.",
+   "ar": "يعرض الهاتف مقدار ما استُهلك من خطتي Claude وCodex ومتى تُعاد تهيئتهما: النسب نفسها المعروضة في الأقراص هنا، ولا شيء غيرها.",
+   "fr": "Le téléphone montre la part utilisée de vos forfaits Claude et Codex et leur réinitialisation : les mêmes pourcentages que les pastilles ici, rien d'autre.",
+   "bn": "ফোন দেখায় আপনার Claude ও Codex প্ল্যানের কতটা ব্যবহার হয়েছে এবং কখন রিসেট হবে: এখানকার পিলের মতো একই শতাংশ, আর কিছু নয়।",
+   "pt-BR": "O celular mostra quanto dos seus planos do Claude e do Codex foi usado e quando eles reiniciam: as mesmas porcentagens das pílulas aqui, nada mais.",
+   "ru": "Телефон показывает, какая часть ваших тарифов Claude и Codex использована и когда они сбросятся: те же проценты, что и на плашках здесь, и ничего больше.",
+   "id": "Ponsel menampilkan seberapa banyak paket Claude dan Codex Anda terpakai dan kapan direset: persentase yang sama dengan pil di sini, tidak ada yang lain."
   }
  }
 }

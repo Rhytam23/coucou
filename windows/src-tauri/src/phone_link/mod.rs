@@ -100,6 +100,9 @@ impl server::Features for TauriFeatures {
     fn diffs(&self) -> bool {
         self.app.state::<Shared>().settings.lock().unwrap().phone_diffs
     }
+    fn usage(&self) -> bool {
+        self.app.state::<Shared>().settings.lock().unwrap().phone_usage
+    }
 }
 
 pub struct PhoneLink {
@@ -405,6 +408,53 @@ pub fn phone_diffs_set_enabled(
     log::line(format!("phone link: file changes on the phone {}", if enabled { "on" } else { "off" }));
     let _ = app.emit("settings-changed", updated);
     Ok(DiffsStatus { enabled })
+}
+
+// ── Plan usage on the phone: the switch (Settings → Android phone) ──
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageStatus {
+    pub enabled: bool,
+}
+
+#[tauri::command]
+pub fn phone_usage_status(shared: State<Shared>) -> UsageStatus {
+    UsageStatus { enabled: shared.settings.lock().unwrap().phone_usage }
+}
+
+/// "Show my Claude and Codex plan usage on the phone". Off by default. A change disconnects the phones once so they
+/// reconnect and are told (or not) about the capability.
+#[tauri::command]
+pub fn phone_usage_set_enabled(
+    app: AppHandle,
+    window: WebviewWindow,
+    link: State<PhoneLink>,
+    shared: State<Shared>,
+    enabled: bool,
+) -> Result<UsageStatus, String> {
+    only_settings(&window)?;
+    let updated = {
+        let mut current = shared.settings.lock().unwrap();
+        current.phone_usage = enabled;
+        if let Err(err) = settings::save(&current) {
+            log::line(format!("could not save settings: {err}"));
+        }
+        current.clone()
+    };
+    link.hub.kick_all("closed", "usage setting changed");
+    log::line(format!("phone link: plan usage on the phone {}", if enabled { "on" } else { "off" }));
+    let _ = app.emit("settings-changed", updated);
+    Ok(UsageStatus { enabled })
+}
+
+/// The plan usage the island shows, for phones that have `usage`.
+#[tauri::command]
+pub fn phone_link_publish_usage(link: State<PhoneLink>, usage: hub::UsageIn) {
+    if link.running.lock().unwrap().is_none() {
+        return;
+    }
+    link.hub.publish_usage(usage);
 }
 
 /// The island's answer to a phone's request for a file's diff (event "phone-link-getdiff").

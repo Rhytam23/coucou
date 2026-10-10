@@ -87,6 +87,8 @@ pub struct Settings {
     pub phone_answers: bool,
     /// Show the files an agent changed on the phone, and their diffs on request (cap `diffs`). Off by default; owned by Rust like the other phone switches.
     pub phone_diffs: bool,
+    /// Show the Claude and Codex plan usage on the phone (cap `usage`). Off by default; owned by Rust like the other phone switches.
+    pub phone_usage: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -148,6 +150,7 @@ impl Default for Settings {
             phone_details: false,
             phone_answers: false,
             phone_diffs: false,
+            phone_usage: false,
         }
     }
 }
@@ -430,7 +433,8 @@ mod tests {
   "phoneChatModels": ["openai/gpt-x"],
   "phoneDetails": true,
   "phoneAnswers": true,
-  "phoneDiffs": true
+  "phoneDiffs": true,
+  "phoneUsage": true
 }"##;
 
     fn custom() -> Value {
@@ -589,6 +593,14 @@ mod tests {
         assert!(!parse(&custom_with("phoneDiffs", None)).unwrap().phone_diffs);
         assert!(parse(&custom_with("phoneDiffs", Some(serde_json::json!(true)))).unwrap().phone_diffs);
         assert!(!parse(&custom_with("phoneDiffs", Some(serde_json::json!("yes")))).unwrap().phone_diffs, "a wrong type does not switch it on");
+    }
+
+    #[test]
+    fn a_file_from_before_phone_usage_keeps_it_off() {
+        assert!(!Settings::default().phone_usage);
+        assert!(!parse(&custom_with("phoneUsage", None)).unwrap().phone_usage);
+        assert!(parse(&custom_with("phoneUsage", Some(serde_json::json!(true)))).unwrap().phone_usage);
+        assert!(!parse(&custom_with("phoneUsage", Some(serde_json::json!("yes")))).unwrap().phone_usage, "a wrong type does not switch it on");
     }
 
     #[test]
@@ -906,6 +918,7 @@ mod tests {
                 "phoneDetails",
                 "phoneAnswers",
                 "phoneDiffs",
+                "phoneUsage",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

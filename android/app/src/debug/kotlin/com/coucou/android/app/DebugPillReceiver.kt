@@ -16,7 +16,7 @@ import com.coucou.android.mochi.BotState
  *
  *   adb shell am broadcast -n com.coucou.android/.app.DebugPillReceiver --es kind finished
  *
- * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff
+ * kind = working | finished | error | question | ratelimit | approval | clear | history | tool | long | multi | chat | details | scan | addrchange | chatstate | askquestion | outfit | diff | usage
  *
  * The island (a black pill hanging from the camera cut-out, over other apps; the "Show Mochi over other
  * apps" switch must be on, the app in the background):
@@ -29,6 +29,9 @@ import com.coucou.android.mochi.BotState
  * `outfit` dresses Mochi without a computer: `--es value beanie` is what the computer would say (auto, none,
  * partyHat, beanie, crown, sunglasses, roundGlasses, bow, scarf, witchHat, pumpkin, santaHat, bunnyEars) and
  * `--es local crown` is the phone's own choice from Settings > Mochi's wardrobe (`--es local computer` follows the computer).
+ *
+ * `usage` shows the Plan usage panel on Home as if the computer had sent it: `--es level low|mid|high`
+ * (the colour of the bars) or `--es level none` to take it away.
  *
  * `diff` shows an agent that changed files (Home > the agent > Files changed): tap a file to open the sheet of its lines
  * (no computer needed). `--es size big` makes the changes longer than the 200 lines the computer sends, to see the note.
@@ -131,6 +134,19 @@ class DebugPillReceiver : BroadcastReceiver() {
             "clear" -> {
                 model.onSessions(emptyList())
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
+            }
+            "usage" -> {
+                val level = intent.getStringExtra("level") ?: "mid"
+                val soon = now + 95 * 60_000L
+                val week = now + 3 * 86_400_000L
+                val pct = when (level) { "low" -> 18; "high" -> 93; else -> 63 }
+                model.applyUsage(
+                    if (level == "none") null
+                    else com.coucou.android.link.UsageSnapshot(
+                        claude = com.coucou.android.link.PlanUsage(com.coucou.android.link.PlanWindow(pct, soon), com.coucou.android.link.PlanWindow(pct / 3, week), plan = "max", updatedAtMs = now),
+                        codex = com.coucou.android.link.PlanUsage(null, com.coucou.android.link.PlanWindow(pct / 2, week), resetCredits = 2, plan = "plus", updatedAtMs = now),
+                    ),
+                )
             }
             "diff" -> {
                 val big = intent.getStringExtra("size") == "big"

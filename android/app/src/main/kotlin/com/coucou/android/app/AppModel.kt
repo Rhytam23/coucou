@@ -170,6 +170,8 @@ class AppModel(private val context: Context) : LinkListener {
     var detailsOffered by mutableStateOf(false); private set
     /** The computer lists the files an agent changed and can send their lines (its switch is on). */
     var diffsOffered by mutableStateOf(false); private set
+    /** The Claude and Codex plan usage the computer sent (its switch is on); null: nothing to show. */
+    var usage by mutableStateOf<com.coucou.android.link.UsageSnapshot?>(null); private set
 
     /** Debug builds only (see [debugSeedChat]): pretends chat is available so the screen can be looked at. */
     private var chatForced = false
@@ -442,6 +444,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     private fun stopLink() {
         closeDiff()
+        usage = null
         finder.stop()
         netWatch.stop()
         currentPairing = null
@@ -514,8 +517,16 @@ class AppModel(private val context: Context) : LinkListener {
             chatOffered = Protocol.CAP_CHAT in caps
             detailsOffered = Protocol.CAP_DETAILS in caps
             diffsOffered = Protocol.CAP_DIFFS in caps
+            if (Protocol.CAP_USAGE !in caps) usage = null
         }
     }
+
+    override fun onUsage(usage: com.coucou.android.link.UsageSnapshot) {
+        main.post { this.usage = usage.takeIf { it.claude != null || it.codex != null } }
+    }
+
+    /** Debug: a sample, as if the computer had sent it. */
+    internal fun applyUsage(usage: com.coucou.android.link.UsageSnapshot?) { this.usage = usage }
 
     override fun onPrefs(outfit: String) {
         main.post { applyComputerOutfit(outfit) }

@@ -54,6 +54,10 @@ pub trait Features: Send + Sync {
     fn diffs(&self) -> bool {
         false
     }
+    /// The plan usage (percentages and reset times of the Claude and Codex plans).
+    fn usage(&self) -> bool {
+        false
+    }
 }
 
 /// Nothing extra: how the link behaved before capabilities existed.
@@ -232,6 +236,7 @@ where
     // The outfit is no secret and says nothing about the user's work: offered whenever the phone asks.
     let prefs = asked("prefs");
     let diffs = asked("diffs") && shared.features.diffs();
+    let usage = asked("usage") && shared.features.usage();
     let mut offered: Vec<&str> = Vec::new();
     if chat.is_some() {
         offered.push("chat");
@@ -248,12 +253,15 @@ where
     if diffs {
         offered.push("diffs");
     }
+    if usage {
+        offered.push("usage");
+    }
     let mut welcome = json!({ "type": "welcome", "v": PROTOCOL, "desktop": shared.name, "os": std::env::consts::OS });
     if !offered.is_empty() {
         welcome["caps"] = json!(offered);
     }
     let _ = say(welcome).await;
-    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs });
+    let (id, evicted) = shared.hub.subscribe_with(tx.clone(), (shared.clock)(), crate::phone_link::hub::Caps { details, answers, prefs, diffs, usage });
 
     // 2. the conversation
     loop {

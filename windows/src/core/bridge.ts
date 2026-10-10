@@ -103,6 +103,29 @@ export interface PhoneLinkDiff {
   lines: [string, string][];
 }
 
+/** One plan window for the phone: used percentage (as the island has it) and when it resets (epoch ms). */
+export interface PhoneLinkWindow {
+  usedPct: number;
+  resetsAt: number;
+}
+
+export interface PhoneLinkPlan {
+  fiveHour?: PhoneLinkWindow;
+  sevenDay?: PhoneLinkWindow;
+  resetCredits?: number;
+  planType?: string;
+  updatedAt: number;
+}
+
+export interface PhoneLinkUsage {
+  claude: PhoneLinkPlan | null;
+  codex: PhoneLinkPlan | null;
+}
+
+export interface PhoneUsageStatus {
+  enabled: boolean;
+}
+
 export interface PhoneDiffsStatus {
   enabled: boolean;
 }
@@ -251,6 +274,10 @@ export const Bridge = {
   phoneDiffsSetEnabled: (enabled: boolean) => callOrThrow<PhoneDiffsStatus>("phone_diffs_set_enabled", { enabled }),
   /** The answer to a phone's request for a file's diff (the "phone-link-getdiff" event); `conn` says which phone. */
   phoneLinkSendDiff: (conn: number, diff: PhoneLinkDiff) => call<void>("phone_link_send_diff", { conn, diff }),
+  phoneUsageStatus: () => call<PhoneUsageStatus>("phone_usage_status"),
+  /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
+  phoneUsageSetEnabled: (enabled: boolean) => callOrThrow<PhoneUsageStatus>("phone_usage_set_enabled", { enabled }),
+  phoneLinkPublishUsage: (usage: PhoneLinkUsage) => call<void>("phone_link_publish_usage", { usage }),
   phoneChatStatus: () => call<PhoneChatStatus>("phone_chat_status"),
   /** Off by default; only from the switch in Settings. Phones are reconnected so they learn about it. */
   phoneChatSetEnabled: (enabled: boolean) => callOrThrow<PhoneChatStatus>("phone_chat_set_enabled", { enabled }),

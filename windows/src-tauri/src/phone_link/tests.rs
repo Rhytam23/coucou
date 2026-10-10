@@ -1422,3 +1422,62 @@ mod diffs_tests {
         });
     }
 }
+
+mod usage_tests {
+    use super::*;
+    use crate::phone_link::hub::{PlanIn, UsageIn, WindowIn};
+    use crate::phone_link::server::Features;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Switch(AtomicBool);
+    impl Features for Switch {
+        fn details(&self) -> bool {
+            false
+        }
+        fn usage(&self) -> bool {
+            self.0.load(Ordering::SeqCst)
+        }
+    }
+
+    async fn phone(rig: &Rig, caps: Option<Value>) -> (Client, Value) {
+        let mut c = Client::connect(rig.port, &rig.fingerprint).await.unwrap();
+        let mut hello = json!({ "type": "hello", "v": 1, "token": TOKEN, "device": "Test phone" });
+        if let Some(caps) = caps {
+            hello["caps"] = caps;
+        }
+        c.send(hello).await;
+        let welcome = c.expect("welcome").await;
+        (c, welcome)
+    }
+
+    fn usage() -> UsageIn {
+        UsageIn { claude: Some(PlanIn { five_hour: Some(WindowIn { used_pct: 61.0, resets_at: 1_900_000_000_000 }), ..PlanIn::default() }), codex: None }
+    }
+
+    #[test]
+    fn usage_is_offered_only_while_the_switch_is_on_and_the_phone_asked() {
+        block_on(async {
+            let on = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            let (_c, welcome) = phone(&on, Some(json!(["usage"]))).await;
+            assert_eq!(welcome["caps"], json!(["usage"]));
+            let (_c, welcome) = phone(&on, None).await;
+            assert!(welcome.get("caps").is_none());
+            let off = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(false)))).await;
+            let (_c, welcome) = phone(&off, Some(json!(["usage"]))).await;
+            assert!(welcome.get("caps").is_none(), "{welcome}");
+        });
+    }
+
+    #[test]
+    fn the_phone_hears_the_usage_and_its_changes() {
+        block_on(async {
+            let rig = Rig::start_full(None, Arc::new(Switch(AtomicBool::new(true)))).await;
+            rig.hub.publish_usage(usage());
+            let (mut c, _) = phone(&rig, Some(json!(["usage"]))).await;
+            c.expect("sessions").await;
+            assert_eq!(c.expect("usage").await["claude"]["fiveHour"]["pct"], 61);
+            rig.hub.publish_usage(UsageIn { claude: Some(PlanIn { five_hour: Some(WindowIn { used_pct: 80.0, resets_at: 1_900_000_000_000 }), ..PlanIn::default() }), codex: None });
+            assert_eq!(c.expect("usage").await["claude"]["fiveHour"]["pct"], 80);
+        });
+    }
+}

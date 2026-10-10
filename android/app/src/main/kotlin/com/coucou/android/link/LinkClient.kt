@@ -28,6 +28,8 @@ interface LinkListener {
     fun onPrefs(outfit: String) {}
     /** A part of a file's diff the phone asked for (only with the `diffs` capability). */
     fun onDiff(part: ServerMsg.Diff) {}
+    /** The plan usage (only with the `usage` capability); both plans null: nothing to show any more. */
+    fun onUsage(usage: UsageSnapshot) {}
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
@@ -111,6 +113,8 @@ class LinkClient(
     @Volatile private var prefsOffered = false
     /** The computer's welcome offered `diffs` on this connection. */
     @Volatile private var diffsOffered = false
+    /** The computer's welcome offered `usage` on this connection. */
+    @Volatile private var usageOffered = false
     @Volatile private var socket: Socket? = null
     @Volatile private var out: OutputStream? = null
     @Volatile private var thread: Thread? = null
@@ -227,6 +231,7 @@ class LinkClient(
                 answersOffered = false
                 prefsOffered = false
                 diffsOffered = false
+                usageOffered = false
                 runCatching { socket?.close() }
                 socket = null
                 approvals.clear()
@@ -268,6 +273,7 @@ class LinkClient(
                     answersOffered = Protocol.CAP_ANSWERS in msg.caps
                     prefsOffered = Protocol.CAP_PREFS in msg.caps
                     diffsOffered = Protocol.CAP_DIFFS in msg.caps
+                    usageOffered = Protocol.CAP_USAGE in msg.caps
                     listener.onCaps(msg.caps)
                     // Told what it may use right away, so the Chat screen has its list when it opens.
                     if (Protocol.CAP_CHAT in msg.caps && Protocol.CAP_CHAT in caps) queue(ClientMsg.ChatModels)
@@ -279,6 +285,7 @@ class LinkClient(
                 is ServerMsg.Question -> if (answersOffered && Protocol.CAP_ANSWERS in caps) listener.onQuestion(msg.request)
                 // Only after the phone asked for it, and only on a connection that was offered `diffs`.
                 is ServerMsg.Diff -> if (diffsOffered && Protocol.CAP_DIFFS in caps) listener.onDiff(msg)
+                is ServerMsg.Usage -> if (usageOffered && Protocol.CAP_USAGE in caps) listener.onUsage(msg.usage)
                 is ServerMsg.Prefs -> if (prefsOffered && Protocol.CAP_PREFS in caps) listener.onPrefs(msg.outfit)
                 ServerMsg.Pong -> {}
                 is ServerMsg.ChatModels -> listener.onChatModels(msg.models)

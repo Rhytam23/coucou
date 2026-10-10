@@ -179,6 +179,24 @@ same again if it is sent more. The line counts toward the 56 KiB budget of a `se
 - Deviation from the plan: the plan said "600 lines in total"; the computer keeps 200 lines per file and the 20-in-10-seconds rate
   instead, which bounds the same thing (at most 4 000 lines in 10 s) without per-connection bookkeeping.
 
+## Plan usage (optional capability `usage`)
+
+A phone that sends `caps: ["usage"]` in its `hello`, while the user has turned on "Show my plan usage on the phone" on the
+computer (off by default, a switch of its own; re-read for every connection), is offered `usage` in `welcome.caps`. It is then
+sent, right after the first `sessions` and again whenever a number changes, what the island's Claude and Codex pills show:
+
+```json
+{"type":"usage",
+ "claude":{"fiveHour":{"pct":42,"resetsAt":1900000000000},"sevenDay":{"pct":7,"resetsAt":1900500000000},"plan":"max","updatedAt":1899999990000},
+ "codex":{"sevenDay":{"pct":100,"resetsAt":1900500000000},"resetCredits":2,"plan":"plus"}}
+```
+
+`pct` is a whole percent 0..100 (rounded and clamped by the computer), `resetsAt` epoch milliseconds, `plan` a short name (letters,
+digits, spaces and dashes, 20 characters at most), `resetCredits` Codex's free resets (0..99). A plan with no usable window is left
+out. A bare `{"type":"usage"}` means the computer has nothing to say any more: the phone removes the panel. A window whose
+`resetsAt` has passed counts as 0 on the phone, as on the PC. Nothing else about the plans (no account, no token, no cost) is
+ever sent, and nothing goes back.
+
 ## Mochi's outfit (optional capability `prefs`)
 
 A phone that sends `caps: ["prefs"]` in its `hello` is offered `prefs` in `welcome.caps` (no switch on the computer: what

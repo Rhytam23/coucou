@@ -18,7 +18,7 @@ object Protocol {
     /** One message never exceeds this; a longer line is a protocol error. */
     const val MAX_LINE_BYTES = 64 * 1024
     /** Optional features this app understands; the desktop offers back the ones it has switched on. */
-    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs")
+    val CAPABILITIES = listOf("chat", "details", "answers", "prefs", "diffs", "usage")
     const val CAP_CHAT = "chat"
     /** Steps, last line, project folder name and colour of each session. */
     const val CAP_DETAILS = "details"
@@ -28,6 +28,8 @@ object Protocol {
     const val CAP_PREFS = "prefs"
     /** The files an agent changed (a list on each session) and, when asked for one, its lines. */
     const val CAP_DIFFS = "diffs"
+    /** How much of the Claude and Codex plans is used, and when they reset. */
+    const val CAP_USAGE = "usage"
     const val MAX_FILES = 20
     const val MAX_FILE_NAME_CHARS = 80
     /** The computer sends at most this many lines of one file, each cut at [MAX_DIFF_LINE_CHARS], in parts of at most [PART_LINES]. */
@@ -46,6 +48,17 @@ object Protocol {
 
 /** A model the user allowed on the computer for the phone. [id] is "provider/model". */
 data class ChatModel(val id: String, val provider: String, val label: String)
+
+/** One window of a plan: whole percent used (0..100) and when it resets (epoch ms). */
+data class PlanWindow(val pct: Int, val resetsAtMs: Long)
+
+/** What the computer knows of one plan. [plan] is a short name such as "plus"; [resetCredits] Codex's free resets. */
+data class PlanUsage(
+    val fiveHour: PlanWindow?, val sevenDay: PlanWindow?, val resetCredits: Int? = null, val plan: String? = null, val updatedAtMs: Long = 0,
+)
+
+/** Both plans; null for one the computer does not know. */
+data class UsageSnapshot(val claude: PlanUsage?, val codex: PlanUsage?)
 
 /** A file an agent changed. [name] is a file name, never a path. */
 data class FileChange(val id: Long, val name: String, val added: Int, val removed: Int, val tooLarge: Boolean = false, val isNew: Boolean = false)
@@ -97,6 +110,8 @@ sealed interface ServerMsg {
     data class Question(val request: QuestionRequest) : ServerMsg
     /** What Mochi wears on the computer: "auto" or an outfit, exactly one of [com.coucou.android.mochi.outfit.Wardrobe.SELECTIONS]. */
     data class Prefs(val outfit: String) : ServerMsg
+    /** The plan usage; both null means the computer has nothing to say any more. */
+    data class Usage(val usage: UsageSnapshot) : ServerMsg
     /** One part of a file's diff; [gone]: the computer no longer has it; [truncated]: there were more lines than it sends. */
     data class Diff(
         val pillId: String, val fileId: Long, val name: String, val added: Int, val removed: Int,
@@ -175,6 +190,7 @@ object Wire {
                 "question" -> question(o)?.let { ServerMsg.Question(it) }
                 // A value this build does not know is dropped rather than guessed: the phone keeps what it had.
                 "diff" -> diff(o)
+                "usage" -> ServerMsg.Usage(UsageSnapshot(plan(o.optJSONObject("claude")), plan(o.optJSONObject("codex"))))
                 "prefs" -> o.optString("outfit", "").takeIf { it in Wardrobe.SELECTIONS }?.let { ServerMsg.Prefs(it) }
                 "pong" -> ServerMsg.Pong
                 "chatModels" -> ServerMsg.ChatModels(o.getJSONArray("models").objects().mapNotNull(::chatModel))
@@ -205,6 +221,23 @@ object Wire {
         color = o.optString("color", "").takeIf { isColor(it) },
         files = files(o.optJSONArray("files")),
     )
+
+    private fun window(o: JSONObject?): PlanWindow? {
+        if (o == null || !o.has("pct") || !o.has("resetsAt")) return null
+        val pct = o.optInt("pct", -1)
+        val at = o.optLong("resetsAt", 0)
+        return if (pct in 0..100 && at > 0) PlanWindow(pct, at) else null
+    }
+
+    private fun plan(o: JSONObject?): PlanUsage? {
+        if (o == null) return null
+        val five = window(o.optJSONObject("fiveHour"))
+        val seven = window(o.optJSONObject("sevenDay"))
+        if (five == null && seven == null) return null
+        val name = o.optString("plan", "").filter { it.isLetterOrDigit() || it == ' ' || it == '-' }.trim().take(20).ifBlank { null }
+        val credits = if (o.has("resetCredits")) o.optInt("resetCredits", -1).takeIf { it in 0..99 } else null
+        return PlanUsage(five, seven, credits, name, o.optLong("updatedAt", 0).coerceAtLeast(0))
+    }
 
     /** Files with an id and a name, as names only (even if a path were sent), at most [Protocol.MAX_FILES]. */
     private fun files(a: JSONArray?): List<FileChange> {
