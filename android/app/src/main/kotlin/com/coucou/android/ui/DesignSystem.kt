@@ -106,14 +106,20 @@ enum class PillKind { PRIMARY, SECONDARY, DANGER }
 @Composable
 fun PillButton(
     text: String, onClick: () -> Unit, modifier: Modifier = Modifier, kind: PillKind = PillKind.SECONDARY,
-    enabled: Boolean = true, icon: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true, onDark: Boolean = false, icon: (@Composable () -> Unit)? = null,
 ) {
     val t = tokens()
-    val bg = if (kind == PillKind.PRIMARY) t.primaryButton else t.secondaryButton
-    val fg = when (kind) {
-        PillKind.PRIMARY -> t.onPrimaryButton
-        PillKind.DANGER -> t.danger
-        PillKind.SECONDARY -> t.text
+    // [onDark]: on the always-black hero panel and island, whatever the theme.
+    val bg = when {
+        onDark -> if (kind == PillKind.PRIMARY) IslandSurface.TEXT else IslandSurface.BUTTON
+        kind == PillKind.PRIMARY -> t.primaryButton
+        else -> t.secondaryButton
+    }
+    val fg = when {
+        kind == PillKind.DANGER -> t.danger
+        onDark -> if (kind == PillKind.PRIMARY) IslandSurface.ON_PRIMARY else IslandSurface.TEXT
+        kind == PillKind.PRIMARY -> t.onPrimaryButton
+        else -> t.text
     }
     Row(
         modifier.alpha(if (enabled) 1f else 0.4f).heightIn(min = Spacing.MIN_TOUCH.dp).clip(CircleShape).background(bg.c())

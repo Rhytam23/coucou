@@ -34,6 +34,25 @@ object ToolLabels {
         "exitplanmode" to "Planning",
     )
 
+    /** The same tools as an action after "wants to" or "Allowed:": "run a command", "edit files". */
+    private val ACTIONS = mapOf(
+        "askuserquestion" to "ask a question", "askquestion" to "ask a question",
+        "bash" to "run a command", "shell" to "run a command", "runshellcommand" to "run a command", "execcommand" to "run a command",
+        "read" to "read files", "readfile" to "read files", "readmanyfiles" to "read files",
+        "edit" to "edit files", "multiedit" to "edit files", "write" to "edit files", "writefile" to "edit files",
+        "notebookedit" to "edit files", "applypatch" to "edit files",
+        "grep" to "search files", "glob" to "search files", "ls" to "look at files",
+        "websearch" to "search the web", "googlewebsearch" to "search the web", "webfetch" to "read a web page",
+        "task" to "run a sub-agent",
+    )
+
+    /** What a request is for, as an action ("run a command"); an unknown tool is cleaned and lower-cased. */
+    fun action(tool: String): String {
+        val name = tool.trim()
+        if (name.isEmpty()) return "do something"
+        return ACTIONS[key(name)] ?: clean(name).lowercase()
+    }
+
     private const val SEP = " · "
 
     /** "ask_question" and "AskQuestion" both reduce to "askquestion". */

@@ -53,6 +53,9 @@ object IslandSurface {
     const val HERO = 0xFF0E0F12L
     const val TEXT = 0xFFF5F6F8L
     const val TEXT_DIM = 0xFF9398A1L
+    /** Pill buttons on these always-dark surfaces. */
+    const val BUTTON = 0xFF2A2B2EL
+    const val ON_PRIMARY = 0xFF0B0C0EL
 }
 
 /** The spacing scale (dp): every gap, padding and gutter is one of these. */

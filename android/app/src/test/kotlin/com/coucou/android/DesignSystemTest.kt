@@ -63,12 +63,13 @@ class DesignSystemTest {
     }
 
     @Test fun settingsUsesTheNewBlocksAndTheRestHasNotMovedYet() {
-        // Each screen moves in its own stage (U1 Settings, U2 Home, ...), together with its guard tests.
+        // Each screen moves in its own stage (U1 Settings, U2 Home, ...); Home moved in U2, together with its guard tests.
         val settings = src("ui/SettingsScreens.kt")
         for (block in listOf("Panel {", "PillButton(", "CoucouSwitch(", "CoucouSlider(", "RowDivider()")) assertTrue("Settings uses $block", settings.contains(block))
+        assertTrue("Home uses the hero", src("ui/HomePanel.kt").contains("HeroPanel(") && src("ui/HomePanel.kt").contains("Panel {"))
         assertFalse("no stock Material switch or slider in Settings", settings.contains("Slider(") && !settings.contains("CoucouSlider("))
         assertFalse(Regex("""\bSwitch\(""").containsMatchIn(settings))
-        for (file in listOf("MainActivity.kt", "ui/HomePanel.kt", "ui/ChatScreen.kt", "ui/SessionScreen.kt")) {
+        for (file in listOf("ui/ChatScreen.kt", "ui/SessionScreen.kt")) {
             assertFalse("$file already uses the new panel", Regex("""\bPanel[ (]""").containsMatchIn(src(file)))
         }
     }

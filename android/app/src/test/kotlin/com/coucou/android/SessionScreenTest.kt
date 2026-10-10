@@ -14,7 +14,8 @@ class SessionScreenTest {
         val main = src("MainActivity.kt")
         assertTrue(main.contains("onDetails = if (focus != null && HomePanel.hasDetails(focus))"))
         assertTrue(main.contains("Screen.SESSION -> SessionScreen("))
-        assertTrue(src("ui/HomePanel.kt").contains("Modifier.clickable(onClick = onDetails)"))
+        val hero = src("ui/HomePanel.kt")
+        assertTrue("the Details pill exists only when there is something to open", hero.contains("if (onDetails != null)") && hero.contains("R.string.session_details), onDetails"))
     }
 
     @Test fun stepsAreShownInPlainWordsAndTheProjectIsOnlyAName() {

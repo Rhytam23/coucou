@@ -33,12 +33,10 @@ class HomePanelTest {
         assertNull(HomePanel.focus(emptyList(), "a"))
     }
 
-    @Test fun theOthersExcludeTheFocusAndComeInTwos() {
+    @Test fun theOthersExcludeTheFocusAndKeepTheirOrder() {
         val list = listOf(s("a", BotState.IDLE), s("b", BotState.IDLE), s("c", BotState.IDLE), s("d", BotState.IDLE), s("e", BotState.IDLE))
         val others = HomePanel.others(list, list[0])
         assertEquals(listOf("b", "c", "d", "e"), others.map { it.pillId })
-        assertEquals(listOf(2, 2), HomePanel.rows(others).map { it.size })
-        assertEquals(listOf(2, 1), HomePanel.rows(others.take(3)).map { it.size })
         assertEquals(5, HomePanel.others(list, null).size)
     }
 
@@ -49,15 +47,6 @@ class HomePanelTest {
         // Settings is no longer a link on the card (it has its own button): nothing to show.
         assertEquals(HomePanel.Link.NONE, HomePanel.link(paired = true, demo = false, hasApproval = false))
         assertEquals(HomePanel.Link.NONE, HomePanel.link(paired = false, demo = true, hasApproval = false))
-    }
-
-    @Test fun everyRowHasTwoCellsAndALonePillStaysOnTheLeft() {
-        val two = HomePanel.cells(listOf(s("a", BotState.IDLE), s("b", BotState.IDLE)))
-        assertEquals(listOf("a", "b"), two.map { it?.pillId })
-        val one = HomePanel.cells(listOf(s("a", BotState.IDLE)))
-        assertEquals(2, one.size)
-        assertEquals("a", one[0]!!.pillId)
-        assertNull(one[1])
     }
 
     @Test fun pillColoursBecomeMochiBodies() {

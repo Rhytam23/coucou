@@ -23,6 +23,12 @@
     <string name="action_unpair">Disconnect this computer</string>
     <string name="demo_leave">Leave demo mode</string>
     <string name="gallery">Mochi gallery</string>
+    <string name="home_running">%1$d running</string>
+    <string name="home_empty_title">Nothing is running</string>
+    <string name="home_empty_hint">Start an agent on your computer and it shows up here.</string>
+    <string name="ask_placeholder">Ask your AI…</string>
+    <string name="recent_title">Recent</string>
+    <string name="recent_all">See all</string>
     <string name="tab_home">Home</string>
     <string name="tab_chat">Chat</string>
     <string name="tab_settings">Settings</string>

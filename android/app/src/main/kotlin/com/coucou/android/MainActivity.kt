@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,6 +64,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +78,7 @@ import com.coucou.android.app.BiometricGate
 import com.coucou.android.app.CoucouApp
 import com.coucou.android.app.Mode
 import com.coucou.android.app.Notifications
+import com.coucou.android.core.HomeText
 import com.coucou.android.core.Nav
 import com.coucou.android.core.Pills
 import com.coucou.android.core.Screen
@@ -85,7 +92,10 @@ import com.coucou.android.mochi.MochiView
 import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
-import com.coucou.android.ui.AgentCard
+import com.coucou.android.ui.AgentRows
+import com.coucou.android.ui.AskBar
+import com.coucou.android.ui.HeroCard
+import com.coucou.android.ui.RecentPanel
 import com.coucou.android.ui.BarClearance
 import com.coucou.android.ui.BottomBar
 import com.coucou.android.ui.DesignScreen
@@ -93,7 +103,6 @@ import com.coucou.android.ui.PairConfirm
 import com.coucou.android.ui.ScanScreen
 import com.coucou.android.ui.SessionScreen
 import com.coucou.android.ui.ChatScreen
-import com.coucou.android.ui.AgentChipRow
 import com.coucou.android.ui.MochiTouch
 import com.coucou.android.ui.HistoryScreen
 import com.coucou.android.ui.SettingsScreen
@@ -120,8 +129,12 @@ class MainActivity : ComponentActivity() {
         model.resume()
         setContent {
             CoucouTheme {
+                // Home's hero is black in both themes, so its status bar icons stay light there; elsewhere they follow the theme.
+                val view = LocalView.current
+                val darkTheme = isSystemInDarkTheme()
+                SideEffect { WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme && screen != Screen.HOME }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    Box(Modifier.fillMaxSize().windowInsetsPadding(if (screen == Screen.HOME) WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom) else WindowInsets.safeDrawing)) {
                         val tabs = Nav.tabs(model.chatOffered, model.chatMessages.isNotEmpty())
                         // The computer stopped offering chat while it was open: back to Home, never a screen with no tab.
                         LaunchedEffect(tabs, screen) { Nav.resolve(screen, tabs).let { if (it != screen) screen = it } }
@@ -149,6 +162,7 @@ class MainActivity : ComponentActivity() {
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN },
+                                onAsk = { screen = Screen.CHAT }, onHistory = { screen = Screen.HISTORY },
                             )
                         }
                         }
@@ -234,7 +248,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit, onScan: () -> Unit) {
+private fun Home(
+    model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit,
+    onScan: () -> Unit, onAsk: () -> Unit, onHistory: () -> Unit,
+) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
     val touches = remember { HashMap<String, MochiTouch>() }
@@ -257,37 +274,27 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverla
     val key = focus?.pillId ?: HOME_KEY
     val engine = engines.getOrPut(key) { MochiEngine(clock, sound = model.sounds) }
     val touch = touches.getOrPut(key) { MochiTouch(engine, model.sounds) { model.sessions.firstOrNull { it.pillId == key }?.state ?: BotState.IDLE } }
-    val state = focus?.state ?: BotState.IDLE
+    val state = focus?.state ?: BotState.SLEEPING // no agent: a sleeping Mochi
     if (engine.state != state && !touch.dizzy) engine.setState(state)
 
+    // The hero's Mochi wears its agent's colour, like the small ones (never white by default).
+    engine.bodyColor = focus?.let { HomePanel.colorHex(it) }?.let { HomePanel.rgb(it) }
+
+    val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO, hasApproval = model.approvals.isNotEmpty())
+    // Items, in order: the hero, [message], approvals, [pairing card], then the other agents, ask, recent.
+    val firstApproval = 1 + (if (model.message != null) 1 else 0)
+    val pairIndex = firstApproval + model.approvals.size
+    val others = HomePanel.others(model.sessions, focus)
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = Gutter),
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = BarClearance),
         verticalArrangement = Arrangement.spacedBy(Gap),
     ) {
-        item { Header(model) }
-        model.message?.let { msg ->
-            item {
-                CoucouCard {
-                    Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(msg, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { model.message = null }) { Text(stringResource(R.string.action_close)) }
-                    }
-                }
-            }
-        }
-
-        // What is waiting for an answer comes first.
-        items(model.approvals, key = { it.fingerprint }) { r -> ApprovalCard(model, r, onApprove) }
-
-        val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO, hasApproval = model.approvals.isNotEmpty())
-        // Header, [message], approvals, the agent card, then the pairing card.
-        val firstApproval = 1 + (if (model.message != null) 1 else 0)
-        val pairIndex = firstApproval + model.approvals.size + 1
         item {
-            AgentCard(
-                focus, engine, touch.modifier, pair,
+            HeroCard(
+                focus, engine, touch.modifier, pair, HomeText.running(model.sessions),
+                linkDot = linkDotColor(model), linkText = linkStatusText(model),
                 onDetails = if (focus != null && HomePanel.hasDetails(focus)) ({ onSession(focus.pillId) }) else null,
                 onLink = {
                     when (pair) {
@@ -298,51 +305,54 @@ private fun Home(model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverla
                 },
             )
         }
-        if (model.mode == Mode.NONE) item { PairCard(model, onScan) }
-
-        val rows = HomePanel.rows(HomePanel.others(model.sessions, focus))
-        if (rows.isNotEmpty()) {
-            item { SectionTitle(stringResource(R.string.sessions_title)) }
-            items(rows, key = { row -> row.first().pillId }) { row ->
-                AgentChipRow(
-                    row,
-                    engineFor = { s ->
-                        miniEngines.getOrPut(s.pillId) {
-                            MochiEngine(clock).apply {
-                                isMini = true
-                                bodyColor = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }
-                            }
-                        }.also {
-                            it.bodyColor = HomePanel.colorHex(s)?.let { hex -> HomePanel.rgb(hex) }
-                            if (it.state != s.state) it.setState(s.state)
-                        }
-                    },
-                    selected = focus?.pillId, onPick = { selected = it.pillId },
-                )
+        model.message?.let { msg ->
+            item {
+                CoucouCard(Modifier.padding(horizontal = Gutter)) {
+                    Row(Modifier.padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(msg, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = { model.message = null }) { Text(stringResource(R.string.action_close)) }
+                    }
+                }
             }
         }
 
+        // What is waiting for an answer comes first.
+        items(model.approvals, key = { it.fingerprint }) { r -> Box(Modifier.padding(horizontal = Gutter)) { ApprovalCard(model, r, onApprove) } }
+        if (model.mode == Mode.NONE) item { Box(Modifier.padding(horizontal = Gutter)) { PairCard(model, onScan) } }
+
+        if (others.isNotEmpty()) {
+            item {
+                Box(Modifier.padding(horizontal = Gutter)) {
+                    AgentRows(
+                        others,
+                        engineFor = { s ->
+                            miniEngines.getOrPut(s.pillId) {
+                                MochiEngine(clock).apply {
+                                    isMini = true
+                                    bodyColor = HomePanel.colorHex(s)?.let { HomePanel.rgb(it) }
+                                }
+                            }.also {
+                                it.bodyColor = HomePanel.colorHex(s)?.let { hex -> HomePanel.rgb(hex) }
+                                if (it.state != s.state) it.setState(s.state)
+                            }
+                        },
+                        onPick = { selected = it.pillId },
+                    )
+                }
+            }
+        }
+
+        // The way into chat, only when the computer offers it (the Chat tab is the same place).
+        if (model.chatOffered) item { Box(Modifier.padding(horizontal = Gutter)) { AskBar(onAsk) } }
+        item { Box(Modifier.padding(horizontal = Gutter)) { RecentPanel(model.decisions, onHistory) } }
+
         // Only when the switch is on but Android still refuses: the one thing Home must say about it.
-        if (model.overlayWished && !model.overlayPermission) item { OverlayHint(onOverlay) }
+        if (model.overlayWished && !model.overlayPermission) item { Box(Modifier.padding(horizontal = Gutter)) { OverlayHint(onOverlay) } }
         item { Spacer(Modifier.height(Gutter)) }
     }
 }
 
 private const val HOME_KEY = "home"
-
-@Composable
-private fun Header(model: AppModel) {
-    Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(linkDotColor(model)))
-                Spacer(Modifier.width(8.dp))
-                Text(linkStatusText(model), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
 
 @Composable
 private fun PairCard(model: AppModel, onScan: () -> Unit) {

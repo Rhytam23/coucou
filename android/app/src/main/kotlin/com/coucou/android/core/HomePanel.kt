@@ -23,18 +23,6 @@ object HomePanel {
     fun others(sessions: List<SessionInfo>, focus: SessionInfo?): List<SessionInfo> =
         sessions.filter { it.pillId != focus?.pillId }
 
-    /** Two pills per row, as on the PC. */
-    fun rows(others: List<SessionInfo>): List<List<SessionInfo>> = others.chunked(2)
-
-    /** Two equal columns, as on the PC. */
-    const val COLUMNS = 2
-
-    /**
-     * A row always has [COLUMNS] cells: a lone pill keeps its column (left) and the other cell is
-     * empty, so every pill has the same width whatever the number of agents.
-     */
-    fun cells(row: List<SessionInfo>): List<SessionInfo?> = List(COLUMNS) { row.getOrNull(it) }
-
     /**
      * The one link on the agent card: answer a waiting request first, else pair when there is no
      * computer yet, else nothing (Settings has its own button at the top).

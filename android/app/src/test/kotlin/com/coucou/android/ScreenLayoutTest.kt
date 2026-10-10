@@ -61,15 +61,36 @@ class ScreenLayoutTest {
         assertTrue("the design screen goes back to the gallery", main.contains("Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })"))
     }
 
-    @Test fun theAgentCardNeverShowsTheRawStatusText() {
-        assertTrue(homePanel.contains("ToolLabels.label("))
+    @Test fun theHeroNeverShowsTheRawStatusText() {
+        assertTrue(homePanel.contains("HomeText.line("))
         assertFalse("the raw text must not be drawn directly", Regex("""Text\(\s*(focus\??\.|detail = focus)?statusText""").containsMatchIn(homePanel))
     }
 
-    @Test fun pillsAreEqualColumnsWithAFixedHeight() {
-        assertTrue(homePanel.contains("HomePanel.cells(row)"))
-        assertTrue(homePanel.contains("CHIP_HEIGHT"))
-        assertEquals(2, Regex("""\.weight\(1f\)""").findAll(homePanel.substringAfter("fun AgentChipRow")).count())
+    @Test fun homeHasNoStepCounterAndNoProgressBar() {
+        assertFalse(homePanel.contains("step_of") || homePanel.contains("LinearProgressIndicator") || homePanel.contains("stepNumber"))
+        assertFalse(main.contains("LinearProgressIndicator"))
+    }
+
+    @Test fun theHeroMochiWearsItsAgentsColourLikeTheSmallOnes() {
+        assertTrue("the hero engine gets a body colour", Regex("""engine\.bodyColor\s*=\s*focus""").containsMatchIn(main))
+        assertTrue(main.contains("it.bodyColor = HomePanel.colorHex(s)"))
+    }
+
+    @Test fun theOtherAgentsAreFullWidthRowsNotTwoColumns() {
+        assertTrue(homePanel.contains("fun AgentRows("))
+        assertFalse(homePanel.contains("AgentChip") || homePanel.contains("cells("))
+        assertTrue(main.contains("AgentRows("))
+    }
+
+    @Test fun homeHangsFromTheTopEdgeAndKeepsItsStatusBarIconsLight() {
+        assertTrue(main.contains("WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)"))
+        assertTrue(homePanel.contains("WindowInsets.statusBars"))
+        assertTrue(main.contains("isAppearanceLightStatusBars = !darkTheme && screen != Screen.HOME"))
+    }
+
+    @Test fun askAndRecentAreOnHome() {
+        assertTrue(main.contains("if (model.chatOffered) item") && main.contains("AskBar(onAsk)"))
+        assertTrue(main.contains("RecentPanel(model.decisions, onHistory)"))
     }
 
     @Test fun noScreenUsesAnOddGutter() {
