@@ -17,6 +17,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import com.coucou.android.core.IconKind
+import com.coucou.android.core.Spacing
+import com.coucou.android.core.TypeScale
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -27,11 +38,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -112,24 +121,28 @@ fun ChatScreen(model: AppModel) {
             stringResource(R.string.chat_title), null,
             trailing = {
                 if (messages.isNotEmpty()) {
-                    TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.chat_clear), maxLines = 1) }
+                    Text(
+                        stringResource(R.string.chat_clear),
+                        Modifier.heightIn(min = Spacing.MIN_TOUCH.dp).clickable(role = Role.Button) { confirmClear = true }.padding(horizontal = 12.dp, vertical = 14.dp),
+                        style = TypeScale.LABEL.style(tokens().textDim.c()), maxLines = 1,
+                    )
                 }
             },
         )
         Text(
             stringResource(R.string.chat_note), Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = TypeScale.SECONDARY.style(tokens().textDim.c()),
         )
         if (!model.chatAvailable) {
-            CoucouCard(Modifier.padding(vertical = 4.dp)) {
-                Text(stringResource(R.string.chat_unavailable), Modifier.padding(Gutter), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Panel(Modifier.padding(vertical = 4.dp)) {
+                Text(stringResource(R.string.chat_unavailable), Modifier.padding(Gutter), style = TypeScale.SECONDARY.style(tokens().textDim.c()))
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (messages.isEmpty()) {
                 Text(
                     stringResource(R.string.chat_empty), Modifier.align(Alignment.Center).padding(Gutter),
-                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = TypeScale.BODY.style(tokens().textDim.c()).copy(textAlign = TextAlign.Center),
                 )
             } else {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Gap)) {
@@ -170,10 +183,10 @@ private fun Bubble(m: ChatMessage) {
                 Text(
                     m.text,
                     Modifier.widthIn(max = 300.dp)
-                        .clip(RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp))
-                        .background(MaterialTheme.colorScheme.primary)
+                        .clip(RoundedCornerShape(18.dp, 18.dp, 6.dp, 18.dp))
+                        .background(tokens().panel2.c())
                         .padding(horizontal = 14.dp, vertical = 10.dp),
-                    color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.bodyMedium,
+                    style = TypeScale.BODY.style(tokens().text.c()),
                 )
             }
         }
@@ -183,7 +196,7 @@ private fun Bubble(m: ChatMessage) {
         if (m.text.isEmpty() && m.status == ChatStatus.STREAMING) TypingDots()
         else if (m.text.isNotEmpty()) SelectionContainer { MarkdownText(m.text) }
         if (m.status == ChatStatus.FAILED) {
-            Text(reasonText(m.reason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(reasonText(m.reason), style = TypeScale.SECONDARY.style(tokens().danger.c()))
         }
     }
 }
@@ -201,7 +214,7 @@ private fun TypingDots() {
             val on = phase.toInt() == i
             Box(
                 Modifier.size(8.dp).clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (on) 1f else 0.35f)),
+                    .background(tokens().textDim.c().copy(alpha = if (on) 1f else 0.35f)),
             )
         }
     }
@@ -210,20 +223,22 @@ private fun TypingDots() {
 @Composable
 private fun MarkdownText(text: String) {
     val blocks = remember(text) { MarkdownLite.parse(text) }
-    val code = MaterialTheme.colorScheme.surfaceVariant
+    val t = tokens()
+    val code = t.panel2.c()
+    val body = TypeScale.BODY.style(t.text.c())
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (b in blocks) {
             when (b) {
-                is MdBlock.Para -> Text(styled(b.spans, code), style = MaterialTheme.typography.bodyMedium)
+                is MdBlock.Para -> Text(styled(b.spans, code), style = body)
                 is MdBlock.Bullet -> Row {
-                    Text("•  ", style = MaterialTheme.typography.bodyMedium)
-                    Text(styled(b.spans, code), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    Text("•  ", style = body)
+                    Text(styled(b.spans, code), Modifier.weight(1f), style = body)
                 }
                 is MdBlock.Code -> Text(
                     b.text,
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(code)
-                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)).padding(10.dp),
-                    style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace,
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(code)
+                        .border(1.dp, t.line.c(), RoundedCornerShape(12.dp)).padding(12.dp),
+                    style = TypeScale.MONO.style(t.text.c()).copy(fontFamily = FontFamily.Monospace),
                 )
             }
         }
@@ -245,23 +260,31 @@ private fun styled(spans: List<MdSpan>, codeBackground: androidx.compose.ui.grap
 private fun Composer(model: AppModel, text: String, refusal: ChatSession.Refusal?, onText: (String) -> Unit, onSend: () -> Unit) {
     val limit = Protocol.CHAT_MAX_TEXT
     val length = text.trim().length
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val t = tokens()
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ModelChip(model)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = text, onValueChange = { onText(it.take(limit + 200)) }, modifier = Modifier.weight(1f),
-                placeholder = { Text(stringResource(R.string.chat_placeholder)) },
-                maxLines = 4, shape = RoundedCornerShape(20.dp), enabled = model.chatAvailable,
+                placeholder = { Text(stringResource(R.string.chat_placeholder), color = t.textFaint.c()) },
+                maxLines = 4, shape = RoundedCornerShape(26.dp), enabled = model.chatAvailable,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = t.panel.c(), unfocusedContainerColor = t.panel.c(), disabledContainerColor = t.panel.c(),
+                    focusedBorderColor = t.textDim.c(), unfocusedBorderColor = t.line.c(), disabledBorderColor = t.line.c(),
+                    focusedTextColor = t.text.c(), unfocusedTextColor = t.text.c(), cursorColor = t.text.c(),
+                ),
             )
             if (model.chatBusy) {
-                OutlinedButton(onClick = { model.chatCancel() }, Modifier.height(52.dp), shape = CircleShape) {
-                    Text(stringResource(R.string.chat_stop), maxLines = 1)
-                }
+                PillButton(stringResource(R.string.chat_stop), { model.chatCancel() }, Modifier.height(56.dp))
             } else {
-                Button(
-                    onClick = onSend, Modifier.height(52.dp), shape = CircleShape,
-                    enabled = model.chatAvailable && length in 1..limit,
-                ) { Text(stringResource(R.string.chat_send), maxLines = 1) }
+                val canSend = model.chatAvailable && length in 1..limit
+                val send = stringResource(R.string.chat_send)
+                Box(
+                    Modifier.alpha(if (canSend) 1f else 0.4f).size(56.dp).clip(CircleShape).background(t.primaryButton.c())
+                        .clickable(enabled = model.chatAvailable && length in 1..limit, role = Role.Button, onClick = onSend)
+                        .semantics { contentDescription = send },
+                    contentAlignment = Alignment.Center,
+                ) { CoucouIcon(IconKind.SEND, tint = t.onPrimaryButton.c(), size = 22.dp) }
             }
         }
         val note = when {
@@ -271,9 +294,9 @@ private fun Composer(model: AppModel, text: String, refusal: ChatSession.Refusal
             refusal == ChatSession.Refusal.OFFLINE -> stringResource(R.string.chat_ref_offline)
             else -> null
         }
-        if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        if (note != null) Text(note, style = TypeScale.SECONDARY.style(t.danger.c()))
         else if (length > limit * 9 / 10) {
-            Text(stringResource(R.string.chat_count, length, limit), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.chat_count, length, limit), style = TypeScale.SECONDARY.style(t.textDim.c()))
         }
     }
 }
@@ -284,16 +307,15 @@ private fun ModelChip(model: AppModel) {
     var open by remember { mutableStateOf(false) }
     val models = model.chatModels
     val current = models.firstOrNull { it.id == model.chatModel }
+    val t = tokens()
     Box {
-        OutlinedButton(
-            onClick = { open = true }, enabled = models.size > 1, shape = CircleShape,
-            modifier = Modifier.height(40.dp),
+        Row(
+            Modifier.heightIn(min = Spacing.MIN_TOUCH.dp).clip(CircleShape).background(t.panel2.c())
+                .clickable(enabled = models.size > 1, role = Role.Button) { open = true }.padding(horizontal = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                stringResource(R.string.chat_model, current?.label ?: "—"),
-                maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall,
-            )
-            if (models.size > 1) Text("  ▾", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.chat_model, current?.label ?: "—"), style = TypeScale.LABEL.style(t.text.c()), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (models.size > 1) CoucouIcon(IconKind.CHEVRON, tint = t.textDim.c(), size = 16.dp, modifier = Modifier.rotate(90f))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             for (m in models) {

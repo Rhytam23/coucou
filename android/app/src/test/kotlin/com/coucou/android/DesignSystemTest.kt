@@ -69,7 +69,7 @@ class DesignSystemTest {
         assertTrue("Home uses the hero", src("ui/HomePanel.kt").contains("HeroPanel(") && src("ui/HomePanel.kt").contains("Panel {"))
         assertFalse("no stock Material switch or slider in Settings", settings.contains("Slider(") && !settings.contains("CoucouSlider("))
         assertFalse(Regex("""\bSwitch\(""").containsMatchIn(settings))
-        for (file in listOf("ui/ChatScreen.kt", "ui/SessionScreen.kt")) {
+        for (file in listOf("ui/SessionScreen.kt")) {
             assertFalse("$file already uses the new panel", Regex("""\bPanel[ (]""").containsMatchIn(src(file)))
         }
     }

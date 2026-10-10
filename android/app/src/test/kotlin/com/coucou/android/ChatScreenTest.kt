@@ -59,4 +59,13 @@ class ChatScreenTest {
         // and the release code has no such trigger
         assertFalse(File("src/main").walkTopDown().filter { it.isFile && it.extension == "kt" }.any { it.readText().contains("DebugPillReceiver") && it.name != "AppModel.kt" })
     }
+
+    @Test fun theScreenWearsTheNewLookAndNoLongerTheOldAccent() {
+        val ui = src("ui/ChatScreen.kt")
+        assertFalse("no blue bubbles any more", ui.contains("colorScheme.primary"))
+        assertTrue("your messages sit on the lighter panel colour", ui.contains("background(tokens().panel2.c())"))
+        assertTrue("send is a round icon button with a label for TalkBack", ui.contains("IconKind.SEND") && ui.contains("contentDescription = send"))
+        assertTrue("the title has no Back button: the bar is the navigation", ui.contains("stringResource(R.string.chat_title), null,"))
+        assertTrue("code uses the mono step", ui.contains("TypeScale.MONO"))
+    }
 }
