@@ -53,7 +53,7 @@ class IslandPlanTest {
         val done = s("a", BotState.FINISHED, "All done")
         val spec = IslandPlan.flash(BotState.WORKING, done, settings, noon, true, name)
         assertEquals(IslandSpec.Kind.FINISHED, spec!!.kind)
-        assertEquals("All done", spec.text)
+        assertEquals("free text from the computer is not shown", "", spec.text)
         assertNull("the first picture after connecting", IslandPlan.flash(null, done, settings, noon, true, name))
         assertNull("the same state again", IslandPlan.flash(BotState.FINISHED, done, settings, noon, true, name))
     }

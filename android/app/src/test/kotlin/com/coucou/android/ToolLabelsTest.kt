@@ -31,16 +31,20 @@ class ToolLabelsTest {
         assertFalse(ToolLabels.label("some_odd_tool").contains('_'))
     }
 
-    @Test fun aToolWithItsDetailKeepsTheDetail() {
-        assertEquals("Running a command · npm test", ToolLabels.label("Bash · npm test"))
+    @Test fun aShellStepShowsOnlyTheProgramAndOtherStepsNoDetailAtAll() {
+        assertEquals("Running a command · npm", ToolLabels.label("Bash · npm test"))
         assertEquals("Reading files", ToolLabels.label("Read · "))
+        assertEquals("Editing files", ToolLabels.label("Edit · /home/me/secret/plan.md"))
+        assertEquals("Reading files", ToolLabels.label("Read · C:\\Users\\me\\.ssh\\id_rsa"))
     }
 
-    @Test fun freeTextIsLeftAlone() {
-        assertEquals("Running npm test", ToolLabels.label("Running npm test"))
-        assertEquals("All done", ToolLabels.label("All done"))
-        assertEquals("src/main.rs", ToolLabels.label("src/main.rs"))
-        assertEquals("Build failed: 2 errors", ToolLabels.label("Build failed: 2 errors"))
+    @Test fun freeTextAndPastedSecretsGiveNothing() {
+        assertEquals("", ToolLabels.label("Running npm test"))
+        assertEquals("", ToolLabels.label("All done"))
+        assertEquals("", ToolLabels.label("src/main.rs"))
+        assertEquals("", ToolLabels.label("Build failed: 2 errors"))
+        assertEquals("", ToolLabels.label("sk-live-4242424242424242"))
+        assertEquals("", ToolLabels.label("AbCdEfGhIjKlMnOpQrStUvWxYz0123"))
     }
 
     @Test fun emptyStaysEmpty() {

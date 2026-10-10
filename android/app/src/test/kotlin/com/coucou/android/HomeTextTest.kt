@@ -14,7 +14,7 @@ class HomeTextTest {
 
     @Test fun aRawToolNameBecomesASentence() {
         assertEquals("Running a command", HomeText.line(s(BotState.WORKING, "Bash")))
-        assertEquals("Editing files · a.txt", HomeText.line(s(BotState.WORKING, "Edit · a.txt")))
+        assertEquals("Editing files", HomeText.line(s(BotState.WORKING, "Edit · a.txt")))
     }
 
     @Test fun aFinishedAgentShowsItsLastMessage() {

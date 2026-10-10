@@ -60,19 +60,31 @@ object ToolLabels {
 
     private fun looksLikeAName(s: String) = s.isNotEmpty() && s.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' || it == ':' }
 
+    /**
+     * The words for a step on a surface that is seen without a tap. The tool is named in plain words; of a shell
+     * command only the program's name follows ([SafeText.program]); the file, the arguments and any free text the
+     * agent wrote are never shown here. Free text that is not a tool name gives "" so the screen falls back to the
+     * state's own word.
+     */
     fun label(raw: String): String {
         val text = raw.trim().removeSuffix("·").trim()
         if (text.isEmpty()) return ""
-        // "Bash · npm test": the tool is named, the rest is what it does.
+        // "Bash · npm test": the tool is named, the rest is what it does (and stays out of sight).
         val at = text.indexOf(SEP)
-        if (at > 0) {
-            val head = text.substring(0, at).trim()
-            val rest = text.substring(at + SEP.length).trim()
-            KNOWN[key(head)]?.let { return if (rest.isEmpty()) it else "$it$SEP$rest" }
-        }
-        if (!looksLikeAName(text)) return text
-        return KNOWN[key(text)] ?: clean(text)
+        val head = if (at > 0) text.substring(0, at).trim() else text
+        val rest = if (at > 0) text.substring(at + SEP.length).trim() else ""
+        if (!looksLikeAName(head)) return ""
+        // An unknown word shows only if it can be a tool's name: a key or a token pasted in its place never does.
+        if (KNOWN[key(head)] == null && !plausibleToolName(head)) return ""
+        val tool = KNOWN[key(head)] ?: clean(head)
+        val program = if (rest.isNotEmpty()) SafeText.requestLabel(head, rest).substringAfter(SEP, "") else ""
+        return if (program.isNotEmpty()) "$tool$SEP$program" else tool
     }
+
+    private val DIGIT_RUN = Regex("[0-9]{3,}")
+
+    private fun plausibleToolName(s: String): Boolean =
+        s.length <= 40 && !DIGIT_RUN.containsMatchIn(s) && (s.length <= 24 || s.any { it == '_' || it == '-' || it == '.' || it == ':' })
 
     private val SEPARATORS = Regex("[_\\-.:]+")
     private val CAMEL = Regex("(?<=[a-z0-9])(?=[A-Z])")

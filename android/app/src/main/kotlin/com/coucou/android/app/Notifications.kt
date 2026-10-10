@@ -16,6 +16,8 @@ import com.coucou.android.R
 import com.coucou.android.core.Glance
 import com.coucou.android.core.GlanceTone
 import com.coucou.android.core.OverlayPolicy
+import com.coucou.android.core.SafeText
+import com.coucou.android.core.ToolLabels
 import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.mochi.BotState
 
@@ -117,8 +119,8 @@ class Notifications(private val context: Context) {
             .setSmallIcon(R.drawable.ic_stat_mochi)
             .setContentTitle(agentName)
             .setSubText(context.getString(R.string.approval_title))
-            .setContentText("${r.tool}: ${r.command}")
-            .setStyle(Notification.BigTextStyle().bigText("${r.tool}: ${r.command}"))
+            // A label and at most the program's name: the exact command is on the approval sheet, behind a tap.
+            .setContentText(SafeText.requestLabel(r.tool, r.command))
             .setCategory(Notification.CATEGORY_ALARM)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setPublicVersion(publicVersion)
@@ -147,7 +149,7 @@ class Notifications(private val context: Context) {
             .setSmallIcon(R.drawable.ic_stat_mochi)
             .setContentTitle(agentName)
             .setContentText(what)
-            .setSubText(statusText.takeIf { it.isNotBlank() })
+            .setSubText(ToolLabels.label(statusText).takeIf { it.isNotBlank() })
             .setCategory(Notification.CATEGORY_STATUS)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setPublicVersion(

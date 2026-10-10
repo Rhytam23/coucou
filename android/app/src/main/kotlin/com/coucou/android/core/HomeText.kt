@@ -12,7 +12,7 @@ object HomeText {
      * doing in plain words ([ToolLabels]). Null when there is nothing to say; the screen then shows the state's name.
      */
     fun line(s: SessionInfo): String? {
-        if (s.state == BotState.FINISHED) s.finalLine?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        if (s.state == BotState.FINISHED) s.finalLine?.let { SafeText.prose(it) }?.takeIf { it.isNotEmpty() && it != "…" }?.let { return it }
         return ToolLabels.label(s.statusText).takeIf { it.isNotEmpty() }
     }
 

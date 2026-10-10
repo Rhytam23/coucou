@@ -483,7 +483,8 @@ class AppModel(private val context: Context) : LinkListener {
         val request = approvals.firstOrNull { it.fingerprint == fingerprint }
         val ok = link?.decide(fingerprint, allow) ?: false
         if (ok && request != null) {
-            recordDecision(Decision(agentName(request.pillId), request.tool, request.command, allow, System.currentTimeMillis()))
+            // The phone's own history never keeps the command: a label and at most the program's name.
+            recordDecision(Decision(agentName(request.pillId), request.tool, com.coucou.android.core.SafeText.requestLabel(request.tool, request.command), allow, System.currentTimeMillis()))
         }
         if (!ok) {
             message = context.getString(R.string.msg_not_pending)
