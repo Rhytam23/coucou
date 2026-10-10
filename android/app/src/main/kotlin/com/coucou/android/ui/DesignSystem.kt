@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.coucou.android.core.IslandSurface
+import com.coucou.android.core.MotionSpec
 import com.coucou.android.core.Radii
 import com.coucou.android.core.Spacing
 import com.coucou.android.core.Tokens
@@ -55,6 +56,13 @@ val LocalTokens = staticCompositionLocalOf { Tokens.DARK }
 fun tokens(): Tokens = LocalTokens.current
 
 internal fun Long.c() = Color(this)
+
+/** True when the user turned animations off (Android's "Remove animations"): springs and slides become plain fades or jumps. */
+@Composable
+fun reducedMotion(): Boolean {
+    val resolver = androidx.compose.ui.platform.LocalContext.current.contentResolver
+    return MotionSpec.isReduced(android.provider.Settings.Global.getFloat(resolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f))
+}
 
 /** A step of the type scale as a Compose style. */
 fun TypeStep.style(color: Color = Color.Unspecified) =

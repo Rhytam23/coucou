@@ -1,6 +1,6 @@
 # Coucou for Android: full UI/UX redesign, "island first"
 
-Status: **decided: Option A, with the defaults below (section 8).** **U0 (design system) is done**: tokens, icons, components and a Design screen (Settings > Mochi gallery > Design system); no existing screen uses them yet. **U1 (navigation shell + Settings) is done.** **U2 (Home) is done.** **U3 (approval and question sheets) is done.** **U4 (pairing and scan) is done.** **U5 (chat) is done.** **U6 (session detail and activity) is done.** **U7 (the island) is done.** U8 (polish) is next. The prototype was updated after the
+Status: **decided: Option A, with the defaults below (section 8).** **U0 (design system) is done**: tokens, icons, components and a Design screen (Settings > Mochi gallery > Design system); no existing screen uses them yet. **U1 (navigation shell + Settings) is done.** **U2 (Home) is done.** **U3 (approval and question sheets) is done.** **U4 (pairing and scan) is done.** **U5 (chat) is done.** **U6 (session detail and activity) is done.** **U7 (the island) is done.** **U8 (polish) is done: the redesign U0..U8 is complete.** The prototype was updated after the
 user's note about agent colours (section 4.1). Prototype: `android/design/prototype.html` (open it in any browser; it is a phone-sized mock).
 
 Sources read: `android/HANDOFF.md`, `android/PARITY_PLAN.md`, `windows/src/views/*` (chat, ticker, views,
@@ -239,3 +239,20 @@ I would do U0, then U1 to U3 first (the screens you look at most), then the rest
 7. **Agent colours** (user's note): each agent keeps its own colour on the main card too (section 4.1); tapping an agent makes it the main one.
 
 No release, no upload, nothing sent to upstream. Each stage ends with tests, CI green and what was not seen on a device.
+
+## 9. Status after U8 (honest)
+
+Built and tested here: tokens, icons, components, bottom bar and Back rules, Settings, Home (hero, agent colours, rows, Ask, Recent),
+approval and question sheets, pairing welcome, black scan screen, Chat, Session detail, Activity, the island's flush top and flares,
+reduced motion, link-dot contrast. About 270 JVM tests pass locally (pure logic and source guards); the Compose code compiles and lints in
+the "Phone link" CI, not on a developer machine.
+
+**Not seen on a device (needs the A12s):**
+- How anything looks and feels: the hero glow and the Mochi colours on Home, the bar over lists, the sheets rising, the switch and the slider.
+- The island's flares against the real camera hole, and whether the flush top reads as "grown from the hole".
+- Large font sizes (1.3x, 2.0x) and TalkBack end to end; I added roles, labels and minimum sizes, not a walkthrough.
+- The light theme as a whole (only contrast numbers were checked).
+- Status bar icon colours when the hero is on screen, and the Home top edge on a phone with a taller cut-out.
+
+**Left out on purpose:** the always-visible "peek" (decision 5), shimmer on the current line (it costs battery for little), a countdown line on the
+approval sheet, and answering questions from the phone (stage C).

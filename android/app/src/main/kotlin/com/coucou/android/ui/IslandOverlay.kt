@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.coucou.android.core.IconKind
+import com.coucou.android.core.MotionSpec
 import com.coucou.android.core.IslandSurface
 import com.coucou.android.core.Tokens
 import com.coucou.android.core.TypeScale
@@ -177,10 +178,15 @@ class IslandOverlay(
         if (opening) {
             width.jump(b.notchWidth.toDouble()); height.jump(0.0); radius.jump(b.cornerSmall.toDouble())
         }
+        val reduced = MotionSpec.isReduced(Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f))
         if (phase == IslandTimeline.Phase.OPEN) {
             val (w, h) = IslandGeometry.sizeFor(b, current.kind)
-            width.goTo(w.toDouble(), now); height.goTo(h.toDouble(), now)
-            radius.goTo((if (current.kind == IslandSpec.Kind.WORKING) b.cornerSmall else b.cornerLarge).toDouble(), now)
+            val corner = (if (current.kind == IslandSpec.Kind.WORKING) b.cornerSmall else b.cornerLarge).toDouble()
+            // "Remove animations": no spring, the island simply appears at its size.
+            if (reduced) { width.jump(w.toDouble()); height.jump(h.toDouble()); radius.jump(corner) }
+            else { width.goTo(w.toDouble(), now); height.goTo(h.toDouble(), now); radius.goTo(corner, now) }
+        } else if (reduced) {
+            width.jump(b.notchWidth.toDouble()); height.jump(0.0); radius.jump(b.cornerSmall.toDouble())
         } else {
             // Back up into the notch: same curve as the PC.
             width.curveTowards(b.notchWidth.toDouble(), now); height.curveTowards(0.0, now); radius.curveTowards(b.cornerSmall.toDouble(), now)

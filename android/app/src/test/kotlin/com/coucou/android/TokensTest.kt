@@ -1,7 +1,9 @@
 package com.coucou.android
 
 import com.coucou.android.core.IslandSurface
+import com.coucou.android.core.MotionSpec
 import com.coucou.android.core.Palette
+import com.coucou.android.core.StatusPalette
 import com.coucou.android.core.Radii
 import com.coucou.android.core.Spacing
 import com.coucou.android.core.Tokens
@@ -90,5 +92,17 @@ class TokensTest {
         assertEquals(20, Radii.PANEL)
         assertEquals(22, Radii.ISLAND_EXPANDED)
         assertEquals(14, Radii.ISLAND_COMPACT)
+    }
+
+    @Test fun statusDotsAreVisibleOnPaperBlackAndDarkPanels() {
+        val surfaces = listOf(Tokens.LIGHT.bg, Tokens.LIGHT.panel, Tokens.DARK.bg, Tokens.DARK.panel, IslandSurface.HERO, IslandSurface.BLACK)
+        for (c in listOf(StatusPalette.ONLINE, StatusPalette.BUSY, StatusPalette.OFFLINE)) for (s in surfaces) {
+            assertTrue("${c.toString(16)} on ${s.toString(16)}", Palette.contrast(c, s) >= 3.0)
+        }
+    }
+
+    @Test fun reducedMotionFollowsTheAnimatorScale() {
+        assertTrue(MotionSpec.isReduced(0f))
+        assertTrue(!MotionSpec.isReduced(1f) && !MotionSpec.isReduced(0.5f))
     }
 }

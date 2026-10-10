@@ -1,5 +1,6 @@
 package com.coucou.android.ui
 
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -49,7 +50,8 @@ private val KNOB = 22.dp
 @Composable
 fun CoucouSwitch(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier, label: String? = null, enabled: Boolean = true) {
     val t = tokens()
-    val knobX by animateDpAsState(if (checked) 22.dp else 0.dp, spring(dampingRatio = 0.72f, stiffness = 400f), label = "knob")
+    val reduced = reducedMotion()
+    val knobX by animateDpAsState(if (checked) 22.dp else 0.dp, if (reduced) snap() else spring(dampingRatio = 0.72f, stiffness = 400f), label = "knob")
     Box(
         modifier.alpha(if (enabled) 1f else 0.4f).sizeIn(minWidth = TRACK_W, minHeight = Spacing.MIN_TOUCH.dp)
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)

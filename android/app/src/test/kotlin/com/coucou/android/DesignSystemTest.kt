@@ -74,4 +74,22 @@ class DesignSystemTest {
             assertFalse("$file still uses CoucouCard", src(file).contains("CoucouCard("))
         }
     }
+
+    @Test fun withAnimationsOffNothingSpringsOrSlides() {
+        assertTrue(system.contains("fun reducedMotion()") && system.contains("ANIMATOR_DURATION_SCALE"))
+        assertTrue("the switch snaps", controls.contains("if (reduced) snap()"))
+        assertTrue("the sheet only fades", src("ui/Sheets.kt").contains("if (reducedMotion()) fadeIn(tween(MotionSpec.REDUCED_MS))"))
+        assertTrue("the island jumps to its size", src("ui/IslandOverlay.kt").contains("if (reduced) { width.jump(w.toDouble())"))
+    }
+
+    @Test fun theBarGrowsWithTheFontInsteadOfCuttingItsLabels() {
+        val bar = src("ui/BottomBar.kt")
+        assertTrue(bar.contains("height(IntrinsicSize.Min).heightIn(min = 64.dp)"))
+        assertTrue(bar.contains("maxLines = 1"))
+    }
+
+    @Test fun statusDotsUseTheThemeSafeColours() {
+        val theme = src("ui/Theme.kt")
+        for (c in listOf("ONLINE", "BUSY", "OFFLINE")) assertTrue(c, theme.contains("StatusPalette.$c"))
+    }
 }

@@ -58,6 +58,16 @@ object IslandSurface {
     const val ON_PRIMARY = 0xFF0B0C0EL
 }
 
+/**
+ * The link dot colours, one value each for every theme and for the always-dark surfaces: each is visible
+ * (3:1 or better) on white paper, on black and on the dark panels. A bright green on white would vanish.
+ */
+object StatusPalette {
+    const val ONLINE = 0xFF0F9F6EL
+    const val BUSY = 0xFFB45309L
+    const val OFFLINE = 0xFF6B7280L
+}
+
 /** The spacing scale (dp): every gap, padding and gutter is one of these. */
 object Spacing {
     val SCALE = listOf(4, 8, 12, 16, 24, 32)
@@ -100,4 +110,7 @@ object MotionSpec {
     const val FADE_OUT_MS = 160
     /** With "remove animations" on, a spring or a slide becomes this fade. */
     const val REDUCED_MS = 120
+
+    /** Android's "Remove animations" (and developer "animator duration scale: off") sets the scale to 0. */
+    fun isReduced(animatorDurationScale: Float): Boolean = animatorDurationScale <= 0f
 }

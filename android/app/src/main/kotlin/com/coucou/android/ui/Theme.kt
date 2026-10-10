@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.coucou.android.core.Palette
+import com.coucou.android.core.StatusPalette
 import com.coucou.android.core.Tokens
 
 /**
@@ -41,9 +42,9 @@ private val Light = scheme(Palette.LIGHT, Tokens.LIGHT, dark = false)
 
 /** Link status colours (the dot next to "Connected"). */
 object StatusColors {
-    val online = Color(0xFF4ADE80)
-    val busy = Color(0xFFFBBF24)
-    val offline = Color(0xFF6B7280)
+    val online = Color(StatusPalette.ONLINE)
+    val busy = Color(StatusPalette.BUSY)
+    val offline = Color(StatusPalette.OFFLINE)
 }
 
 @Composable

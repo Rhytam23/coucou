@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
@@ -46,6 +47,7 @@ import com.coucou.android.core.ApprovalSheetPlan
 import com.coucou.android.core.HomePanel
 import com.coucou.android.core.IconKind
 import com.coucou.android.core.IslandSurface
+import com.coucou.android.core.MotionSpec
 import com.coucou.android.core.Pills
 import com.coucou.android.core.Radii
 import com.coucou.android.core.Spacing
@@ -75,7 +77,7 @@ fun BottomSheetHost(onDismiss: () -> Unit, wash: Color? = null, content: @Compos
         )
         AnimatedVisibility(
             visible = shown, modifier = Modifier.align(Alignment.BottomCenter),
-            enter = slideInVertically(spring(dampingRatio = 0.72f, stiffness = 400f)) { it } + fadeIn(),
+            enter = if (reducedMotion()) fadeIn(tween(MotionSpec.REDUCED_MS)) else slideInVertically(spring(dampingRatio = 0.72f, stiffness = 400f)) { it } + fadeIn(),
         ) {
             Column(
                 Modifier.fillMaxWidth().clip(shape).background(Color(IslandSurface.PANEL)).border(1.dp, Color.White.copy(alpha = 0.08f), shape)
