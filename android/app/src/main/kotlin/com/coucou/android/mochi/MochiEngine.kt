@@ -363,12 +363,6 @@ class MochiEngine(
         anim(Prop.MORPH, keys(Triple(target, dur, Ease.inOut)))
     }
 
-    fun resetMorph() {
-        tweens.remove(Prop.MORPH)
-        locks.remove(Prop.MORPH)
-        morph = 0.0
-    }
-
     /**
      * Dresses Mochi. Animated: the old outfit leaves (180 ms), the new one drops in (350 ms) and Mochi does a
      * little squash (BotEngine.setOutfit on the Mac, setOutfit in windows/src/mochi/engine.ts).

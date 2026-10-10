@@ -11,9 +11,6 @@ import com.coucou.android.mochi.BotState
 object OverlayPolicy {
     private val FLASH = setOf(BotState.FINISHED, BotState.ERROR, BotState.QUESTION, BotState.RATELIMIT)
 
-    /** How long a status pill stays before it slides away. */
-    const val STATUS_MS = 4_500L
-
     /**
      * Only a change into one of those states wakes it. The same state sent again does not, and
      * neither does the first picture after connecting (previous == null): sessions that finished

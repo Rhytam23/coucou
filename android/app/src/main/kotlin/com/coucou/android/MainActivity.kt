@@ -53,7 +53,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
@@ -302,7 +301,6 @@ private fun Home(
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     var addressOpen by rememberSaveable { mutableStateOf(false) }
 
     // Allow tapped on a notification before the link was back: open the prompt once the request is here.

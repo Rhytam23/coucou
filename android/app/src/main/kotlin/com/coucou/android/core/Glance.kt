@@ -35,7 +35,6 @@ data class Glance(
 object GlanceBuilder {
     const val MAX_LINES = 4
     private val BUSY = setOf(BotState.WORKING, BotState.THINKING, BotState.SEARCHING)
-    private val NEEDS_YOU = setOf(BotState.APPROVAL, BotState.QUESTION)
     private val TROUBLE = setOf(BotState.ERROR, BotState.RATELIMIT, BotState.DIZZY)
 
     /** Most urgent first; the same order as the Home list. */

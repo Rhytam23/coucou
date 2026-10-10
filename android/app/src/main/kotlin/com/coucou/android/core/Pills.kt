@@ -16,7 +16,6 @@ data class PillDefinition(
 
 object Pills {
     const val DEFAULT_MAIN_PILL = "integration_claude"
-    const val MAX_DECLARED = 4
 
     val catalog: List<PillDefinition> = listOf(
         PillDefinition("integration_claude", "VS Code", "#F5F6F8", PillCategory.WORKSPACE),

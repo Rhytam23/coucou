@@ -4,7 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
@@ -56,8 +55,6 @@ fun CoucouTheme(content: @Composable () -> Unit) {
         MaterialTheme(colorScheme = scheme, content = content)
     }
 }
-
-val CardShape = RoundedCornerShape(14.dp)
 
 /** The gutter at the side of every screen, and the gap between cards (one rhythm everywhere). */
 val Gutter = 16.dp

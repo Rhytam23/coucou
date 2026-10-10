@@ -81,7 +81,6 @@ object Spacing {
 /** Corner radii (dp). Pills and chips are fully round. */
 object Radii {
     const val PANEL = 20
-    const val INPUT = 14
     const val SHEET = 28
     const val ISLAND_EXPANDED = 22
     const val ISLAND_COMPACT = 14
@@ -106,8 +105,6 @@ object TypeScale {
 /** Motion constants shared with the PC (see core/IslandMotion.kt for the springs). */
 object MotionSpec {
     const val RETRACT_MS = 340
-    const val FADE_IN_MS = 300
-    const val FADE_OUT_MS = 160
     /** With "remove animations" on, a spring or a slide becomes this fade. */
     const val REDUCED_MS = 120
 
