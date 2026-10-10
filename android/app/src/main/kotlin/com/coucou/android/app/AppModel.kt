@@ -514,10 +514,10 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     override fun onPrefs(outfit: String) {
-        main.post { setComputerOutfit(outfit) }
+        main.post { applyComputerOutfit(outfit) }
     }
 
-    fun setComputerOutfit(outfit: String) {
+    fun applyComputerOutfit(outfit: String) {
         val v = com.coucou.android.mochi.outfit.Wardrobe.parse(outfit)
         computerOutfit = v
         kv.put("computer_outfit", v)

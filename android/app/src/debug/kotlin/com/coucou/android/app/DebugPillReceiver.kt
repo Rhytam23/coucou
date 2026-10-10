@@ -130,7 +130,7 @@ class DebugPillReceiver : BroadcastReceiver() {
                 model.approvals.forEach { model.onApprovalResolved(it.fingerprint) }
             }
             "outfit" -> {
-                intent.getStringExtra("value")?.let { model.setComputerOutfit(it) }
+                intent.getStringExtra("value")?.let { model.applyComputerOutfit(it) }
                 intent.getStringExtra("local")?.let { model.updateSettings(model.settings.copy(outfit = com.coucou.android.mochi.outfit.Wardrobe.parseLocal(it))) }
             }
             "history" -> {
