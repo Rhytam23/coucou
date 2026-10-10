@@ -3,7 +3,7 @@ package com.coucou.android.core
 import com.coucou.android.link.ApprovalRequest
 
 /**
- * What the approval sheet shows and when (android/UX_PLAN.md, U3). Pure, so each rule is a unit test.
+ * What the approval sheet shows and when. Pure, so each rule is a unit test.
  * The sheet rises over any screen while a request waits, until the user closes it; it comes back for
  * the next request, or from the "Review request" button on Home.
  */

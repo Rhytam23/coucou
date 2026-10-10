@@ -7,7 +7,7 @@ enum class Tab { HOME, CHAT, SETTINGS }
 enum class Screen { HOME, CHAT, SETTINGS, HISTORY, GALLERY, WARDROBE, SESSION, SCAN }
 
 /**
- * Where the user is and where Back goes (android/UX_PLAN.md, section 2). Pure, so every rule is a unit test:
+ * Where the user is and where Back goes. Pure, so every rule is a unit test:
  * - the bar always has Home, Chat and Settings (Chat shows why it cannot chat yet when that is the case);
  * - the bar shows on the three tab roots, and hides on every page below them and while the keyboard is open;
  * - Back goes up one level; on Home it is the system's (leave the app).

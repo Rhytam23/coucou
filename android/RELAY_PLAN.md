@@ -25,7 +25,7 @@ Status: **approved by the user on 2026-10-10**, with the decisions and two addit
 - **Stage R0 (done):** `docs/RELAY_LINK.md` (the wire spec) and `android/relay/test-vectors.json` with its generator.
 
 Sources read: `android/HANDOFF.md`, `docs/ANDROID_LINK.md`, `relay/README.md` and `relay/src/index.ts` (Louis's APNs
-relay, for style), `android/PARITY_PLAN.md` (stage G, row 16), `CLAUDE.md`, and the phone-link code on both sides.
+relay, for style), the former parity plan (stage G, row 16; deleted in the cleanup, it is in the git history), `CLAUDE.md`, and the phone-link code on both sides.
 
 ## 1. Goal and non-goals
 

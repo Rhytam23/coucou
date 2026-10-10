@@ -43,10 +43,7 @@ import com.coucou.android.core.Tokens
 import com.coucou.android.core.TypeScale
 import com.coucou.android.core.TypeStep
 
-/*
- * The redesign's building blocks (android/UX_PLAN.md, section 4). U0 adds them and a Design screen to
- * look at them; no existing screen uses them yet. Screens move over one stage at a time (U1..U8).
- */
+// The app's building blocks: panels, pill buttons, the hero panel, the tokens of the (dark) theme.
 
 /** The tokens of the current theme; CoucouTheme provides them. */
 val LocalTokens = staticCompositionLocalOf { Tokens.DARK }

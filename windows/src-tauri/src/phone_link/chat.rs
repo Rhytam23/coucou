@@ -1,4 +1,4 @@
-// Chat from the phone (docs/ANDROID_LINK.md, "Chat"; android/CHAT_PLAN.md).
+// Chat from the phone (docs/ANDROID_LINK.md, "Chat").
 //
 // The phone sends text, this computer asks the provider with ITS key, and the answer
 // comes back as small `chatDelta` lines. Nothing here knows a key, a provider address

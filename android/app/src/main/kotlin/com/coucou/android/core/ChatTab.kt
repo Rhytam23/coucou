@@ -1,6 +1,6 @@
 package com.coucou.android.core
 
-/** What the always-visible Chat tab shows (android/CHAT_PLAN.md, UX_PLAN.md). */
+/** What the always-visible Chat tab shows. */
 enum class ChatTabState { NOT_PAIRED, NOT_CONNECTED, CHAT_OFF, NO_MODELS, READY }
 
 object ChatTab {

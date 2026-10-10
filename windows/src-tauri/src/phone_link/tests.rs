@@ -585,7 +585,7 @@ fn a_flood_from_several_addresses_still_leaves_room_for_the_known_phone() {
 }
 
 
-// ── Chat from the phone (CHAT_PLAN.md, C1): the rules, with a fake provider ──────────────────
+// ── Chat from the phone: the rules, with a fake provider ──────────────────
 
 mod chat_tests {
     use super::*;
