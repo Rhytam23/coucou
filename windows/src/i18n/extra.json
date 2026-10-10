@@ -3723,6 +3723,17 @@
    "pt-BR": "Cada marcação permite que seu celular pareado veja o cartão desse serviço: um título e até três linhas curtas, somente leitura. Nada aparece até você marcar. Endereços, assuntos, links ou chaves nunca são enviados.",
    "ru": "Каждая отметка позволяет подключённому телефону видеть карточку сервиса: заголовок и до трёх коротких строк, только для чтения. Пока вы не отметите, ничего не показывается. Адреса, темы писем, ссылки и ключи не отправляются никогда.",
    "id": "Setiap centang memungkinkan ponsel Anda yang terhubung melihat kartu layanan itu: satu judul dan hingga tiga baris pendek, hanya-baca. Tidak ada yang ditampilkan sebelum Anda mencentangnya. Alamat, subjek, tautan, atau kunci tidak pernah dikirim."
+  },
+  "The link you copied contains the pairing code: anyone who gets it can pair a phone with this computer. If it ends up somewhere it should not, press Pair again to make a new code; the old one stops working.": {
+   "zh-Hans": "您复制的链接包含配对码：任何拿到它的人都可以将手机与这台电脑配对。如果它出现在不该出现的地方，请点击“重新配对”生成新的配对码；旧的配对码将失效。",
+   "hi": "आपने जो लिंक कॉपी किया है उसमें पेयरिंग कोड है: जिसे भी यह मिले वह किसी फ़ोन को इस कंप्यूटर से पेयर कर सकता है। अगर यह कहीं ग़लत जगह पहुँच जाए तो “दोबारा पेयर करें” दबाकर नया कोड बनाएँ; पुराना कोड काम करना बंद कर देगा।",
+   "es": "El enlace que copiaste contiene el código de emparejamiento: quien lo consiga puede emparejar un teléfono con este ordenador. Si acaba donde no debe, pulsa Emparejar de nuevo para crear un código nuevo; el anterior deja de funcionar.",
+   "ar": "الرابط الذي نسخته يحتوي على رمز الإقران: يمكن لأي شخص يحصل عليه إقران هاتف بهذا الكمبيوتر. إذا وصل إلى مكان غير مناسب، فاضغط «إقران مجددًا» لإنشاء رمز جديد؛ وسيتوقف الرمز القديم عن العمل.",
+   "fr": "Le lien que vous avez copié contient le code de jumelage : quiconque l'obtient peut jumeler un téléphone avec cet ordinateur. S'il se retrouve où il ne devrait pas, appuyez sur Jumeler à nouveau pour créer un nouveau code ; l'ancien cessera de fonctionner.",
+   "bn": "আপনি যে লিঙ্কটি কপি করেছেন তাতে পেয়ারিং কোড আছে: যে কেউ এটি পেলে এই কম্পিউটারের সাথে একটি ফোন পেয়ার করতে পারবে। এটি অনুপযুক্ত জায়গায় চলে গেলে “আবার পেয়ার করুন” চাপুন নতুন কোড তৈরি করতে; পুরনো কোড আর কাজ করবে না।",
+   "pt-BR": "O link que você copiou contém o código de pareamento: quem o obtiver pode parear um celular com este computador. Se ele for parar onde não deveria, toque em Parear de novo para gerar um código novo; o antigo deixa de funcionar.",
+   "ru": "Скопированная ссылка содержит код сопряжения: любой, кто её получит, сможет связать телефон с этим компьютером. Если ссылка попала не туда, нажмите «Связать заново», чтобы создать новый код; старый перестанет работать.",
+   "id": "Tautan yang Anda salin berisi kode pemasangan: siapa pun yang mendapatkannya dapat memasangkan ponsel ke komputer ini. Jika tautan itu sampai ke tempat yang tidak semestinya, tekan Pasangkan lagi untuk membuat kode baru; kode lama berhenti berfungsi."
   }
  }
 }

@@ -364,6 +364,19 @@ function usableProvidersCandidates(): ProviderDef[] {
   return PROVIDERS.filter((p) => p.key !== null);
 }
 
+/**
+ * Said after the link is copied: the link is the pairing code itself, so whoever reads it (the clipboard, a chat, a
+ * screenshot) can pair a phone until a new code is made. Hidden until the link has been copied.
+ */
+export function copyLinkHint(): HTMLElement {
+  const hint = h("div", {
+    class: "hint",
+    text: t("The link you copied contains the pairing code: anyone who gets it can pair a phone with this computer. If it ends up somewhere it should not, press Pair again to make a new code; the old one stops working."),
+  });
+  hint.hidden = true;
+  return hint;
+}
+
 function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[] {
   // The QR comes from Rust (qrcode crate) as an SVG made only of paths.
   const qr = h("div", { class: "qr" });
@@ -373,8 +386,10 @@ function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[
   link.addEventListener("focus", () => link.select());
 
   const copy = h("button", { text: t("Copy link") });
+  const copied = copyLinkHint();
   copy.addEventListener("click", () => {
     void navigator.clipboard?.writeText(pairing.link).then(() => {
+      copied.hidden = false; // stays after the button text is restored
       copy.textContent = t("Copied");
       window.setTimeout(() => (copy.textContent = t("Copy link")), 1500);
     });
@@ -387,6 +402,7 @@ function pairingRows(pairing: PhoneLinkPairing, again: () => void): HTMLElement[
     h("div", { class: "hint", text: t("In Coucou for Android, scan this code with the camera or paste the link.") }),
     qr,
     h("div", { class: "row" }, link, copy),
+    copied,
     h("div", { class: "row" }, repair, h("span", { class: "hint", text: t("The phone that was paired is disconnected and needs the new code.") })),
   ];
 }
