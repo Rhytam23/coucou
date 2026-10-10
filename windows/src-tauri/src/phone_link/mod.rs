@@ -333,7 +333,7 @@ fn pairing_of(link: &PhoneLink, r: &Running) -> Result<Pairing, String> {
         (s.phone_relay, s.phone_relay_url.clone())
     };
     // The relay fields go in only when the switch is on and everything for it is there.
-    let relay = if on { relay_client::Target::parse(&url).ok().and_then(|t| relay_client::credentials(&*link.store).ok().map(|c| (t, c))) } else { None };
+    let relay = if on { relay_client::Target::parse(&url).ok().zip(relay_client::credentials(&*link.store).ok()) } else { None };
     let (link_text, relay_host) = match &relay {
         Some((target, creds)) => {
             let shown = target.display();

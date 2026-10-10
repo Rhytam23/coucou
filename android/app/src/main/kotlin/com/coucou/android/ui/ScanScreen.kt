@@ -71,7 +71,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.coucou.android.R
 import com.coucou.android.core.ScanPermission
 import com.coucou.android.scan.QrDecoder
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.delay

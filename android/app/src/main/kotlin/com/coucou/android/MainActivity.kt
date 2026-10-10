@@ -15,7 +15,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +31,6 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -116,7 +114,6 @@ import com.coucou.android.ui.HeroCard
 import com.coucou.android.ui.RecentPanel
 import com.coucou.android.ui.BarClearance
 import com.coucou.android.ui.BottomBar
-import com.coucou.android.ui.DesignScreen
 import com.coucou.android.ui.PairConfirm
 import com.coucou.android.ui.ScanScreen
 import com.coucou.android.ui.SessionScreen
@@ -168,8 +165,7 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.CHAT -> ChatScreen(model, onHome = { screen = Screen.HOME }, onSettings = { screen = Screen.SETTINGS })
                             Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
-                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS }, onDesign = { screen = Screen.DESIGN })
-                            Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })
+                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onHistory = { screen = Screen.HISTORY },
                                 onGallery = { screen = Screen.GALLERY }, onWardrobe = { screen = Screen.WARDROBE }, onOverlay = ::setOverlay,
@@ -421,13 +417,12 @@ private fun OverlayHint(onOverlay: (Boolean) -> Unit) {
 
 /** Every state and emote, drawn live. Handy to check the port by eye. */
 @Composable
-private fun Gallery(onBack: () -> Unit, onDesign: () -> Unit) {
+private fun Gallery(onBack: () -> Unit) {
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
     val states = remember { BotState.entries.map { s -> s to MochiEngine(clock).apply { setState(s, force = true) } } }
     val emotes = remember { BotEmote.entries.map { e -> e to MochiEngine(clock).apply { setPermanentEmote(e) } } }
     Column(Modifier.padding(horizontal = Gutter)) {
         ScreenTitle(stringResource(R.string.gallery), onBack)
-        TextButton(onClick = onDesign) { Text(stringResource(R.string.design_entry)) }
         Spacer(Modifier.height(Gap))
         LazyVerticalGrid(GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(Gap), verticalArrangement = Arrangement.spacedBy(Gap)) {
             gridItems(states) { (s, e) -> GalleryCell(s.key, e) }

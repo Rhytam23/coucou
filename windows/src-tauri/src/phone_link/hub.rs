@@ -195,7 +195,7 @@ fn clean_services(cards: Vec<ServiceIn>) -> Vec<ServiceIn> {
 fn services_line(cards: &[ServiceIn], allowed: &[String]) -> Option<Arc<str>> {
     let list: Vec<serde_json::Value> = cards
         .iter()
-        .filter(|c| allowed.iter().any(|a| *a == c.id))
+        .filter(|c| allowed.contains(&c.id))
         .map(|c| {
             let mut v = json!({
                 "id": c.id, "title": c.title, "headline": c.headline,

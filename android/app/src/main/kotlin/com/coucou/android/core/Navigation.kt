@@ -4,7 +4,7 @@ package com.coucou.android.core
 enum class Tab { HOME, CHAT, SETTINGS }
 
 /** Every screen of the app. Tabs are the roots; the rest are one level down. */
-enum class Screen { HOME, CHAT, SETTINGS, HISTORY, GALLERY, DESIGN, WARDROBE, SESSION, SCAN }
+enum class Screen { HOME, CHAT, SETTINGS, HISTORY, GALLERY, WARDROBE, SESSION, SCAN }
 
 /**
  * Where the user is and where Back goes (android/UX_PLAN.md, section 2). Pure, so every rule is a unit test:
@@ -26,7 +26,7 @@ object Nav {
     fun tabOf(screen: Screen): Tab? = when (screen) {
         Screen.HOME -> Tab.HOME
         Screen.CHAT -> Tab.CHAT
-        Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY, Screen.DESIGN, Screen.WARDROBE -> Tab.SETTINGS
+        Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY, Screen.WARDROBE -> Tab.SETTINGS
         Screen.SESSION, Screen.SCAN -> null
     }
 
@@ -38,6 +38,5 @@ object Nav {
         Screen.HOME -> null
         Screen.CHAT, Screen.SETTINGS, Screen.SESSION, Screen.SCAN -> Screen.HOME
         Screen.HISTORY, Screen.GALLERY, Screen.WARDROBE -> Screen.SETTINGS
-        Screen.DESIGN -> Screen.GALLERY
     }
 }

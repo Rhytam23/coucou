@@ -23,7 +23,7 @@ class SecureScreensTest {
     }
 
     @Test fun otherScreensAreNotHidden() {
-        for (s in listOf(Screen.HOME, Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY, Screen.DESIGN, Screen.WARDROBE, Screen.SESSION)) {
+        for (s in listOf(Screen.HOME, Screen.SETTINGS, Screen.HISTORY, Screen.GALLERY, Screen.WARDROBE, Screen.SESSION)) {
             assertFalse("$s", needed(s))
         }
     }

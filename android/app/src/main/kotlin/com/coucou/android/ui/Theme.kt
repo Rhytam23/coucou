@@ -1,7 +1,5 @@
 package com.coucou.android.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults

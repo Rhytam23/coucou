@@ -14,7 +14,6 @@ class DesignSystemTest {
     private val system get() = src("ui/DesignSystem.kt")
     private val controls get() = src("ui/DesignControls.kt")
     private val icons get() = src("ui/DesignIcons.kt")
-    private val screen get() = src("ui/DesignScreen.kt")
 
     @Test fun theSwitchIsARealToggleForTalkBack() {
         assertTrue(controls.contains("role = Role.Switch"))
@@ -47,7 +46,7 @@ class DesignSystemTest {
         val gradle = File("build.gradle.kts").readText()
         assertFalse(gradle.contains("material-icons"))
         assertFalse(gradle.contains("androidx.navigation"))
-        for (text in listOf(system, controls, icons, screen)) assertFalse(text.contains("androidx.compose.material.icons"))
+        for (text in listOf(system, controls, icons)) assertFalse(text.contains("androidx.compose.material.icons"))
     }
 
     @Test fun thePanelsHaveNoShadow() {
@@ -55,11 +54,8 @@ class DesignSystemTest {
         assertFalse(system.contains("elevation"))
     }
 
-    @Test fun theThemeHandsOutTheTokensAndTheDesignScreenIsReachableFromTheGallery() {
+    @Test fun theThemeHandsOutTheTokens() {
         assertTrue(src("ui/Theme.kt").contains("LocalTokens provides"))
-        val main = src("MainActivity.kt")
-        assertTrue(main.contains("onDesign = { screen = Screen.DESIGN }"))
-        assertTrue(main.contains("Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })"))
     }
 
     @Test fun settingsUsesTheNewBlocksAndTheRestHasNotMovedYet() {

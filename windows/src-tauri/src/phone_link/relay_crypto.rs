@@ -11,8 +11,7 @@
 //   * after any fault the session is dead (`Faulted`): the caller drops it and the phone starts a new handshake;
 //   * secrets print as "..", are wiped when dropped, and nothing here writes them anywhere.
 
-// The relay client that uses all of this arrives in the next stage.
-#![allow(dead_code)]
+// The phone's half of the handshake (`init_frame`, `finish_handshake`) is compiled for tests only: the computer never plays the phone.
 
 use ring::{aead, hkdf, hmac};
 
@@ -63,9 +62,6 @@ pub enum ChannelError {
 pub struct Secret32([u8; 32]);
 
 impl Secret32 {
-    pub fn new(bytes: [u8; 32]) -> Self {
-        Secret32(bytes)
-    }
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
@@ -231,6 +227,7 @@ fn parse_handshake(frame: &[u8], wanted: u8) -> Result<([u8; NONCE_LEN], &[u8]),
 }
 
 /// The phone's first frame, and the nonce it must remember to check the answer.
+#[cfg(test)]
 pub fn init_frame(k: &PairingKey, room: &str, n_phone: [u8; NONCE_LEN]) -> Vec<u8> {
     let tag = mac(&k_auth(k), &[b"init", room.as_bytes(), &n_phone]);
     let mut f = header(T_INIT, 0).to_vec();
@@ -255,6 +252,7 @@ pub fn accept_init(k: &PairingKey, room: &str, init: &[u8], n_host: [u8; NONCE_L
 }
 
 /// The phone's side: checks that the `accept` answers **its current** nonce, and returns the session.
+#[cfg(test)]
 pub fn finish_handshake(k: &PairingKey, room: &str, n_phone: &[u8; NONCE_LEN], accept: &[u8]) -> Result<Session, ChannelError> {
     let (n_host, tag) = parse_handshake(accept, T_ACCEPT)?;
     if !mac_ok(&k_auth(k), &[b"accept", room.as_bytes(), n_phone, &n_host], tag) {
@@ -346,10 +344,6 @@ impl Session {
         Ok(line)
     }
 
-    /// The next counter this side will send (for tests and diagnostics; it carries no secret).
-    pub fn next_send_counter(&self) -> u64 {
-        self.send_counter
-    }
 
     #[cfg(test)]
     fn set_send_counter_for_test(&mut self, counter: u64) {

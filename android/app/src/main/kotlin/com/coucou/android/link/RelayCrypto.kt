@@ -185,7 +185,6 @@ object RelayCrypto {
         private var faulted = false
 
         /** The next counter this side will send (carries no secret). */
-        val nextSendCounter: Long get() = sendCounter
 
         /** Encrypts one protocol v1 line (UTF-8 JSON, without the newline) into a binary frame. */
         @Synchronized fun seal(line: ByteArray): ByteArray {
