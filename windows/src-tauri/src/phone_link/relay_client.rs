@@ -984,4 +984,43 @@ mod tests {
             assert!(!code.contains(forbidden), "relay_client.rs must not use {forbidden}");
         }
     }
+
+    // ── End to end through a real relay (run by android/relay/tools/e2e.sh, never by `cargo test`) ──
+
+    /// The computer's half of the end-to-end check: connects to the relay at `COUCOU_E2E_RELAY_URL` with the fixed test
+    /// credentials the Kotlin phone test also has, offers one approval and waits for the phone's decision. Ignored by
+    /// default; the script runs it together with the phone side, against the real Worker or the Node twin.
+    #[test]
+    #[ignore = "needs a running relay and the Kotlin phone test: android/relay/tools/e2e.sh"]
+    fn e2e_the_computer_side_for_the_phone_test() {
+        let url = std::env::var("COUCOU_E2E_RELAY_URL").expect("COUCOU_E2E_RELAY_URL");
+        let store = MemStore::default();
+        store.set(ROOM_KEY, &crypto::base64url_encode(&[0x11; 16])).unwrap();
+        store.set(PAIRING_KEY, &crypto::base64url_encode(&[0x22; 32])).unwrap();
+        set_access_key(&store, &crypto::base64url_encode(&[0x33; 32])).unwrap();
+        block_on(async {
+            let host = Arc::new(Recorder::default());
+            let hub = Hub::new(host.clone());
+            let shared = Shared::with_features(hub.clone(), "e2e-token-0123456789abcdef".to_string(), "E2E PC".to_string(), None, Arc::new(server::NoFeatures));
+            let handle = start(shared, Target::parse(&url).unwrap(), credentials(&store).unwrap());
+            hub.publish(
+                vec![],
+                Some(ApprovalIn {
+                    request_id: "e2e-req".into(),
+                    session_id: "s1".into(),
+                    pill_id: "integration_claude".into(),
+                    tool: "Bash".into(),
+                    command: "echo end-to-end".into(),
+                }),
+                server::now_ms(),
+            );
+            let mut waited = 0;
+            while host.0.lock().unwrap().is_empty() && waited < 1200 {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                waited += 1;
+            }
+            assert_eq!(host.0.lock().unwrap().clone(), vec![("e2e-req".to_string(), true)], "the phone's decision reached the computer");
+            handle.stop();
+        });
+    }
 }

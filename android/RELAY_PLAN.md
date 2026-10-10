@@ -273,7 +273,7 @@ Each stage is a small series of commits with tests, "Phone link" CI green, `Co-A
 | R2 | Secure channel core **(done)** | Rust module (`phone_link/relay_crypto.rs`: HKDF, AES-GCM frames, handshake, counters) and Kotlin twin (`link/RelayCrypto.kt`) with no I/O | RFC 5869 HKDF vectors; the shared vectors both ways; wrong key, wrong room, wrong direction, flipped bit, truncated, replay, gap, reorder, old `accept`, counter limit; K never in `Debug`/`toString`/log text (a test greps); cross-language: Rust decrypts what Kotlin made and the reverse |
 | R3 | PC client **(done)** | WS client task (**D1**), settings `phoneRelay` + URL, pairing link fields, status, Settings UI block + 9-language strings, admission, "Pair again" rotates K and room | Rust tests with an in-process fake relay; settings tests (off by default, wrong type stays off); i18n test; a flood/disconnect test; the PC never blocks on an unreachable relay |
 | R4 | Android client **(done)** | WS client (**D2**), `RelayConnector` for `LinkClient`, transport selection (LAN first, relay fallback, LAN retried), SecureStore for K, pairing parser, "Away from home Wi-Fi" card in Settings, debug trigger | Kotlin tests: WS framing against the Node twin, handshake, selection and switch-back rules (pure, fake clock), parser accepts old and new links, K stored only encrypted |
-| R5 | End to end and CI | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
+| R5 | End to end and CI **(done)** | CI job runs the **real Worker under `wrangler dev` (miniflare)** and connects the Rust PC client and the Kotlin phone client through it: sessions, an approval, deny, allow-gate unchanged, decide-once, PC restart, phone restart, "Pair again" cuts the old phone | the full v1 suite once more over the relay; interop tests |
 | R6 | Review | a written threat-model check against section 5 with a test or an explicit "cannot test" for every row; deploy guide; staging checklist | as above |
 
 ### Findings while building R1
@@ -413,3 +413,17 @@ no permission is ever approved without an explicit click and the phone's screen-
   --es kind relayonly --ez on true` skips the direct link so the relay path can be tried at home; `adb logcat -s CoucouRelay`.
 - Not tested here: Compose and lint (CI only), a real phone, the Doze behaviour and battery cost of the foreground-service WebSocket, and
   real Cloudflare. R5 runs the Rust PC against the Kotlin phone through the real Worker.
+
+### Findings while building R5
+
+- `android/relay/tools/e2e.sh [worker|node]` starts the relay (the real Worker under `wrangler dev`, i.e. workerd on this machine, or
+  the Node twin) on 127.0.0.1 with fixed test credentials, runs the **Rust** computer side
+  (`relay_client::tests::e2e_the_computer_side_for_the_phone_test`, ignored by default) and the **Kotlin** phone side
+  (`RelayE2ETest`) together, and reports OK only when the phone's decision reached the computer: the real `relay_client.rs`, the real
+  `LinkClient` over the in-house WebSocket, the real hub and the real relay code in between. Both modes passed here. It also checks the
+  Worker's `401` for a wrong access key.
+- This is the first test where Rust and Kotlin talk to each other through the relay, not only through shared vectors. It found nothing
+  to fix, which is also a result.
+- CI job `relay-e2e` runs both modes on every push. It deploys nothing and the relay listens on loopback only.
+- Still not covered: real Cloudflare (hibernation timing, the real rate-limit binding across data centres, the 100 s idle behaviour of
+  a WebSocket without traffic) and a phone on mobile data. That is the staging test (`docs/RELAY_DEPLOY.md`).
