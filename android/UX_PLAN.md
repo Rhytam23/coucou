@@ -1,7 +1,7 @@
 # Coucou for Android: full UI/UX redesign, "island first"
 
-Status: **plan and clickable prototype only. No app code has been changed.** Waiting for the user's choices
-(section 8). Prototype: `android/design/prototype.html` (open it in any browser; it is a phone-sized mock).
+Status: **decided: Option A, with the defaults below (section 8).** Stage U0 is next. The prototype was updated after the
+user's note about agent colours (section 4.1). Prototype: `android/design/prototype.html` (open it in any browser; it is a phone-sized mock).
 
 Sources read: `android/HANDOFF.md`, `android/PARITY_PLAN.md`, `windows/src/views/*` (chat, ticker, views,
 recap...), `design/prototype/notch-buddy.html`, `design/captures/` (compact, overview, approval, question,
@@ -126,7 +126,13 @@ idle `#E6E9EE`, working `#3B9EFF`, thinking `#8B5CF6`, searching `#6366F2`, appr
 error `#F4505E`, finished `#34D399`, rate limit `#FB923C`, sleeping `#94A2B8`, dizzy `#F472B6`.
 - **Wash**: a radial gradient from the bottom edge of a panel, the state colour at 40-55% alpha fading to nothing by 70% of the height (PC `.wash`). Dark only; on light it is 18% and the panel stays white.
 - **No blue accent.** The Material blue accent goes: actions are white pills, links are white with a thin underline, focus rings are `#2F6BFF` only for keyboard/TalkBack focus (as the PC).
-- Agent colour (the user's pill colour from `color`) tints the dot and the mini Mochi only.
+- **Every agent keeps its own colour everywhere, the main (hero) Mochi included.** The colour is the agent's pill colour: the one the
+  user chose on the computer (`color` in the details cap), else the pill catalog's. It tints the Mochi's body (the engine already does this
+  for the small ones through `bodyColor`), the row dot and the project chip. The state still shows through the badge, the eyes and the
+  wash, which keep the state colours. Tapping another agent makes it the main one and its Mochi keeps its colour, so a coloured Mochi never
+  turns white on the way to the main card. Today the hero Mochi has no `bodyColor`, which is the bug this fixes (stage U2). One honest limit:
+  the catalog's colour for some agents (for example Claude Code in VS Code, `#F5F6F8`) is near white, so until the user picks a colour on the
+  computer that agent looks white; we use the colour as given and do not invent one.
 - Every text/background pair is checked by `Palette.contrast` (>= 4.5:1 for text, >= 3:1 for large text and icons), in both themes.
 
 ### 4.2 Type scale (system font, as the PC uses the system font)
@@ -222,13 +228,14 @@ I would do U0, then U1 to U3 first (the screens you look at most), then the rest
 - Nothing in it talks to a computer; the data is invented sample data ("Korus", "SBE Hub", "Morning Brief" are the names from Louis's own captures).
 - It has not been seen on a real phone, and the real island's cut-out behaviour differs per device.
 
-## 8. Choices needed before any code
+## 8. Decisions (answered by the user: "Option A, go with your defaults")
+1. **Navigation and Home: Option A** (island panel at the top, agent rows, "Ask" bar, "Recent", floating bottom bar Home / Chat / Settings).
+2. **Look:** true-black dark with `#141518` panels, and the "paper" light theme, both from the start.
+3. **Approval:** the exact command is hidden behind "Show exact command"; a plain sentence says what kind of action it is; the lock prompt
+   always shows the exact command, so Allow is never blind.
+4. **Order:** U0 (design system), then U1 to U3, then the rest.
+5. **Island (U7):** keep the position logic, change only the shape; no always-visible "peek" for now.
+6. **Chat tab:** hidden when the computer does not offer chat.
+7. **Agent colours** (user's note): each agent keeps its own colour on the main card too (section 4.1); tapping an agent makes it the main one.
 
-1. **Navigation and Home:** A (island panel + bottom bar, recommended), B (PC clone, tabs inside the island), or C (one screen and sheets)?
-2. **Look:** dark = true black with `#141518` panels as proposed; light theme = "paper" as proposed. OK, or do you want dark only for now (less work, light theme later in U8)?
-3. **Commands on the approval sheet:** (a) hidden behind "Show exact command" (your brief; recommended with the lock prompt still showing it), or (b) a one-line cut preview always visible. Either way the exact text is never removed. This is the one place where seeing the action protects you.
-4. **Order:** start with U0 (design system) then U1 to U3 as proposed, or a different first screen?
-5. **Island (U7):** keep the same position logic and only change the shape, or also allow a short "peek" shape always visible while an agent works (the PC's compact view)? Always visible costs a little battery and screen area at the top.
-6. **Chat tab when the PC does not offer chat:** hide it (proposed) or show it with a "turn it on in Coucou on your computer" explanation?
-
-Nothing is started until you answer. No release, no upload, nothing sent to upstream.
+No release, no upload, nothing sent to upstream. Each stage ends with tests, CI green and what was not seen on a device.

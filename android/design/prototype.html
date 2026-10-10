@@ -174,11 +174,15 @@ const KORUS = {
   searching:'Searching the web', approval:'Wants to run a command in Korus', question:'Asks which search engine to use',
   error:'Stopped on an error', finished:'Migration applied, 14 tests passed.', ratelimit:'Limit reached, waits a few minutes', sleeping:'Sleeping'
 };
-const OTHERS = [
-  {n:'SBE Hub', k:'Gemini CLI', s:'thinking', t:'Comparing search engines', col:'52,211,153'},
-  {n:'Morning Brief', k:'Codex', s:'idle', t:'Ready', col:'245,165,36'},
-  {n:'Publication IG', k:'Claude Code', s:'sleeping', t:'Sleeping', col:'167,139,250'}
+// Each agent keeps its own colour (the pill colour: the user's choice on the computer, else the catalog's) everywhere, hero included.
+const AGENTS = [
+  {n:'Korus', k:'Claude Code', col:'217,119,87'},
+  {n:'SBE Hub', k:'Gemini CLI', s:'thinking', t:'Comparing search engines', col:'138,180,248'},
+  {n:'Morning Brief', k:'Codex', s:'idle', t:'Nothing to do right now', col:'45,212,191'},
+  {n:'Publication IG', k:'Amp', s:'sleeping', t:'Sleeping', col:'245,158,11'}
 ];
+const cur = () => { const a=AGENTS[S.focus]; return S.focus===0 ? {...a,s:S.agent,t:KORUS[S.agent]} : a; };
+const OTHERS = () => AGENTS.map((a,i)=>({...a,i})).filter(a=>a.i!==S.focus).map(a=>a.i===0?{...a,s:S.agent,t:KORUS[S.agent]}:a);
 const STEPS = ['Read the project files','Planned the migration','Edited the schema file','Ran the tests'];
 const RECENT = [
   {a:1, t:'Allowed: edit a file', f:'You allowed Claude Code to edit a file', w:'09:41'},
@@ -186,7 +190,7 @@ const RECENT = [
   {a:0, t:'Denied: network request', f:'You denied Codex a network request', w:'Yesterday'}
 ];
 const CMD = 'npx prisma migrate deploy';
-const S = {theme:'dark', opt:'A', tab:'home', page:null, agent:'working', none:false, paired:true, over:false,
+const S = {focus:0, theme:'dark', opt:'A', tab:'home', page:null, agent:'working', none:false, paired:true, over:false,
   sheet:null, toast:null, paste:false, confirm:false, lock:false, showCmd:false, island:'working',
   qh:true, sound:true, vol:60, overlay:true, notify:true, chat:[
     {u:1,t:'Compare Postgres full-text and Meilisearch for course search'},
@@ -210,7 +214,7 @@ const ic = (n,cls='i') => `<svg class="${cls}" viewBox="0 0 24 24">${ICONS[n]}</
 let uid = 0;
 function mix(a,b,t){return a.map((v,i)=>Math.round(v*(1-t)+b[i]*t))}
 function rgb(s){return s.split(',').map(Number)}
-function mochi(st, size, tint){
+function mochi(st, size, tint, full){
   const id='m'+(++uid), c=rgb((ST[st]||ST.idle).c), base=[196,197,202];
   const bottom = tint ? rgb(tint) : mix(base,c,st==='idle'?0.05:0.55);
   const top = tint ? mix(rgb(tint),[255,255,255],.45) : [244,242,239];
@@ -223,7 +227,7 @@ function mochi(st, size, tint){
   else if(tired) eyes='<path d="M32 58q6 6 12 0M56 58q6 6 12 0" stroke="#1a1b1f" stroke-width="3.2" fill="none" stroke-linecap="round"/>';
   else { const h = st==='approval'?15:11; eyes=`<rect x="34" y="${58-h/2+2}" width="7" height="${h}" rx="3.5" fill="#15161a"/><rect x="59" y="${58-h/2+2}" width="7" height="${h}" rx="3.5" fill="#15161a"/>`; }
   let badge='';
-  if(!tint && st!=='idle' && st!=='sleeping'){
+  if((!tint||full) && st!=='idle' && st!=='sleeping'){
     let g='';
     if(['working','thinking','searching'].includes(st)) g='<circle cx="16" cy="25" r="2" fill="#fff"/><circle cx="22" cy="25" r="2" fill="#fff"/><circle cx="28" cy="25" r="2" fill="#fff"/>';
     else if(st==='approval') g='<rect x="20.8" y="17" width="3.4" height="9" rx="1.7" fill="#fff"/><circle cx="22.5" cy="30" r="2" fill="#fff"/>';
@@ -233,7 +237,7 @@ function mochi(st, size, tint){
       ? `<rect x="6" y="16" width="34" height="18" rx="9" fill="${col}" stroke="#000" stroke-width="3"/>${g}`
       : `<circle cx="22" cy="25" r="11" fill="${col}" stroke="#000" stroke-width="3"/>${g}`;
   }
-  const glow = (!tint && st!=='idle') ? `<circle cx="50" cy="56" r="46" fill="url(#g${id})"/>` : '';
+  const glow = ((!tint||full) && st!=='idle') ? `<circle cx="50" cy="56" r="46" fill="url(#g${id})"/>` : '';
   return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" style="flex:none;overflow:visible"><defs>
     <radialGradient id="g${id}"><stop offset="0" stop-color="${col}" stop-opacity=".42"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient>
     <linearGradient id="b${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(${top})"/><stop offset=".45" stop-color="rgb(${mix(top,bottom,.3)})"/><stop offset="1" stop-color="rgb(${bottom})"/></linearGradient></defs>
@@ -266,20 +270,20 @@ function scanScreen(){
     <div class="hint" style="position:static;margin-bottom:6px">Prototype: tap the frame to simulate a scan.</div></div>`;
 }
 function heroA(){
-  const st=S.agent;
+  const st=cur().s;
   if(S.none) return `<div class="hero" style="--wc:148,162,184;--wa2:.35"><div class="wash" style="position:absolute;inset:0"></div>
     <div class="top"><span class="dot" style="--dc:52,211,153"></span>Connected to Korus-PC</div>
     <div class="main" style="flex-direction:column;text-align:center;padding:6px 0 4px">${mochi('sleeping',112)}<div class="sent" style="font-size:18px">Nothing is running</div><div class="sub" style="margin-top:2px">Start an agent on your computer and it shows up here.</div></div></div>`;
-  const run = [S.agent, ...OTHERS.map(o=>o.s)].filter(x=>['working','thinking','searching'].includes(x)).length;
+  const run = [S.agent, ...AGENTS.slice(1).map(o=>o.s)].filter(x=>['working','thinking','searching'].includes(x)).length;
   return `<div class="hero wash" style="${wc(st)}"><div class="top"><span class="dot" style="--dc:52,211,153"></span><span class="grow ell">Connected to Korus-PC</span><span>${run} running</span></div>
-    <div class="main">${mochi(st,108)}
-      <div class="grow"><h2 class="title" style="color:#fff">Korus</h2><div class="sub">Claude Code</div>
-      <div class="sent ${['working','thinking','searching'].includes(st)?'shim':''}">${KORUS[st]}</div></div></div>
-    <div class="actions">${st==='approval'?`<button class="btn p" ${A('sheet','approval')}>Review request</button>`:st==='question'?`<button class="btn p" ${A('sheet','question')}>See the question</button>`:''}
+    <div class="main">${mochi(st,108,cur().col,1)}
+      <div class="grow"><h2 class="title" style="color:#fff">${cur().n}</h2><div class="sub">${cur().k}</div>
+      <div class="sent ${['working','thinking','searching'].includes(st)?'shim':''}">${cur().t}</div></div></div>
+    <div class="actions">${S.focus===0&&st==='approval'?`<button class="btn p" ${A('sheet','approval')}>Review request</button>`:S.focus===0&&st==='question'?`<button class="btn p" ${A('sheet','question')}>See the question</button>`:''}
       <button class="btn" ${A('page','session')}>Details ${ic('chev','i')}</button></div></div>`;
 }
 function agentRows(){
-  return `<div class="panel">${OTHERS.map((o,i)=>`<button class="row" ${A('pick',i)}>${mochi(o.s,40,o.col)}
+  return `<div class="panel">${OTHERS().map(o=>`<button class="row" ${A('pick',o.i)}>${mochi(o.s,40,o.col)}
     <span class="grow"><b class="ell" style="display:block">${o.n}</b><span class="sub ell" style="display:block">${o.t}</span></span>
     <span class="sub" style="display:flex;align-items:center;gap:6px;flex:none"><span class="dot" style="--dc:${ST[o.s].c}"></span>${ST[o.s].l}</span></button>`).join('')}</div>`;
 }
@@ -292,8 +296,8 @@ function homeA(){
     <div class="sec" style="margin:8px 4px 0;display:flex"><span class="grow">Recent</span><button ${A('page','activity')}>See all</button></div>${recent()}</div></div>`;
 }
 function homeB(){
-  const st=S.agent;
-  const pills = OTHERS.map(o=>`<button class="chip" style="height:44px;border-radius:22px;padding:0 14px 0 6px;gap:8px;background:rgba(${o.col},.16);color:rgb(${o.col});border:1px solid rgba(${o.col},.35);font-size:13px">${mochi(o.s,32,o.col)}<span class="ell">${o.n}</span></button>`).join('');
+  const st=cur().s;
+  const pills = OTHERS().map(o=>`<button class="chip" ${A('pick',o.i)} style="height:44px;border-radius:22px;padding:0 14px 0 6px;gap:8px;background:rgba(${o.col},.16);color:rgb(${o.col});border:1px solid rgba(${o.col},.35);font-size:13px">${mochi(o.s,32,o.col)}<span class="ell">${o.n}</span></button>`).join('');
   return `<div class="body" style="padding:0">
     <div style="background:#000;border-radius:0 0 30px 30px;padding:36px 12px 12px;border:1px solid rgba(255,255,255,.06);border-top:0;color:#F5F6F8">
       <div style="display:flex;align-items:center;gap:6px;height:40px;padding:0 4px">
@@ -301,23 +305,23 @@ function homeB(){
         <button style="width:36px;height:36px;display:grid;place-items:center;color:#8E939C" ${A('tab','chat')}>${ic('chat')}</button>
         <span class="grow"></span><span style="font-size:12px;color:#7B8089">${S.none?'0':'2'} running</span>
         <button style="width:36px;height:36px;display:grid;place-items:center;color:#8E939C" ${A('tab','settings')}>${ic('sliders')}</button></div>
-      <div class="panel wash" style="${wc(st)};background:#141518;margin-top:6px"><div style="padding:16px;display:flex;gap:14px;align-items:center">${mochi(S.none?'sleeping':st,92)}
-        <div class="grow"><div style="display:flex;gap:8px;align-items:baseline"><b>${S.none?'Coucou':'Korus'}</b><span class="sub">${S.none?'':'Claude Code'}</span></div>
-        <div style="margin-top:4px;font-weight:600;line-height:20px" class="${['working','thinking','searching'].includes(st)&&!S.none?'shim':''}">${S.none?'Nothing is running.':KORUS[st]}</div></div></div></div>
+      <div class="panel wash" style="${wc(st)};background:#141518;margin-top:6px"><div style="padding:16px;display:flex;gap:14px;align-items:center">${mochi(S.none?'sleeping':st,92,S.none?null:cur().col,1)}
+        <div class="grow"><div style="display:flex;gap:8px;align-items:baseline"><b>${S.none?'Coucou':cur().n}</b><span class="sub">${S.none?'':cur().k}</span></div>
+        <div style="margin-top:4px;font-weight:600;line-height:20px" class="${['working','thinking','searching'].includes(st)&&!S.none?'shim':''}">${S.none?'Nothing is running.':cur().t}</div></div></div></div>
       ${S.none?'':`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${pills}</div>`}
     </div>
     <div class="sub faint" style="text-align:center;margin:90px 24px 0">Option B keeps the PC layout: the lower half of a phone stays empty.</div></div>`;
 }
 function homeC(){
-  const st=S.none?'sleeping':S.agent;
+  const st=S.none?'sleeping':cur().s;
   return `<div class="body" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:36px">
     <div style="display:flex;align-items:center;width:100%;height:48px"><span class="dot" style="--dc:52,211,153"></span><span class="sub" style="margin-left:8px;flex:1;text-align:left">Connected to Korus-PC</span>
       <button style="width:48px;height:48px;display:grid;place-items:center;margin-right:-10px" ${A('tab','settings')}>${ic('sliders')}</button></div>
     <div class="panel wash" style="${wc(st)};width:100%;margin-top:8px;padding:26px 16px 22px;display:flex;flex-direction:column;align-items:center;--wa2:calc(var(--wa)*1.1)">
-      ${mochi(st,150)}<h2 class="title" style="margin-top:12px">${S.none?'Nothing is running':'Korus'}</h2><div class="sub">${S.none?'Start an agent on your computer.':'Claude Code'}</div>
-      ${S.none?'':`<div style="margin-top:8px;font-weight:600" class="${['working','thinking','searching'].includes(st)?'shim':''}">${KORUS[st]}</div>`}
+      ${mochi(st,150,S.none?null:cur().col,1)}<h2 class="title" style="margin-top:12px">${S.none?'Nothing is running':cur().n}</h2><div class="sub">${S.none?'Start an agent on your computer.':cur().k}</div>
+      ${S.none?'':`<div style="margin-top:8px;font-weight:600" class="${['working','thinking','searching'].includes(st)?'shim':''}">${cur().t}</div>`}
       ${S.none?'':`<button class="btn" style="margin-top:14px;height:40px" ${A('page','session')}>Details ${ic('chev','i')}</button>`}</div>
-    ${S.none?'':`<div style="display:flex;gap:18px;margin-top:20px">${OTHERS.map((o,i)=>`<button style="display:flex;flex-direction:column;align-items:center;gap:4px;width:84px" ${A('pick',i)}>${mochi(o.s,52,o.col)}<span class="sub ell" style="max-width:84px">${o.n}</span></button>`).join('')}</div>`}
+    ${S.none?'':`<div style="display:flex;gap:18px;margin-top:20px">${OTHERS().map(o=>`<button style="display:flex;flex-direction:column;align-items:center;gap:4px;width:84px" ${A('pick',o.i)}>${mochi(o.s,52,o.col)}<span class="sub ell" style="max-width:84px">${o.n}</span></button>`).join('')}</div>`}
     <div style="margin-top:auto;width:100%;padding-top:20px">${askBar()}</div></div>`;
 }
 function home(){return S.opt==='A'?homeA():S.opt==='B'?homeB():homeC()}
@@ -356,16 +360,16 @@ function settings(){
       <div class="sub" style="margin-top:8px">The name, Mochi, icon and sounds are © Louis Raillé, used with permission.</div></div></div></div></div>`;
 }
 function session(){
-  const st=S.agent;
+  const a=cur(), st=a.s;
   const steps = STEPS.map(s=>`<div class="row" style="min-height:44px;gap:12px;color:var(--dim)"><span style="color:var(--online);display:grid">${ic('check')}</span><span class="grow">${s}</span></div>`).join('');
   const cur = ['working','thinking','searching'].includes(st);
-  return `<div class="body">${head('Korus')}<div class="gap">
-    <div class="panel wash" style="${wc(st)}"><div class="row" style="gap:14px;padding:16px">${mochi(st,88)}<span class="grow"><span class="sub">Claude Code</span>
-      <b style="display:block;font-size:16px;line-height:22px" class="${cur?'shim':''}">${KORUS[st]}</b>
-      <span class="chip" style="margin-top:8px;background:var(--panel2);color:var(--text)">Project: korus</span></span></div></div>
-    ${st==='finished'?`<div class="panel wash" style="--wc:52,211,153;--wa2:calc(var(--wa)*.6)"><div style="padding:16px"><div class="sub">Last message</div><div style="font-weight:600;margin-top:4px">Migration applied, 14 tests passed.</div></div></div>`:''}
+  return `<div class="body">${head(a.n)}<div class="gap">
+    <div class="panel wash" style="${wc(st)}"><div class="row" style="gap:14px;padding:16px">${mochi(st,88,a.col,1)}<span class="grow"><span class="sub">${a.k}</span>
+      <b style="display:block;font-size:16px;line-height:22px" class="${['working','thinking','searching'].includes(st)?'shim':''}">${a.t}</b>
+      <span class="chip" style="margin-top:8px;background:var(--panel2);color:var(--text)">Project: ${a.n.toLowerCase().replace(/ /g,'-')}</span></span></div></div>
+    ${st==='finished'&&S.focus===0?`<div class="panel wash" style="--wc:52,211,153;--wa2:calc(var(--wa)*.6)"><div style="padding:16px"><div class="sub">Last message</div><div style="font-weight:600;margin-top:4px">Migration applied, 14 tests passed.</div></div></div>`:''}
     <div class="sec" style="margin:8px 4px 0">What it did</div>
-    <div class="panel">${steps}${cur?`<div class="row" style="min-height:44px"><span class="dot" style="--dc:${ST[st].c}"></span><span class="grow shim" style="font-weight:600">${KORUS[st]}</span></div>`:''}</div>
+    <div class="panel">${steps}${cur?`<div class="row" style="min-height:44px"><span class="dot" style="--dc:${ST[st].c}"></span><span class="grow shim" style="font-weight:600">${a.t}</span></div>`:''}</div>
     <div class="sub faint" style="padding:4px 8px">Steps are shown in plain words. File paths and commands stay on your computer.</div></div></div>`;
 }
 function activity(){
@@ -384,7 +388,7 @@ function sheets(){
   let h='';
   if(S.sheet==='approval'){
     h=`<div class="dim" ${A('closeSheet')}></div><div class="sheet wash" style="${wc('approval')};--wa2:.45">
-      <div class="grab"></div><div style="display:flex;gap:14px;align-items:center">${mochi('approval',84)}<div class="grow"><div class="sub">Korus · Claude Code</div>
+      <div class="grab"></div><div style="display:flex;gap:14px;align-items:center">${mochi('approval',84,AGENTS[0].col,1)}<div class="grow"><div class="sub">Korus · Claude Code</div>
       <div style="font-size:18px;line-height:24px;font-weight:700;margin-top:2px">Wants to run a command in Korus</div></div></div>
       <div class="sub" style="margin-top:10px">It will change the database structure. Allow only if you started this.</div>
       <button class="sub" style="margin-top:12px;text-decoration:underline;color:#9398A1" ${A('cmd')}>${S.showCmd?'Hide exact command':'Show exact command'}</button>
@@ -393,7 +397,7 @@ function sheets(){
       <div class="sub" style="text-align:center;margin-top:10px;font-size:12px">Allow asks for your fingerprint or screen lock. Deny does not.</div><div class="cd"></div></div>`;
   } else if(S.sheet==='question'){
     h=`<div class="dim" ${A('closeSheet')}></div><div class="sheet wash" style="${wc('question')};--wa2:.4">
-      <div class="grab"></div><div style="display:flex;gap:14px;align-items:center">${mochi('question',84)}<div class="grow"><div class="sub">SBE Hub · Gemini CLI</div>
+      <div class="grab"></div><div style="display:flex;gap:14px;align-items:center">${mochi('question',84,AGENTS[1].col,1)}<div class="grow"><div class="sub">SBE Hub · Gemini CLI</div>
       <div style="font-size:18px;line-height:24px;font-weight:700;margin-top:2px">Has a question for you</div></div></div>
       <div class="sub" style="margin-top:10px">Answer it on your computer. (Answering from the phone is a later stage.)</div>
       <div style="margin-top:16px"><button class="btn p block" ${A('closeSheet')}>OK</button></div></div>`;
@@ -417,13 +421,13 @@ function islandGeom(k){ // dp, from the plan: peek 216x30, working 250x66, card 
 }
 function island(){
   const k=S.island, [w,h]=islandGeom(k), st = k==='approval'?'approval':k==='question'?'question':k==='finished'?'finished':'working';
-  const mini = (k==='peek'||k==='working') ? `<div class="pk"><span>${mochi(S.agent==='idle'?'working':st,22)}</span><span class="dot" style="--dc:${ST[st].c}"></span></div>` : '';
+  const mini = (k==='peek'||k==='working') ? `<div class="pk"><span>${mochi(S.agent==='idle'?'working':st,22,AGENTS[0].col,1)}</span><span class="dot" style="--dc:${ST[st].c}"></span></div>` : '';
   let inner='';
   if(k==='working') inner=`<div class="in" style="top:32px;left:16px;right:16px;font-size:13px;line-height:18px"><span class="shim ell" style="display:block">Korus · Running the migration</span></div>`;
   if(k==='finished'||k==='question'||k==='approval'){
     const title = k==='approval'?'Korus wants to run a command':k==='question'?'SBE Hub has a question':'Korus finished';
     const sub = k==='approval'?'Claude Code · changes the database':k==='question'?'Answer it on your computer':'Migration applied, 14 tests passed.';
-    inner=`<div class="in"><div style="display:flex;gap:12px;align-items:center">${mochi(st,48)}<div class="grow"><b style="display:block;line-height:20px">${title}</b><span class="sub ell" style="display:block;color:#9398A1">${sub}</span></div></div>
+    inner=`<div class="in"><div style="display:flex;gap:12px;align-items:center">${mochi(st,48,(k==='question'?AGENTS[1]:AGENTS[0]).col,1)}<div class="grow"><b style="display:block;line-height:20px">${title}</b><span class="sub ell" style="display:block;color:#9398A1">${sub}</span></div></div>
       ${k==='approval'?`<div style="display:flex;gap:8px;margin-top:12px"><button class="btn grow" ${A('deny')}>Deny</button><button class="btn p grow" ${A('allow')}>${ic('lock','')} Allow</button></div><div class="sub" style="font-size:11px;margin-top:6px;text-align:center;color:#7B8089">Allow asks for your fingerprint or screen lock</div>`:`<div style="display:flex;gap:8px;margin-top:12px"><button class="btn p" ${A('openapp')}>Open Coucou</button></div>`}</div>
       ${k==='finished'?'<div class="cdl"></div>':''}`;
   }
@@ -466,7 +470,7 @@ function setIsland(k){
   if(k==='finished'){ islTimer=setTimeout(()=>{ const e=$('isl'); if(e) e.classList.add('closing'); S.island='hidden'; render(); const e2=$('isl'); if(e2){e2.classList.add('closing')} },10000); }
 }
 function setAgent(st){
-  S.agent=st; S.none=(st==='none'); S.sheet = st==='approval'&&!S.over?'approval':st==='question'&&!S.over?'question':null; S.showCmd=false;
+  S.focus=0; S.agent=st; S.none=(st==='none'); S.sheet = st==='approval'&&!S.over?'approval':st==='question'&&!S.over?'question':null; S.showCmd=false;
   setIsland(st==='approval'?'approval':st==='question'?'question':st==='finished'?'finished':['working','thinking','searching'].includes(st)?'working':'hidden');
   render();
 }
@@ -478,7 +482,7 @@ document.addEventListener('click',e=>{
     case 'page': S.page=arg; break;
     case 'back': if(S.page){S.page=null} else {S.tab='home'} break;
     case 'toggle': S[a1]=!S[a1]; break;
-    case 'pick': return toast(S.opt==='C'||true?'No details sent for this agent. Turn on "details" in Coucou on your computer.':'');
+    case 'pick': S.focus=+arg; break;
     case 'sheet': S.sheet=arg; break;
     case 'closeSheet': S.sheet=null; break;
     case 'cmd': S.showCmd=!S.showCmd; break;
