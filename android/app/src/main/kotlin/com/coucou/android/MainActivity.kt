@@ -78,6 +78,7 @@ import com.coucou.android.app.BiometricGate
 import com.coucou.android.app.CoucouApp
 import com.coucou.android.app.Mode
 import com.coucou.android.app.Notifications
+import com.coucou.android.core.ApprovalSheetPlan
 import com.coucou.android.core.HomeText
 import com.coucou.android.core.Nav
 import com.coucou.android.core.Pills
@@ -93,6 +94,8 @@ import com.coucou.android.ui.CoucouCard
 import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentRows
+import com.coucou.android.ui.ApprovalSheet
+import com.coucou.android.ui.QuestionSheet
 import com.coucou.android.ui.AskBar
 import com.coucou.android.ui.HeroCard
 import com.coucou.android.ui.RecentPanel
@@ -119,6 +122,9 @@ class MainActivity : ComponentActivity() {
     private var screen by mutableStateOf(Screen.HOME)
     /** The session whose details are open. */
     private var detailPill by mutableStateOf<String?>(null)
+    /** The approval the user closed without deciding (the sheet stays down for it), and the session whose question is open. */
+    private var closedApproval by mutableStateOf<String?>(null)
+    private var questionPill by mutableStateOf<String?>(null)
     private var confirming = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -161,7 +167,7 @@ class MainActivity : ComponentActivity() {
                             Screen.HOME -> Home(
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
-                                onScan = { screen = Screen.SCAN },
+                                onScan = { screen = Screen.SCAN }, onReview = { closedApproval = null }, onQuestion = { questionPill = it },
                                 onAsk = { screen = Screen.CHAT }, onHistory = { screen = Screen.HISTORY },
                             )
                         }
@@ -172,6 +178,10 @@ class MainActivity : ComponentActivity() {
                                 alert = model.approvals.isNotEmpty(), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
                             )
                         }
+                        // A request for permission rises over whatever is on screen until it is decided or closed.
+                        val pending = ApprovalSheetPlan.next(model.approvals, closedApproval)
+                        if (pending != null && screen != Screen.SCAN) ApprovalSheet(model, pending, onAllow = ::approve, onDismiss = { closedApproval = pending.fingerprint })
+                        questionPill?.let { QuestionSheet(model, it, onDismiss = { questionPill = null }) }
                         // A scanned code or a link from the camera app: the user decides before anything is paired.
                         model.pairRequest?.let { PairConfirm(model, it) }
                     }
@@ -250,7 +260,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun Home(
     model: AppModel, onApprove: (ApprovalRequest) -> Unit, onOverlay: (Boolean) -> Unit, onSession: (String) -> Unit,
-    onScan: () -> Unit, onAsk: () -> Unit, onHistory: () -> Unit,
+    onScan: () -> Unit, onAsk: () -> Unit, onHistory: () -> Unit, onReview: () -> Unit, onQuestion: (String) -> Unit,
 ) {
     val engines = remember { HashMap<String, MochiEngine>() }
     val miniEngines = remember { HashMap<String, MochiEngine>() }
@@ -281,9 +291,8 @@ private fun Home(
     engine.bodyColor = focus?.let { HomePanel.colorHex(it) }?.let { HomePanel.rgb(it) }
 
     val pair = HomePanel.link(model.isPaired, model.mode == Mode.DEMO, hasApproval = model.approvals.isNotEmpty())
-    // Items, in order: the hero, [message], approvals, [pairing card], then the other agents, ask, recent.
-    val firstApproval = 1 + (if (model.message != null) 1 else 0)
-    val pairIndex = firstApproval + model.approvals.size
+    // Items, in order: the hero, [message], [pairing card], then the other agents, ask, recent.
+    val pairIndex = 1 + (if (model.message != null) 1 else 0)
     val others = HomePanel.others(model.sessions, focus)
     LazyColumn(
         state = listState,
@@ -296,10 +305,11 @@ private fun Home(
                 focus, engine, touch.modifier, pair, HomeText.running(model.sessions),
                 linkDot = linkDotColor(model), linkText = linkStatusText(model),
                 onDetails = if (focus != null && HomePanel.hasDetails(focus)) ({ onSession(focus.pillId) }) else null,
+                onQuestion = if (focus != null && focus.state == BotState.QUESTION) ({ onQuestion(focus.pillId) }) else null,
                 onLink = {
                     when (pair) {
                         HomePanel.Link.PAIR -> scope.launch { listState.animateScrollToItem(pairIndex) }
-                        HomePanel.Link.APPROVAL -> scope.launch { listState.animateScrollToItem(firstApproval) }
+                        HomePanel.Link.APPROVAL -> onReview()
                         HomePanel.Link.NONE -> {}
                     }
                 },
@@ -316,8 +326,6 @@ private fun Home(
             }
         }
 
-        // What is waiting for an answer comes first.
-        items(model.approvals, key = { it.fingerprint }) { r -> Box(Modifier.padding(horizontal = Gutter)) { ApprovalCard(model, r, onApprove) } }
         if (model.mode == Mode.NONE) item { Box(Modifier.padding(horizontal = Gutter)) { PairCard(model, onScan) } }
 
         if (others.isNotEmpty()) {
@@ -386,46 +394,6 @@ private fun PairCard(model: AppModel, onScan: () -> Unit) {
                 Modifier.fillMaxWidth().height(48.dp), shape = CircleShape,
             ) { Text(stringResource(R.string.pair_clipboard), maxLines = 1, overflow = TextOverflow.Ellipsis) }
             TextButton(onClick = { model.startDemo() }) { Text(stringResource(R.string.demo_try)) }
-        }
-    }
-}
-
-@Composable
-private fun ApprovalCard(model: AppModel, r: ApprovalRequest, onApprove: (ApprovalRequest) -> Unit) {
-    CoucouCard(emphasis = true) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(model.agentName(r.pillId), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(stringResource(R.string.approval_title), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-            }
-            // The command exactly as the agent will run it, in the website's code style.
-            Column(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
-                    .padding(10.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(r.tool, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Text(
-                    r.command,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 8,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onApprove(r) }, Modifier.weight(1f).height(48.dp), shape = CircleShape) {
-                    Text(stringResource(R.string.action_allow))
-                }
-                OutlinedButton(
-                    onClick = { model.decide(r.fingerprint, allow = false) },
-                    Modifier.weight(1f).height(48.dp), shape = CircleShape,
-                ) { Text(stringResource(R.string.action_deny)) }
-            }
-            Text(stringResource(R.string.approval_hint), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

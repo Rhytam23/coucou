@@ -94,7 +94,7 @@ class ScanScreenTest {
 
     @Test fun theScanButtonIsOnThePairingCardAndThePasteFieldStays() {
         val main = src("MainActivity.kt")
-        val card = main.substringAfter("private fun PairCard").substringBefore("private fun ApprovalCard")
+        val card = main.substringAfter("private fun PairCard").substringBefore("private fun OverlayHint")
         assertTrue(card.contains("R.string.scan_button") && card.contains("R.string.pair_paste") && card.contains("R.string.pair_clipboard"))
     }
 }

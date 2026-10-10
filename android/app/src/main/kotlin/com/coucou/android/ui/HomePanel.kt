@@ -80,6 +80,8 @@ internal fun stateColor(state: BotState): Color =
 fun HeroCard(
     focus: SessionInfo?, engine: MochiEngine, touch: Modifier, link: HomePanel.Link, running: Int,
     linkDot: Color, linkText: String, onLink: () -> Unit, onDetails: (() -> Unit)?,
+    /** Opens the question sheet; non-null only while the agent has a question. */
+    onQuestion: (() -> Unit)? = null,
 ) {
     val state = focus?.state ?: BotState.SLEEPING
     val wash = MochiConst.STATES[state]?.color?.let(::rgbColor)
@@ -120,7 +122,7 @@ fun HeroCard(
                     }
                 }
             }
-            if (link != HomePanel.Link.NONE || onDetails != null) {
+            if (link != HomePanel.Link.NONE || onDetails != null || onQuestion != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (link != HomePanel.Link.NONE) {
                         PillButton(
@@ -128,6 +130,7 @@ fun HeroCard(
                             kind = PillKind.PRIMARY, onDark = true,
                         )
                     }
+                    if (onQuestion != null) PillButton(stringResource(R.string.question_see), onQuestion, kind = PillKind.PRIMARY, onDark = true)
                     if (onDetails != null) {
                         PillButton(
                             stringResource(R.string.session_details), onDetails, onDark = true,

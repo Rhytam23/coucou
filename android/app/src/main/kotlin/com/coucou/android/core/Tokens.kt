@@ -88,7 +88,9 @@ object TypeScale {
     val BODY = TypeStep("body", 15, 22, 400)
     val SECONDARY = TypeStep("secondary", 13, 18, 400)
     val LABEL = TypeStep("label", 12, 16, 600)
-    val ALL = listOf(DISPLAY, TITLE, HEADLINE, BODY, SECONDARY, LABEL)
+    /** Only for the exact command and code in chat. */
+    val MONO = TypeStep("mono", 12, 18, 400)
+    val ALL = listOf(DISPLAY, TITLE, HEADLINE, BODY, SECONDARY, LABEL, MONO)
 }
 
 /** Motion constants shared with the PC (see core/IslandMotion.kt for the springs). */
