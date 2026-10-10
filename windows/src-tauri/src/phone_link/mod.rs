@@ -15,6 +15,7 @@
 
 mod chat;
 mod chat_backend;
+mod discovery;
 mod hub;
 #[cfg(test)]
 mod interop;
@@ -88,6 +89,8 @@ pub struct PhoneLink {
     /// Chat from the phone; offered to phones only while the user's switch is on (chat.rs).
     chat: Arc<chat::ChatLink>,
     store: Arc<dyn SecretStore>,
+    /// The announcement on the local network (discovery.rs): exists only while the link runs.
+    advertiser: discovery::Advertiser,
     running: Mutex<Option<Running>>,
     error: Mutex<Option<String>>,
 }
@@ -99,6 +102,7 @@ impl PhoneLink {
             hub: Hub::new(Arc::new(TauriHost { app: app.clone() })),
             app,
             store: Arc::new(Keystore),
+            advertiser: discovery::Advertiser::new(Arc::new(discovery::MdnsPublisher::new())),
             running: Mutex::new(None),
             error: Mutex::new(None),
         }
@@ -115,6 +119,11 @@ impl PhoneLink {
         match result {
             Ok(r) => {
                 log::line(format!("phone link: listening on port {}", r.port));
+                // So the phone can find this computer again after a Wi-Fi change. The link works without it.
+                match self.advertiser.start(&pairing::computer_name(), r.port, &r.identity.fingerprint) {
+                    Ok(()) => log::line("phone link: announced on the local network"),
+                    Err(e) => log::line(format!("phone link: not announced on the local network: {e}")),
+                }
                 *running = Some(r);
                 *self.error.lock().unwrap() = None;
                 Ok(())
@@ -151,6 +160,7 @@ impl PhoneLink {
     }
 
     pub fn stop(&self) {
+        self.advertiser.stop();
         if let Some(r) = self.running.lock().unwrap().take() {
             r.handle.stop();
             log::line("phone link: stopped");
@@ -388,6 +398,13 @@ pub fn phone_link_publish(link: State<PhoneLink>, sessions: Vec<SessionIn>, appr
 }
 
 /// Called once at launch: the link comes back if the user had turned it on.
+/// The app is quitting: withdraw the announcement so phones forget this computer at once.
+pub fn stop_on_exit(app: &AppHandle) {
+    if let Some(link) = app.try_state::<PhoneLink>() {
+        link.stop();
+    }
+}
+
 pub fn start_if_enabled(app: &AppHandle) {
     let enabled = app.state::<Shared>().settings.lock().unwrap().phone_link;
     if enabled {

@@ -797,8 +797,14 @@ pub fn run() {
             shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Coucou");
+        .build(tauri::generate_context!())
+        .expect("error while building Coucou")
+        .run(|app, event| {
+            // Withdraw the phone link's announcement on the local network before the process ends.
+            if let tauri::RunEvent::Exit = event {
+                phone_link::stop_on_exit(app);
+            }
+        });
 }
 
 #[cfg(test)]

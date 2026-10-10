@@ -125,6 +125,37 @@ The whole `sessions` line stays under 56 KiB: when many sessions carry many step
 A field with nothing to say is left out. Turning the switch on or off disconnects the phones once so they reconnect and are told.
 Not sent, ever: the prompt, command output, Claude's full answer, file contents, full paths.
 
+## Finding the computer again (optional, still protocol v1)
+
+The pairing link holds the computer's address, and an address changes with every network (a home Wi-Fi, a hotspot, a
+new router). So the computer can also announce itself on the local network, and the phone can find it there. This is
+an addition: **v=1 is unchanged, the saved address stays the first thing tried, and an old phone or an old computer
+simply keeps using the saved address.**
+
+- **Announcement** (computer): while the phone link is on, DNS-SD over multicast DNS, service type `_coucou._tcp`,
+  instance name = the computer's name, the real port, IPv4 address. Off means silent: when the switch is turned off, the
+  link stops or the app quits, the announcement is withdrawn and nothing runs.
+- **TXT record**: `v=1` and `fp=<first 16 lowercase hex characters of the certificate's SHA-256>`. Nothing else. Never the
+  token, never the pairing link, never a user name or a path. The certificate is public by nature (every peer that connects
+  receives it), so its short id is not a secret, and it is **a hint, not a credential**.
+- **Phone**: the framework's `NsdManager` (no library). It searches only when it has a paired computer, a Wi-Fi or cable is
+  up and the link is not connected; it holds a multicast lock only while searching.
+  1. The saved address is tried first and gets 2 s to accept the TCP connection.
+  2. After that failure the network is searched for up to 15 s. Between searches it waits 20 s, 60 s, 3 min, then 5 min;
+     a network change (`ConnectivityManager` callback) starts a search at once and resets the waiting. No Wi-Fi: no search.
+  3. A service is a candidate only if its `fp` equals the first 16 characters of the **paired** certificate fingerprint and its
+     `v` is `1` (or absent), and its address is on the local network. The name and the address never count.
+  4. A candidate is then checked with a bare TLS handshake against the **full** pinned fingerprint. The probe takes no
+     token: nothing secret can be sent to it. Only a certificate that matches is accepted; one that does not (a lookalike
+     that copied the short id) is dropped and never saved. When the paired fingerprint is announced twice, the first that
+     passes wins.
+  5. The stored host and port are replaced; the token and the pinned fingerprint are untouched. The link reconnects.
+- If nothing is found, the phone says so calmly (same Wi-Fi? computer awake and Coucou running? firewall? hotspots and guest
+  networks can block devices from finding each other, "client isolation") and offers to pair again or to type the address.
+- Limits, honestly: multicast does not cross routers or VPNs; some access points block it between clients; a firewall that
+  blocks UDP 5353 on the private profile hides the computer (the Windows prompt "allow Coucou on private networks" covers
+  it); two computers with the same certificate do not exist (each has its own).
+
 ## Behaviour rules (same as the other ports)
 
 - Never block the agent: if the phone does not answer, the desktop's own approval stays usable.
@@ -152,7 +183,7 @@ Not sent, ever: the prompt, command output, Claude's full answer, file contents,
   error text is never forwarded or logged, only a kind (no key, unreachable, auth, provider).
 - Only permission requests (Allow/Deny) go to the phone; a question from Claude Code needs its options
   picked on the island.
-- New crates: `rcgen` (+ `yasna`) makes the certificate once, `qrcode` draws the pairing QR; `rustls`,
+- New crates: `mdns-sd` (+ `flume`, `if-addrs`, `socket-pktinfo`, `spin`; default features off, so no async runtime or logger) announces the computer on the local network while the link is on (`phone_link/discovery.rs`); `rcgen` (+ `yasna`) makes the certificate once, `qrcode` draws the pairing QR; `rustls`,
   `tokio-rustls` and `ring` were already in the dependency tree (through `reqwest`) and are now named
   directly. Hashing, randomness and the constant-time comparison use `ring`; no other crate.
 
@@ -167,6 +198,7 @@ Not sent, ever: the prompt, command output, Claude's full answer, file contents,
 - `android/tools/dev-desktop.mjs` pretends to be a desktop (needs `node` and `openssl`). With `--fake-chat` it offers
   `chat` with a fake provider (no key, no cost): `/error`, `/auth`, `/slow`, `/long` and `/rewrite` trigger the odd cases.
 - `DevDesktopInteropTest` runs the Android client against it.
+- `cargo test -p coucou phone_link` also tests the announcement (what is published and when, that no secret can be in it); the real multicast needs a real network and is not in the tests.
 - `cargo test -p coucou phone_link` tests the real server (wrong token, fingerprint mismatch, oversize
   line, late decision, answered-at-the-desk, pairing again, local-network filter...).
 - `RustDesktopInteropTest` runs the Android client against the real Rust server

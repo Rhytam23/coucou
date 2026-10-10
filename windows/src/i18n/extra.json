@@ -3361,6 +3361,17 @@
    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
   },
+  "Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.": {
+   "zh-Hans": "网络变化后，你的手机会自动重新找到这台电脑。只有在此开关打开时，才会在本地网络中公布。某些热点和访客网络会阻止这一功能。",
+   "hi": "नेटवर्क बदलने पर आपका फ़ोन इस कंप्यूटर को अपने-आप फिर से ढूँढ लेता है। यह स्विच चालू रहने पर ही इसे आपके लोकल नेटवर्क पर घोषित किया जाता है। कुछ हॉटस्पॉट और गेस्ट नेटवर्क इसे रोक देते हैं।",
+   "es": "Tu teléfono vuelve a encontrar este ordenador por sí solo cuando cambia la red. Solo se anuncia en tu red local mientras este interruptor esté activado. Algunos puntos de acceso y redes de invitados lo bloquean.",
+   "ar": "يعثر هاتفك على هذا الكمبيوتر من جديد تلقائيًا عند تغيّر الشبكة. ولا يُعلَن عنه في شبكتك المحلية إلا أثناء تشغيل هذا المفتاح. بعض نقاط الاتصال وشبكات الضيوف تحجب ذلك.",
+   "fr": "Ton téléphone retrouve tout seul cet ordinateur quand le réseau change. Il n'est annoncé sur ton réseau local que tant que cet interrupteur est activé. Certains points d'accès et réseaux invités bloquent cette fonction.",
+   "bn": "নেটওয়ার্ক বদলালে আপনার ফোন নিজে থেকেই এই কম্পিউটারটি আবার খুঁজে নেয়। এই সুইচ চালু থাকলে তবেই এটি আপনার লোকাল নেটওয়ার্কে জানানো হয়। কিছু হটস্পট ও গেস্ট নেটওয়ার্ক এটি আটকে দেয়।",
+   "pt-BR": "Seu celular encontra este computador de novo sozinho quando a rede muda. Ele só é anunciado na sua rede local enquanto esta chave estiver ligada. Alguns hotspots e redes de convidados bloqueiam isso.",
+   "ru": "Телефон сам находит этот компьютер снова, когда сеть меняется. Компьютер объявляется в вашей локальной сети только пока этот переключатель включён. Некоторые точки доступа и гостевые сети это блокируют.",
+   "id": "Ponsel Anda menemukan komputer ini lagi secara otomatis saat jaringan berubah. Komputer ini hanya diumumkan di jaringan lokal Anda selama sakelar ini aktif. Beberapa hotspot dan jaringan tamu memblokirnya."
+  },
   "Android phone": {
    "zh-Hans": "Android 手机",
    "hi": "Android फ़ोन",
