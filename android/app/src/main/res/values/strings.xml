@@ -23,6 +23,9 @@
     <string name="action_unpair">Disconnect this computer</string>
     <string name="demo_leave">Leave demo mode</string>
     <string name="gallery">Mochi gallery</string>
+    <string name="design_entry">Design system (for testers)</string>
+    <string name="design_title">Design system</string>
+    <string name="design_note">The building blocks of the new look. No other screen uses them yet.</string>
     <string name="pair_clipboard">Paste from clipboard</string>
     <string name="notif_unlock">Unlock to see the request</string>
     <string name="msg_not_pending">That request is no longer pending.</string>

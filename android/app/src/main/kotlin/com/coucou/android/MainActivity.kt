@@ -82,6 +82,7 @@ import com.coucou.android.ui.CoucouTheme
 import com.coucou.android.core.HomePanel
 import com.coucou.android.ui.AgentCard
 import com.coucou.android.ui.ChatEntry
+import com.coucou.android.ui.DesignScreen
 import com.coucou.android.ui.PairConfirm
 import com.coucou.android.ui.ScanScreen
 import com.coucou.android.ui.SessionScreen
@@ -99,7 +100,7 @@ import com.coucou.android.ui.SectionTitle
 import com.coucou.android.ui.linkDotColor
 import com.coucou.android.ui.linkStatusText
 
-private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION, SCAN }
+private enum class Screen { HOME, GALLERY, SETTINGS, HISTORY, CHAT, SESSION, SCAN, DESIGN }
 
 class MainActivity : ComponentActivity() {
     private val model get() = (application as CoucouApp).model
@@ -119,7 +120,11 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
                         BackHandler(enabled = screen != Screen.HOME) {
-                            screen = if (screen == Screen.HISTORY || screen == Screen.GALLERY) Screen.SETTINGS else Screen.HOME
+                            screen = when (screen) {
+                                Screen.HISTORY, Screen.GALLERY -> Screen.SETTINGS
+                                Screen.DESIGN -> Screen.GALLERY
+                                else -> Screen.HOME
+                            }
                         }
                         when (screen) {
                             Screen.SCAN -> ScanScreen(
@@ -129,7 +134,8 @@ class MainActivity : ComponentActivity() {
                             )
                             Screen.CHAT -> ChatScreen(model, onBack = { screen = Screen.HOME })
                             Screen.SESSION -> SessionScreen(model, detailPill.orEmpty(), onBack = { screen = Screen.HOME })
-                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })
+                            Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS }, onDesign = { screen = Screen.DESIGN })
+                            Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onBack = { screen = Screen.HOME }, onHistory = { screen = Screen.HISTORY },
                                 onGallery = { screen = Screen.GALLERY }, onOverlay = ::setOverlay,
@@ -421,12 +427,13 @@ private fun OverlayHint(onOverlay: (Boolean) -> Unit) {
 
 /** Every state and emote, drawn live. Handy to check the port by eye. */
 @Composable
-private fun Gallery(onBack: () -> Unit) {
+private fun Gallery(onBack: () -> Unit, onDesign: () -> Unit) {
     val clock = remember { { SystemClock.elapsedRealtimeNanos() / 1e6 } }
     val states = remember { BotState.entries.map { s -> s to MochiEngine(clock).apply { setState(s, force = true) } } }
     val emotes = remember { BotEmote.entries.map { e -> e to MochiEngine(clock).apply { setPermanentEmote(e) } } }
     Column(Modifier.padding(horizontal = Gutter)) {
         ScreenTitle(stringResource(R.string.gallery), onBack)
+        TextButton(onClick = onDesign) { Text(stringResource(R.string.design_entry)) }
         Spacer(Modifier.height(Gap))
         LazyVerticalGrid(GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(Gap), verticalArrangement = Arrangement.spacedBy(Gap)) {
             gridItems(states) { (s, e) -> GalleryCell(s.key, e) }

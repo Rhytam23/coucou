@@ -1,6 +1,6 @@
 # Coucou for Android: full UI/UX redesign, "island first"
 
-Status: **decided: Option A, with the defaults below (section 8).** Stage U0 is next. The prototype was updated after the
+Status: **decided: Option A, with the defaults below (section 8).** **U0 (design system) is done**: tokens, icons, components and a Design screen (Settings > Mochi gallery > Design system); no existing screen uses them yet. U1 is next. The prototype was updated after the
 user's note about agent colours (section 4.1). Prototype: `android/design/prototype.html` (open it in any browser; it is a phone-sized mock).
 
 Sources read: `android/HANDOFF.md`, `android/PARITY_PLAN.md`, `windows/src/views/*` (chat, ticker, views,

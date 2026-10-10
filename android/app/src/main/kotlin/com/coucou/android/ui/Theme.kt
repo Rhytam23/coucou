@@ -12,10 +12,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.coucou.android.core.Palette
+import com.coucou.android.core.Tokens
 
 /**
  * The look of the Coucou website (docs/site.css): near-black page, slightly lighter cards with a thin
@@ -44,8 +46,12 @@ object StatusColors {
 
 @Composable
 fun CoucouTheme(content: @Composable () -> Unit) {
-    val scheme: ColorScheme = if (isSystemInDarkTheme()) Dark else Light
-    MaterialTheme(colorScheme = scheme, content = content)
+    val dark = isSystemInDarkTheme()
+    val scheme: ColorScheme = if (dark) Dark else Light
+    // The redesign's tokens ride along; screens that have not moved over still use the Material scheme above.
+    CompositionLocalProvider(LocalTokens provides if (dark) Tokens.DARK else Tokens.LIGHT) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }
 
 val CardShape = RoundedCornerShape(14.dp)

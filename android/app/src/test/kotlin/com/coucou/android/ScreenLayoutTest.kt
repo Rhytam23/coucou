@@ -41,7 +41,8 @@ class ScreenLayoutTest {
     }
 
     @Test fun backFromTheGalleryGoesToSettings() {
-        assertTrue(main.contains("Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS })"))
+        assertTrue(main.contains("Screen.GALLERY -> Gallery(onBack = { screen = Screen.SETTINGS }"))
+        assertTrue("the design screen goes back to the gallery", main.contains("Screen.DESIGN -> DesignScreen(onBack = { screen = Screen.GALLERY })"))
     }
 
     @Test fun theAgentCardNeverShowsTheRawStatusText() {
