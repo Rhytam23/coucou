@@ -102,6 +102,7 @@ import com.coucou.android.link.DiscoveryState
 import com.coucou.android.ui.AddressSheet
 import com.coucou.android.ui.BatteryCard
 import com.coucou.android.ui.DiagnosticsScreen
+import com.coucou.android.ui.LicencesScreen
 import com.coucou.android.ui.LinkHealthPanel
 import com.coucou.android.ui.AgentRows
 import com.coucou.android.ui.DiscoveryHint

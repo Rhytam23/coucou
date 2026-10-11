@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -88,7 +90,7 @@ val verifyReleaseNoLogs by tasks.registering {
         val apks = apkDir.get().asFile.walkTopDown().filter { it.extension == "apk" }.toList()
         check(apks.size == 1) { "expected one release APK, found ${apks.size}" }
         val leftovers = listOf("CoucouOverlay", "CoucouLaunch", "CoucouDiscovery", "CoucouIsland", "island failed", "cannot browse", "ignored an early tap")
-        java.util.zip.ZipFile(apks.single()).use { zip ->
+        ZipFile(apks.single()).use { zip ->
             for (entry in zip.entries().asSequence().filter { it.name.endsWith(".dex") }) {
                 val text = String(zip.getInputStream(entry).readBytes(), Charsets.ISO_8859_1)
                 for (word in leftovers) check(!text.contains(word)) { "'$word' is still in ${entry.name}: the debug logs were not stripped" }
