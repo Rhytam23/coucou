@@ -14,9 +14,9 @@ use ring::rand::{SecureRandom, SystemRandom};
 
 use super::hub::hex;
 
-const CERT_KEY: &str = "phone-link-cert";
-const PRIVATE_KEY: &str = "phone-link-key";
-const TOKEN_KEY: &str = "phone-link-token";
+pub(super) const CERT_KEY: &str = "phone-link-cert";
+pub(super) const PRIVATE_KEY: &str = "phone-link-key";
+pub(super) const TOKEN_KEY: &str = "phone-link-token";
 
 /// Where the secrets are kept. The app's implementation is the OS keystore
 /// (secrets.rs); tests use memory.
@@ -187,6 +187,30 @@ pub mod tests {
         fn set(&self, key: &str, value: &str) -> Result<(), String> {
             self.0.lock().unwrap().insert(key.into(), value.into());
             Ok(())
+        }
+    }
+
+    /// A store that accepts only what the real keystore accepts (`secrets::INTERNAL_KEYS`), and can be told to refuse every write.
+    #[derive(Default)]
+    pub struct StrictStore {
+        pub inner: MemStore,
+        pub refuse_writes: std::sync::atomic::AtomicBool,
+    }
+    impl SecretStore for StrictStore {
+        fn get(&self, key: &str) -> Option<String> {
+            if !crate::secrets::is_internal(key) {
+                return None;
+            }
+            self.inner.get(key)
+        }
+        fn set(&self, key: &str, value: &str) -> Result<(), String> {
+            if !crate::secrets::is_internal(key) {
+                return Err(format!("unknown key {key}"));
+            }
+            if self.refuse_writes.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err("the keystore is locked".into());
+            }
+            self.inner.set(key, value)
         }
     }
 

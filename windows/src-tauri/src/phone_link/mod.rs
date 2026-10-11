@@ -347,6 +347,18 @@ fn pairing_of(link: &PhoneLink, r: &Running) -> Result<Pairing, String> {
     Ok(Pairing { link: link_text, qr_svg, host, port: r.port, name, relay: relay_host })
 }
 
+/// Cuts every connected phone off, then makes a new token and a new relay room and key. The phones go first and unconditionally: if a
+/// secret cannot be stored (a locked keystore), the user must still see "Pair again" take effect on the connections, and the error is
+/// reported afterwards instead of leaving the phones connected.
+fn renew_pairing(hub: &Hub, token: &Mutex<String>, store: &dyn SecretStore) -> Result<(), String> {
+    hub.kick_all("auth", "unpaired");
+    *token.lock().unwrap() = pairing::new_token(store)?;
+    // "Pair again" also makes a new room and a new K: a phone that held the old ones can no longer reach this computer
+    // through the relay, whatever it still remembers.
+    relay_client::new_pairing(store)?;
+    Ok(())
+}
+
 /// A new pairing code: the phone that had the old one is disconnected and must
 /// pair again.
 #[tauri::command]
@@ -356,12 +368,7 @@ pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> 
     }
     let running = link.running.lock().unwrap();
     let r = running.as_ref().ok_or("the phone link is off")?;
-    let token = pairing::new_token(&*link.store)?;
-    *r.shared.token.lock().unwrap() = token;
-    // "Pair again" also makes a new room and a new K: a phone that held the old ones can no longer reach this computer
-    // through the relay, whatever it still remembers.
-    relay_client::new_pairing(&*link.store)?;
-    link.hub.kick_all("auth", "unpaired");
+    renew_pairing(&link.hub, &r.shared.token, &*link.store)?;
     log::line("phone link: new pairing code, phones disconnected");
     let result = pairing_of(&link, r);
     drop(running);

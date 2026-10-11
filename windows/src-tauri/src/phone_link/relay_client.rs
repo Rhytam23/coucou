@@ -32,9 +32,9 @@ use super::pairing::SecretStore;
 use super::relay_crypto::{self as crypto, PairingKey, Session};
 use super::server::{self, Shared};
 
-const ROOM_KEY: &str = "phone-relay-room";
-const PAIRING_KEY: &str = "phone-relay-key";
-const ACCESS_KEY: &str = "phone-relay-access";
+pub(super) const ROOM_KEY: &str = "phone-relay-room";
+pub(super) const PAIRING_KEY: &str = "phone-relay-key";
+pub(super) const ACCESS_KEY: &str = "phone-relay-access";
 
 /// How often the computer sends the text `ping` the relay answers by itself, and how long silence is tolerated.
 const HEARTBEAT: Duration = Duration::from_secs(25);

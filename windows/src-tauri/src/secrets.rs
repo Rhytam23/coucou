@@ -56,15 +56,28 @@ pub fn present(key: &str) -> bool {
 
 // ── Entries only Rust reads and writes ───────────────────────────────────────
 //
-// The phone link's certificate key and pairing token. They are not in KNOWN_KEYS
+// The phone link's certificate, key and pairing token, and the relay's room, end-to-end key and access key.
+// They are not in KNOWN_KEYS
 // on purpose: the island has `secret_present` / `secret_set` / `secret_clear`
 // for those, and none of the three may be reachable from a webview.
 
 /// Every entry of that kind. Anything outside this list is refused.
-pub const INTERNAL_KEYS: &[&str] = &["phone-link-cert", "phone-link-key", "phone-link-token"];
+pub const INTERNAL_KEYS: &[&str] = &[
+    "phone-link-cert",
+    "phone-link-key",
+    "phone-link-token",
+    "phone-relay-room",
+    "phone-relay-key",
+    "phone-relay-access",
+];
+
+/// Whether the keystore would accept this key through `get_internal` / `set_internal`.
+pub fn is_internal(key: &str) -> bool {
+    INTERNAL_KEYS.contains(&key)
+}
 
 fn internal_entry(key: &str) -> Result<Entry, String> {
-    if !INTERNAL_KEYS.contains(&key) {
+    if !is_internal(key) {
         return Err(format!("unknown key {key}"));
     }
     Entry::new(SERVICE, key).map_err(|e| e.to_string())
@@ -75,7 +88,15 @@ pub fn get_internal(key: &str) -> Option<String> {
 }
 
 pub fn set_internal(key: &str, value: &str) -> Result<(), String> {
-    internal_entry(key)?.set_password(value).map_err(|e| e.to_string())
+    let entry = internal_entry(key)?;
+    if value.is_empty() {
+        // An empty value means "forget it" (the relay's access key); some keystores refuse an empty password.
+        return match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        };
+    }
+    entry.set_password(value).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

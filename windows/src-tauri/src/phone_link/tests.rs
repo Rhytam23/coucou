@@ -1690,3 +1690,67 @@ mod relay_cap_tests {
         });
     }
 }
+
+// ── The keystore's key list (secrets::INTERNAL_KEYS) ──
+
+/// Every key the phone link stores must be in the real keystore's list: the keystore refuses the others with "unknown key".
+/// MemStore accepts anything, which is how a missing key once went unnoticed.
+#[test]
+fn every_secret_the_phone_link_stores_is_in_the_keystores_key_list() {
+    for key in [
+        pairing::CERT_KEY,
+        pairing::PRIVATE_KEY,
+        pairing::TOKEN_KEY,
+        super::relay_client::ROOM_KEY,
+        super::relay_client::PAIRING_KEY,
+        super::relay_client::ACCESS_KEY,
+    ] {
+        assert!(crate::secrets::INTERNAL_KEYS.contains(&key), "{key} is not in secrets::INTERNAL_KEYS");
+    }
+    // And nothing in the list is a stray: each one is used by the phone link.
+    assert_eq!(crate::secrets::INTERNAL_KEYS.len(), 6);
+}
+
+#[test]
+fn the_whole_pairing_life_works_through_the_real_key_list() {
+    use pairing::tests::StrictStore;
+    use super::relay_client as relay;
+    let store = StrictStore::default();
+    pairing::load_or_create_identity(&store).unwrap();
+    let t1 = pairing::token(&store).unwrap();
+    let (room1, _) = relay::pairing(&store).unwrap();
+    relay::set_access_key(&store, &super::relay_crypto::base64url_encode(&[7u8; 32])).unwrap();
+    assert!(relay::access_key(&store).is_some());
+    // "Pair again"
+    let hub = Hub::new(Arc::new(Recorder::default()));
+    let token = Mutex::new(t1.clone());
+    super::renew_pairing(&hub, &token, &store).unwrap();
+    assert_ne!(*token.lock().unwrap(), t1);
+    assert_ne!(relay::pairing(&store).unwrap().0, room1);
+    // Clearing the access key goes through too.
+    relay::set_access_key(&store, "").unwrap();
+}
+
+#[test]
+fn a_key_outside_the_list_is_refused_by_the_strict_store() {
+    use pairing::tests::StrictStore;
+    use pairing::SecretStore;
+    assert!(StrictStore::default().set("phone-something-new", "x").is_err());
+}
+
+#[test]
+fn pairing_again_disconnects_the_phones_even_when_the_keystore_refuses_to_save() {
+    use pairing::tests::StrictStore;
+    use std::sync::atomic::Ordering;
+    block_on(async {
+        let rig = Rig::start().await;
+        let mut phone = Client::paired(&rig).await;
+        let store = StrictStore::default();
+        store.refuse_writes.store(true, Ordering::SeqCst);
+        let token = Mutex::new(TOKEN.to_string());
+        assert!(super::renew_pairing(&rig.hub, &token, &store).is_err());
+        // The error is reported, and the phone was cut off all the same.
+        assert_eq!(phone.expect("error").await["code"], "auth");
+        assert!(phone.closed().await);
+    });
+}
