@@ -52,6 +52,33 @@ The desktop side is in `windows/src-tauri/src/phone_link`; the protocol is `docs
 - **Widget, quick-settings tile, ongoing notification**: agent names and state words only. Updated when something changes, never on a timer.
 - Mochi and his 11 outfits, sounds, wardrobe (Settings), a tap on Mochi slaps him, a long press pets him.
 
+## Getting the phone link running on Windows
+
+1. Download the portable build from the repository's **Windows** workflow run (Actions, Windows, the `Coucou-Windows-portable`
+   artifact). It holds `coucou.exe` and `coucou-hook.exe`.
+2. **Close any other Coucou first.** An installed copy (for example in `C:\Program Files\Coucou`) starts at login and has no
+   phone link, so the phone would say "Connecting…" forever. Then start the portable `coucou.exe`.
+3. Settings > **Android phone** > turn **Phone link** on. It is off by default and listens on your local network only. If Windows
+   asks about the firewall, allow Coucou on **private** networks (a network marked *Public* blocks the phone).
+4. **Show pairing code**, then scan the QR code with the app (or paste the link). The phone and the computer must be on the same Wi-Fi.
+5. Optional, each with its own switch on the same page: session details, answers to questions, file changes, chat through the
+   computer's own keys, plan usage, services.
+
+What to know when you try approvals from the phone:
+
+- Only **Claude Code** (the command-line tool), Codex, Copilot CLI and Muse Code can be approved from Coucou or the phone. Requests
+  from the **Claude Desktop app** are asked in that app only: the computer declines them at once (`windows/src/island/agents.ts`,
+  `APPROVAL_AGENTS`; the same rule as on the Mac).
+- Claude Code must be in a mode that **asks**. In auto or bypass mode it never asks, so nothing reaches the phone. To test:
+  `claude --permission-mode default "…"`, or press Shift+Tab until it says manual mode.
+- The plan usage numbers also come from Claude Code's status line, so they update from the command-line tool and not from the
+  Claude Desktop app.
+- In Windows PowerShell, `claude` can be blocked by the script policy (`claude.ps1 cannot be loaded`). Run `claude.cmd`, use
+  Command Prompt, or allow local scripts for your user with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+For testing without a cable once the phone has been connected by USB once: `adb tcpip 5555`, then
+`adb connect <phone address>:5555`. It resets when the phone restarts or its address changes.
+
 ## Security rules the tests guard
 
 Certificate pinning and the pairing token; approval fingerprints, 120 s expiry and decide-once; the biometric gate for Allow;
