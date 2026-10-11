@@ -388,6 +388,8 @@ class LinkClientTest {
         client(d, rec, plain = true, backoff = longArrayOf(30), readTimeoutMs = 30_000).also { it.start() }.let { c ->
             assertTrue(rec.connected.await(5, TimeUnit.SECONDS))
             d.answerPings = false
+            // A pong already on its way would count as "heard from it since the question": let the in-flight ones land first.
+            Thread.sleep(500)
             now += 10_000 // the test's clock only moves when told to
             c.checkNow()
             assertEquals(LostReason.SILENT, rec.lost.poll(10, TimeUnit.SECONDS))
