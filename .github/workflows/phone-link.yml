@@ -23,11 +23,11 @@ jobs:
     runs-on: windows-latest
     defaults: { run: { working-directory: windows } }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: windows/package-lock.json }
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -44,14 +44,14 @@ jobs:
   interop:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - name: System libraries the Tauri app compiles against
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev libgtk-layer-shell-dev libsoup-3.0-dev libssl-dev libxdo-dev
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -64,7 +64,7 @@ jobs:
         run: |
           cargo build --release -p coucou-hook
           cargo test --workspace --locked
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
       - name: Kotlin client against the Rust desktop
@@ -77,9 +77,9 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: android/relay } }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: android/relay/package-lock.json }
       - run: npm ci
       - name: Types
@@ -97,14 +97,14 @@ jobs:
     # `wrangler dev` (workerd), then through the Node twin. Nothing is deployed; the relay listens on 127.0.0.1 only.
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
       - name: System libraries the Tauri app compiles against
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
             librsvg2-dev libgtk-layer-shell-dev libsoup-3.0-dev libssl-dev libxdo-dev
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
@@ -112,11 +112,11 @@ jobs:
             windows/target
           key: phone-link-linux-${{ hashFiles('windows/Cargo.lock') }}
           restore-keys: phone-link-linux-
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: android/relay/package-lock.json }
       - run: npm ci
         working-directory: android/relay
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
       - name: End to end through the Worker (workerd)
@@ -129,11 +129,11 @@ jobs:
     runs-on: ubuntu-24.04
     defaults: { run: { working-directory: android } }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with: { persist-credentials: false }
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: '17' }
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with: { node-version: '22' }
       - uses: gradle/actions/setup-gradle@v5
       - name: English strings are up to date
