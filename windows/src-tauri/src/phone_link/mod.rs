@@ -1,3 +1,4 @@
+// Copyright (c) 2026 Rhytam Biswas. MIT License, like the rest of Coucou; see android/LICENSE for the text.
 // The phone link: lets the Android app ("Coucou for Android") see the agents'
 // sessions and answer permission requests from the phone.
 // Protocol: docs/ANDROID_LINK.md.

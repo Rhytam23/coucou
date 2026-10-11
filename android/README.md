@@ -5,7 +5,7 @@ agents as Mochi on your phone and lets you approve or deny their permission requ
 through your computer's AI providers.
 
 The name, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission (see
-[PERMISSION.md](PERMISSION.md)). The code is under the MIT License. The app is free: no ads, no billing, no analytics.
+[PERMISSION.md](PERMISSION.md)). The Android code is © Rhytam Biswas under the MIT License (see [LICENSE](LICENSE)). The app is free: no ads, no billing, no analytics.
 It is English only and dark only. Not published anywhere: Louis must approve the build and the store listing first.
 
 ## Build and test

@@ -6,7 +6,7 @@
     "about_repo": "github.com/Louis-CFM/coucou",
     "licences_title": "Licences",
     "licences_intro": "The code of Coucou is MIT-licensed. The name, the character, the icon and the sounds are Louis Raillé's and are not. The libraries are listed with their licence.",
-    "about_assets": "The name Coucou, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission. The code is released under the MIT License.",
+    "about_assets": "The name Coucou, the Mochi character, the icon and the sounds are © Louis Raillé and used with permission. The Android code is © Rhytam Biswas, released under the MIT License.",
     "action_allow": "Allow",
     "action_deny": "Deny",
     "action_close": "Close",
