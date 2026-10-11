@@ -1779,3 +1779,42 @@ fn over_the_wire_a_10000_character_command_is_flagged_and_allow_does_nothing() {
         assert_eq!(rig.decisions(), vec![("req-long".to_string(), false)]);
     });
 }
+
+// ── Which window may call which command ──
+
+#[test]
+fn only_the_right_window_may_call_a_command_that_changes_something() {
+    use super::{caller_allowed, Caller};
+    assert!(caller_allowed("settings", Caller::Settings));
+    assert!(caller_allowed("island", Caller::Island));
+    for other in ["island", "mochi", "", "Settings", "settings ", "main", "settings2"] {
+        assert!(!caller_allowed(other, Caller::Settings), "{other:?} must not act as the settings window");
+    }
+    for other in ["settings", "mochi", "", "Island", "island ", "main"] {
+        assert!(!caller_allowed(other, Caller::Island), "{other:?} must not act as the island");
+    }
+}
+
+/// Reads mod.rs: every `#[tauri::command]` that is not a plain read of a status must check the calling window. A command added later
+/// without the check fails here, which is how phone_link_set_enabled (it starts a network server) was found.
+#[test]
+fn every_command_that_changes_something_checks_the_calling_window() {
+    let source = include_str!("mod.rs");
+    let mut seen = 0;
+    for chunk in source.split("#[tauri::command]\n").skip(1) {
+        let name = chunk.split("pub fn ").nth(1).and_then(|r| r.split('(').next()).expect("a command has a name");
+        let end = chunk.find("\n}\n").expect("a command ends");
+        let body = &chunk[..end];
+        seen += 1;
+        if name.ends_with("_status") {
+            // Reads only. None of them returns a secret: the relay's access key is reported as a yes/no.
+            assert!(!body.contains("settings::save") && !body.contains(".start()") && !body.contains(".stop()"), "{name} changes something");
+            continue;
+        }
+        assert!(
+            body.contains("window: WebviewWindow") && (body.contains("only_settings(&window)") || body.contains("only_island(&window)")),
+            "{name} changes something but does not check the calling window"
+        );
+    }
+    assert!(seen >= 25, "the test must see the commands (saw {seen})");
+}

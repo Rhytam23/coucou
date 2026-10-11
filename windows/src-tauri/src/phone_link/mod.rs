@@ -286,14 +286,17 @@ pub fn phone_link_status(link: State<PhoneLink>, shared: State<Shared>) -> Statu
     status_of(&link, enabled)
 }
 
-/// Turns the link on or off. Only ever from the switch in Settings → Phone.
+/// Turns the link on or off. Only ever from the switch in Settings → Phone (the calling window is checked).
 #[tauri::command]
 pub fn phone_link_set_enabled(
     app: AppHandle,
+    window: WebviewWindow,
     link: State<PhoneLink>,
     shared: State<Shared>,
     enabled: bool,
 ) -> Result<Status, String> {
+    // It starts a network server: only the switch in Settings may do it.
+    only_settings(&window)?;
     if enabled {
         link.start()?;
     } else {
@@ -315,9 +318,7 @@ pub fn phone_link_set_enabled(
 /// is the secret that lets a phone in.
 #[tauri::command]
 pub fn phone_link_pairing(window: WebviewWindow, link: State<PhoneLink>) -> Result<Pairing, String> {
-    if window.label() != "settings" {
-        return Err("only the settings window may show the pairing code".into());
-    }
+    only_settings(&window)?;
     let running = link.running.lock().unwrap();
     let r = running.as_ref().ok_or("the phone link is off")?;
     pairing_of(&link, r)
@@ -363,9 +364,7 @@ fn renew_pairing(hub: &Hub, token: &Mutex<String>, store: &dyn SecretStore) -> R
 /// pair again.
 #[tauri::command]
 pub fn phone_link_new_pairing(window: WebviewWindow, link: State<PhoneLink>) -> Result<Pairing, String> {
-    if window.label() != "settings" {
-        return Err("only the settings window may change the pairing".into());
-    }
+    only_settings(&window)?;
     let running = link.running.lock().unwrap();
     let r = running.as_ref().ok_or("the phone link is off")?;
     renew_pairing(&link.hub, &r.shared.token, &*link.store)?;
@@ -668,29 +667,35 @@ pub fn phone_services_set(
 
 /// What the island's service pills show, for phones whose user allowed those services.
 #[tauri::command]
-pub fn phone_link_publish_services(link: State<PhoneLink>, services: Vec<hub::ServiceIn>) {
+pub fn phone_link_publish_services(window: WebviewWindow, link: State<PhoneLink>, services: Vec<hub::ServiceIn>) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.publish_services(services);
+    Ok(())
 }
 
 /// The plan usage the island shows, for phones that have `usage`.
 #[tauri::command]
-pub fn phone_link_publish_usage(link: State<PhoneLink>, usage: hub::UsageIn) {
+pub fn phone_link_publish_usage(window: WebviewWindow, link: State<PhoneLink>, usage: hub::UsageIn) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.publish_usage(usage);
+    Ok(())
 }
 
 /// The island's answer to a phone's request for a file's diff (event "phone-link-getdiff").
 #[tauri::command]
-pub fn phone_link_send_diff(link: State<PhoneLink>, conn: u64, diff: hub::DiffIn) {
+pub fn phone_link_send_diff(window: WebviewWindow, link: State<PhoneLink>, conn: u64, diff: hub::DiffIn) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.send_diff(conn, diff);
+    Ok(())
 }
 
 // ── Chat from the phone: the switch and the list of models (Settings → Android phone) ──
@@ -703,11 +708,36 @@ pub struct ChatStatus {
     pub models: Vec<String>,
 }
 
+/// The window a command that changes something may be called from. Every such command checks it, and `tests.rs` reads this file to
+/// prove that none was added without a check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Caller {
+    Settings,
+    Island,
+}
+
+fn caller_allowed(label: &str, who: Caller) -> bool {
+    match who {
+        Caller::Settings => label == "settings",
+        Caller::Island => label == island::WINDOW_LABEL,
+    }
+}
+
 fn only_settings(window: &WebviewWindow) -> Result<(), String> {
-    if window.label() == "settings" {
+    if caller_allowed(window.label(), Caller::Settings) {
         Ok(())
     } else {
         Err("only the settings window may change what the phone can use".into())
+    }
+}
+
+/// The island is the one window that knows the sessions and the pending request; what it publishes goes to phones, so no other
+/// window may publish.
+fn only_island(window: &WebviewWindow) -> Result<(), String> {
+    if caller_allowed(window.label(), Caller::Island) {
+        Ok(())
+    } else {
+        Err("only the island may publish to the phone".into())
     }
 }
 
@@ -771,29 +801,35 @@ pub fn phone_chat_set_models(
 
 /// The question Claude Code is waiting on (None: none), for phones that may answer it.
 #[tauri::command]
-pub fn phone_link_publish_question(link: State<PhoneLink>, question: Option<hub::QuestionIn>) {
+pub fn phone_link_publish_question(window: WebviewWindow, link: State<PhoneLink>, question: Option<hub::QuestionIn>) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.publish_question(question, server::now_ms());
+    Ok(())
 }
 
 /// What Mochi wears on the computer, for phones that asked for `prefs`.
 #[tauri::command]
-pub fn phone_link_publish_prefs(link: State<PhoneLink>, outfit: String) {
+pub fn phone_link_publish_prefs(window: WebviewWindow, link: State<PhoneLink>, outfit: String) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.publish_outfit(&outfit);
+    Ok(())
 }
 
 /// The island's picture of its sessions and of the request waiting for an answer.
 #[tauri::command]
-pub fn phone_link_publish(link: State<PhoneLink>, sessions: Vec<SessionIn>, approval: Option<ApprovalIn>) {
+pub fn phone_link_publish(window: WebviewWindow, link: State<PhoneLink>, sessions: Vec<SessionIn>, approval: Option<ApprovalIn>) -> Result<(), String> {
+    only_island(&window)?;
     if link.running.lock().unwrap().is_none() {
-        return;
+        return Ok(());
     }
     link.hub.publish(sessions, approval, server::now_ms());
+    Ok(())
 }
 
 /// The app is quitting: withdraw the announcement so phones forget this computer at once.
