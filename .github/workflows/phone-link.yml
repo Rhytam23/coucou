@@ -1,15 +1,21 @@
 name: Phone link
 
-# Fork-only checks for the Android phone link (windows/src-tauri/src/phone_link):
+# Checks for the Android phone link (windows/src-tauri/src/phone_link):
 # the desktop tests on Windows, and the Kotlin client against the real Rust
 # server on Linux. Builds nothing that is published and uploads no artifact.
 
 on:
-  push:
-    branches: [android]
+  pull_request:
     paths:
-      - 'windows/**'
-      - 'android/**'
+      - 'windows/src-tauri/src/phone_link/**'
+      - 'android/app/src/**'
+      - 'docs/ANDROID_LINK.md'
+      - '.github/workflows/phone-link.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'windows/src-tauri/src/phone_link/**'
+      - 'android/app/src/**'
       - 'docs/ANDROID_LINK.md'
       - 'docs/RELAY_LINK.md'
       - '.github/workflows/phone-link.yml'
@@ -119,6 +125,9 @@ jobs:
       - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v5
+      - name: The hook binary the Tauri build expects (a cold cache does not have it)
+        working-directory: windows
+        run: cargo build --release -p coucou-hook
       - name: End to end through the Worker (workerd)
         env: { WRANGLER_SEND_METRICS: "false" }
         run: android/relay/tools/e2e.sh worker
