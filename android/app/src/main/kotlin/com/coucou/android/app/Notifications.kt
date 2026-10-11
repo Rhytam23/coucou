@@ -32,6 +32,7 @@ class Notifications(private val context: Context) {
 
     init {
         nm.deleteNotificationChannel("approvals")
+        nm.deleteNotificationChannel("approvals_v2")
         nm.createNotificationChannel(
             NotificationChannel(CH_LINK, "Connection", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows that Coucou is connected to your computer"
@@ -58,7 +59,7 @@ class Notifications(private val context: Context) {
                 // A short buzz, so a request is felt even when the notification volume is 0 (a channel cannot change
                 // later, which is why this one has a new id).
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 120, 250)
+                vibrationPattern = longArrayOf(0, 500, 150, 500)
                 // Mochi's own approval sound, bundled in res/raw.
                 setSound(
                     Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.approval}"),
@@ -141,6 +142,19 @@ class Notifications(private val context: Context) {
             }
             .build()
         runCatching { nm.notify(id, n) } // POST_NOTIFICATIONS may be denied: the in-app card still works
+        if (alert == OverlayPolicy.ApprovalAlert.HEADS_UP) wakeScreen()
+    }
+
+    /**
+     * A request on a sleeping phone lights the screen for a few seconds, so the lock screen shows the notification
+     * ("Unlock to see the request"). The phone stays locked; nothing about the command is shown.
+     */
+    @Suppress("DEPRECATION")
+    private fun wakeScreen() = runCatching {
+        val pm = context.getSystemService(android.os.PowerManager::class.java)
+        if (pm.isInteractive) return@runCatching
+        pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "coucou:approval")
+            .acquire(WAKE_MS)
     }
 
     fun cancelApproval(fp: String) = nm.cancel(idFor(fp))
@@ -194,7 +208,8 @@ class Notifications(private val context: Context) {
 
     companion object {
         const val CH_LINK = "link"
-        const val CH_APPROVAL = "approvals_v2"
+        private const val WAKE_MS = 6_000L
+        const val CH_APPROVAL = "approvals_v3"
         const val CH_APPROVAL_QUIET = "approvals_quiet"
         const val CH_UPDATES = "updates"
         private const val STATUS_TAG = "status"
