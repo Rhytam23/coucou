@@ -144,7 +144,14 @@ class IslandOverlay(
 
     /** True when the island is on screen showing a request: the notification can then stay quiet. */
     fun isShowingRequest(): Boolean =
-        view != null && timeline.phase == IslandTimeline.Phase.OPEN && timeline.current?.kind == IslandSpec.Kind.APPROVAL
+        view != null && timeline.phase == IslandTimeline.Phase.OPEN && timeline.current?.kind == IslandSpec.Kind.APPROVAL &&
+            seenByUser()
+
+    /** The island is a window of its own: nobody sees it with the screen off, in a screen saver or behind the lock screen. */
+    private fun seenByUser(): Boolean = runCatching {
+        context.getSystemService(android.os.PowerManager::class.java).isInteractive &&
+            !context.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+    }.getOrDefault(false)
 
     /** The island is a nicety on top of the app: nothing that goes wrong with the window may reach the caller. */
     private inline fun safely(block: () -> Unit) {
