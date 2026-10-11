@@ -15,18 +15,21 @@ Louis asked for a short screen recording of the main flow. Nothing is published:
 1. Home, connected, Mochi and the agent card (5 s).
 2. Lock the phone. In the terminal, ask Claude Code to write `demo.txt` (10 s).
 3. The screen lights up with the notification: "Approval needed / Unlock to see the request" (8 s).
-4. Unlock, open the request, show what it will do, tap Allow, the fingerprint prompt, the terminal continues (20 s).
-5. A second request: tap Deny, the terminal says it was denied (15 s).
+4. Unlock and tap Allow with the fingerprint. The phone screen is black here, so cut to the PC with the caption "Request sent for approval", then the terminal continuing (20 s).
+5. A second request: the PC shows it waiting, Deny on the phone, the terminal says it was denied, caption "Denied on the phone" (15 s).
 6. Plan usage and the Chat tab, if switched on (15 s).
 7. Settings > About and Licences: the attribution to Louis (10 s).
 
 ## The one catch: secure screens record black
 
-The pairing, chat and approval screens are marked secure on purpose (so nothing sensitive can be captured). A screen
-recording of them is black. Do not remove that protection for the video. Options:
+The pairing, chat and approval screens are marked secure on purpose, so a screen recording of them is black. The video
+does not remove that protection. During those seconds it shows the request from the other side instead:
 
-- Film those few seconds with another phone pointed at the screen; or
-- Record only the parts that are not secure, and show the approval through the PC side and the notification.
+- Record the PC screen at the same time (the terminal waiting on the permission, and Coucou's island or card on the PC).
+- Put a caption over the black part: **"Request sent for approval"**, then **"Approved on the phone (fingerprint)"** or
+  **"Denied on the phone"**. Add the captions when editing (any video editor, or the Windows Clipchamp).
+- Cut between the phone (notification, Home, Settings, About) and the PC (terminal and island), so the viewer always sees
+  something real. Use the other phone as a camera only if Louis wants to see the approval sheet itself.
 
 ## How to record
 
