@@ -35,6 +35,55 @@ enum VoiceSettings {
         set { UserDefaults.standard.set(newValue, forKey: captionEnabledKey) }
     }
 
+    /// Language Coucou ANSWERS in: "en" (default) or "fr".
+    static var language: String {
+        get { UserDefaults.standard.string(forKey: "voiceLanguage") ?? "en" }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceLanguage") }
+    }
+    static var answerLocale: Locale { Locale(identifier: language == "fr" ? "fr-FR" : "en-US") }
+
+    /// Language Coucou LISTENS to: "auto" (the Mac's dictation language, default), "en" or "fr".
+    /// Independent from the answer language: speak French, hear English.
+    static var listenLanguage: String {
+        get { UserDefaults.standard.string(forKey: "voiceListenLanguage") ?? "auto" }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceListenLanguage") }
+    }
+
+    /// Coucou already offered to answer in the language you speak (asked once).
+    static var languageOfferDone: Bool {
+        get { UserDefaults.standard.bool(forKey: "voiceLanguageOfferDone") }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceLanguageOfferDone") }
+    }
+
+    /// Voice used to answer: "system" (macOS voices) or "elevenlabs" (user's API key).
+    static var ttsEngine: String {
+        get { UserDefaults.standard.string(forKey: "voiceTTSEngine") ?? "system" }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceTTSEngine") }
+    }
+    /// ElevenLabs voice: "female" (default) or "male".
+    static var elevenGender: String {
+        get { UserDefaults.standard.string(forKey: "voiceElevenGender") ?? "female" }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceElevenGender") }
+    }
+
+    /// Mac voice pitch per voice type (Settings → Voice). The male default is higher than
+    /// the voice's own, so it sounds younger. Range 0.8–1.6 (AVSpeech accepts 0.5–2).
+    static let defaultPitchFemale = 1.1
+    static let defaultPitchMale   = 1.25
+    static func pitchKey(for gender: String) -> String { gender == "male" ? "voicePitchMale" : "voicePitchFemale" }
+    static func pitch(for gender: String) -> Double {
+        let v = UserDefaults.standard.double(forKey: pitchKey(for: gender))
+        let fallback = gender == "male" ? defaultPitchMale : defaultPitchFemale
+        return v == 0 ? fallback : min(1.6, max(0.8, v))
+    }
+
+    /// Questions answered with a web search by Claude, with the user's own Anthropic API
+    /// key. Off by default: the question leaves the Mac only once this is turned on.
+    static var webSearchEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "voiceWebSearchEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "voiceWebSearchEnabled") }
+    }
+
     /// Weather by voice (Open-Meteo, no key). Off by default: network only when the user
     /// turned it on and set a city.
     static var weatherEnabled: Bool {

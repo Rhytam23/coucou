@@ -31,7 +31,9 @@ final class VoiceEngine: ObservableObject {
     @Published private(set) var commandTranscript: String = ""
     @Published private(set) var recognizerUnavailable: Bool = false
     @Published private(set) var audioError: String? = nil
-    @Published private(set) var micLevel: Double = 0
+    /// Read by Mochi's canvas every frame; not published, so ~20 updates/s while I talk
+    /// don't re-render Settings or the island views.
+    private(set) var micLevel: Double = 0
 
     // MARK: - Pause reasons
 
@@ -126,12 +128,20 @@ final class VoiceEngine: ObservableObject {
 
     func cancelListening() { endCommand(postFinished: false) }
 
+    /// Settings → Voice language changed: restart recognition in the new language.
+    func reloadLanguage() {
+        guard audio != nil else { return }
+        stopAudioPipeline()
+        if isEnabled && !isPaused { startAudioPipeline() }
+        VoiceBrain.shared.endConversation()   // next session gets instructions in the new language
+    }
+
     /// Start the next conversation turn (re-listen for 8 s without wake phrase).
     /// Called by IslandWindowController after showing a command result.
-    func startConversationTurn() {
+    func startConversationTurn(firstWordTimeout: TimeInterval = 8.0) {
         isInConversation = true
         audio?.resetVAD()
-        startListeningDirectly(firstWordTimeout: 8.0)
+        startListeningDirectly(firstWordTimeout: firstWordTimeout)
     }
 
     /// End the conversation window and return to normal wake-phrase mode.
@@ -181,7 +191,8 @@ final class VoiceEngine: ObservableObject {
             Task { @MainActor in self?.endCommand(postFinished: true) }
         }
         commandMaxWork = maxItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.directListenMaxTime, execute: maxItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(Self.directListenMaxTime, firstWordTimeout + 10),
+                                      execute: maxItem)
     }
 
     /// Locale used for the current recognition session — nil if pipeline is not running.
@@ -345,7 +356,8 @@ final class VoiceEngine: ObservableObject {
         stopAudioStallTask()
         stallTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 500_000_000)
+                // Tolerance lets macOS batch this wakeup with others (stall seen in 2–3 s).
+                try? await Task.sleep(for: .milliseconds(500), tolerance: .milliseconds(400))
                 guard let self, let audio = self.audio else { return }
                 // Grace period: don't fire within stallTimeout of pipeline start.
                 let sinceStart = Date().timeIntervalSince(self.pipelineStartTime)
@@ -456,10 +468,13 @@ final class VoiceEngine: ObservableObject {
         // A short noise (cough, click) legitimately gives no text: only count windows
         // where speech went on for a while.
         guard elapsed >= 3 else { return }
+        // Music without words gives no text either: while music plays it takes 6 silent
+        // windows, not 2, before a rebuild (each costs a restart and ~0.5 s of deafness).
+        let music = AppState.shared.musicPlaying || SpotifyController.shared.isPlaying
         deafWindows += 1
-        if deafWindows >= 2 {
+        if deafWindows >= (music ? 6 : 2) {
             deafWindows = 0
-            appendAppLog("nb.log", "[Voice] recognizer returned nothing for 2 windows, rebuilding")
+            appendAppLog("nb.log", "[Voice] recognizer returned nothing for \(music ? 6 : 2) windows, rebuilding")
             triggerPipelineRebuild(reason: "recognizer deaf")
         }
     }
@@ -594,6 +609,8 @@ final class VoiceEngine: ObservableObject {
     private func commandUpdate(_ command: String) {
         // Semi-duplex: ignore updates while Coucou is speaking.
         guard !VoiceSpeaker.shared.isBusy else { return }
+        // The recognizer often repeats the same partial: no update, no re-render.
+        guard command != commandTranscript else { return }
         commandTranscript = command
         let wc = command.split(separator: " ").count
         if wc > lastWordCount {
@@ -656,8 +673,16 @@ final class VoiceEngine: ObservableObject {
     // MARK: - Helpers
 
     private func suitableLocale() -> Locale? {
-        var candidates = MacDictation.automaticLocales()
-        candidates += [Locale(identifier: "fr-FR"), Locale(identifier: "en-US")]
+        // The language I speak (Settings → Voice → "You speak"): automatic = the Mac's
+        // dictation languages first. The answer language is separate (VoiceSettings.language).
+        var candidates: [Locale]
+        switch VoiceSettings.listenLanguage {
+        case "fr": candidates = [Locale(identifier: "fr-FR"), Locale(identifier: "fr-CA")]
+        case "en": candidates = [Locale(identifier: "en-US"), Locale(identifier: "en-GB"), Locale(identifier: "en-AU")]
+        default:   candidates = []
+        }
+        candidates += MacDictation.automaticLocales()
+        candidates += [Locale(identifier: "en-US"), Locale(identifier: "fr-FR")]
         for locale in candidates {
             if let r = SFSpeechRecognizer(locale: locale),
                r.supportsOnDeviceRecognition, r.isAvailable {

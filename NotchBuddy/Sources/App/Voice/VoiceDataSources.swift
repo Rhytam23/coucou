@@ -164,41 +164,35 @@ final class LiveVoiceInfo: VoiceInfoProviding {
                      resetsIn: reset.map { duration($0.timeIntervalSinceNow, fr: fr, units: 2) })
     }
 
-    // MARK: Mail — prepare only, the user clicks Send
+    // MARK: Guided email — the island's mail card, sent only on the user's click
 
-    func composeMail(_ request: VoiceQuery.MailRequest, locale: Locale?) async -> VoiceActionResult {
-        let fr = Self.isFrench(locale)
-        func t(_ f: String, _ e: String) -> String { fr ? f : e }
+    func resolveEmail(_ recipient: String) async -> String? {
+        if let e = VoiceQuery.spokenEmail(recipient) { return e }
+        return await ContactLookup.email(for: recipient)
+    }
 
-        guard let address = await ContactLookup.email(for: request.recipient) else {
-            return .init(outcome: .failure,
-                         message: t("Je ne trouve pas l'adresse de \(request.recipient) dans tes contacts.",
-                                    "I can't find \(request.recipient)'s address in your contacts."))
-        }
-        var fileURL: URL? = nil
-        if let name = request.file {
-            fileURL = FileLookup.find(name, in: request.folder)
-            if fileURL == nil {
-                return .init(outcome: .failure,
-                             message: t("Je ne trouve pas le fichier « \(name) ».", "I can't find the file “\(name)”."))
-            }
-        }
+    func findFile(_ name: String, folder: VoiceQuery.MailRequest.Folder?) -> URL? {
+        FileLookup.find(name, in: folder)
+    }
 
-        if let fileURL, let service = NSSharingService(named: .composeEmail) {
-            service.recipients = [address]
-            service.subject = fileURL.deletingPathExtension().lastPathComponent
-            service.perform(withItems: [fileURL])
-            return .init(outcome: .success,
-                         message: t("Mail prêt pour \(request.recipient) avec \(fileURL.lastPathComponent). Tu n'as plus qu'à cliquer sur Envoyer.",
-                                    "Email to \(request.recipient) with \(fileURL.lastPathComponent) is ready. Just click Send."))
-        }
-        guard let url = URL(string: "mailto:\(address)") else {
-            return .init(outcome: .failure, message: t("Je n'arrive pas à ouvrir Mail.", "I can't open Mail."))
-        }
-        NSWorkspace.shared.open(url)
-        return .init(outcome: .success,
-                     message: t("Mail prêt pour \(request.recipient). Écris ton message et clique sur Envoyer.",
-                                "Email to \(request.recipient) is ready. Write it and click Send."))
+    func draftBody(to recipient: String, about instruction: String) async -> String? {
+        await VoiceBrain.draftMail(to: recipient, about: instruction)
+    }
+
+    func showMailCard(to address: String, subject: String, body: String, file: URL?) {
+        let app = AppState.shared
+        app.voiceMailDraft = VoiceMailDraft(to: address, subject: subject, body: body)
+        app.droppedFile = file.map { DroppedFile(url: $0, name: $0.lastPathComponent) }
+        NotificationCenter.default.post(name: .voiceShowMailCard, object: nil)
+    }
+
+    // MARK: Web search (opt-in, the user's Anthropic key)
+
+    var webSearchEnabled: Bool { VoiceSettings.webSearchEnabled }
+    var hasWebKey: Bool { !(ClaudeService.shared.apiKey ?? "").isEmpty }
+
+    func webAnswer(_ question: String, history: [VoiceWebTurn], french: Bool) async -> String? {
+        await ClaudeService.shared.voiceAnswer(question, history: history, french: french)
     }
 
     // MARK: Apps
@@ -341,7 +335,8 @@ enum FileLookup {
         case .downloads: dirs = [.downloadsDirectory]
         case .desktop:   dirs = [.desktopDirectory]
         case .documents: dirs = [.documentDirectory]
-        case nil:        dirs = [.downloadsDirectory, .desktopDirectory, .documentDirectory]
+        case .pictures:  dirs = [.picturesDirectory]
+        case nil:        dirs = [.downloadsDirectory, .desktopDirectory, .documentDirectory, .picturesDirectory]
         }
         let wanted = IntentParser.normalise(query).split(separator: " ").map(String.init)
         guard !wanted.isEmpty else { return nil }
@@ -353,7 +348,8 @@ enum FileLookup {
             for case let url as URL in e {
                 if e.level > 2 { e.skipDescendants(); continue }
                 guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else { continue }
-                let name = IntentParser.normalise(url.deletingPathExtension().lastPathComponent)
+                // "Goku.png" normalises to "gokupng": compare with the full file name too.
+                let name = IntentParser.normalise(url.lastPathComponent)
                 let ext  = url.pathExtension.lowercased()
                 let ok = wanted.allSatisfy { w in name.contains(w) || ext == w }
                 guard ok else { continue }
