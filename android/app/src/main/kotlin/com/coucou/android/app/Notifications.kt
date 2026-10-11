@@ -31,6 +31,7 @@ class Notifications(private val context: Context) {
     private val nm = context.getSystemService(NotificationManager::class.java)
 
     init {
+        nm.deleteNotificationChannel("approvals")
         nm.createNotificationChannel(
             NotificationChannel(CH_LINK, "Connection", NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows that Coucou is connected to your computer"
@@ -54,6 +55,10 @@ class Notifications(private val context: Context) {
         nm.createNotificationChannel(
             NotificationChannel(CH_APPROVAL, "Approvals", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "An agent is waiting for your permission"
+                // A short buzz, so a request is felt even when the notification volume is 0 (a channel cannot change
+                // later, which is why this one has a new id).
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 120, 250)
                 // Mochi's own approval sound, bundled in res/raw.
                 setSound(
                     Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.approval}"),
@@ -189,7 +194,7 @@ class Notifications(private val context: Context) {
 
     companion object {
         const val CH_LINK = "link"
-        const val CH_APPROVAL = "approvals"
+        const val CH_APPROVAL = "approvals_v2"
         const val CH_APPROVAL_QUIET = "approvals_quiet"
         const val CH_UPDATES = "updates"
         private const val STATUS_TAG = "status"
