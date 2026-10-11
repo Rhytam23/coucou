@@ -255,7 +255,7 @@ The relay transport lives inside the same service. Design:
 - Louis's `relay/` is a Cloudflare Worker that holds his **APNs key** and does one job: Live Activity pushes for the iPhone. It is
   not touched.
 - The Android fork would add a **separate, key-less, user-deployed** relay (`android/relay/`, never under his `relay/`), used only
-  by the unofficial Android port, **off by default, with no URL built in**, and nothing flows to any server he runs or pays for.
+  by Coucou for Android, **off by default, with no URL built in**, and nothing flows to any server he runs or pays for.
 - The PC-side part sits in `windows/src-tauri/src/phone_link/` behind an opt-in switch; if he ever wants it upstream it is a
   small, self-contained, reviewed change, and no PR is opened without the user's decision.
 - No telemetry, no accounts, no third party in the data path except the user's own Cloudflare account, and the payload is

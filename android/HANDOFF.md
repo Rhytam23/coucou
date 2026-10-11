@@ -5,14 +5,14 @@ For a new coding session with no memory of the earlier work.
 ## What this is
 
 **Coucou** (https://github.com/Louis-CFM/coucou, by Louis Raillé) is a macOS app, with a Windows/Linux Tauri port in `windows/`, where
-**Mochi** shows the state of AI coding agents and lets the user approve their permission requests. **Our project** is an unofficial
+**Mochi** shows the state of AI coding agents and lets the user approve their permission requests. **Our project** is the
 Android port in `android/` (Kotlin + Compose), built by Rhytam Biswas (`Rhytam23`) with Claude on branch `android` of the fork
 `Rhytam23/coucou` (`upstream` = Louis-CFM/coucou, read-only for us).
 
 ## Rules that must never be broken
 
 Louis agreed by email (`PERMISSION.md`): Mochi, the sounds, visuals, icon and the name "Coucou for Android" for this Android app only, and
-only if it is **free (no ads, paid features or analytics; CI greps for them)**, shows the visible "unofficial port" notice with a link to his
+only if it is **free (no ads, paid features or analytics; CI greps for them)**, credits him in the app (About and Licences) with a link to his
 repo, keeps the MIT notice, and **he approves the build and the store listing BEFORE anything is published**. Pushing source to the fork is fine.
 Never create a release, upload an APK, submit to a store, or open a PR to `upstream` without the user saying so.
 

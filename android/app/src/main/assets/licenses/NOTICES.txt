@@ -1,6 +1,6 @@
 COUCOU FOR ANDROID: LICENCES AND NOTICES
 
-Coucou for Android is an unofficial Android port based on Coucou by Louis Raillé (https://github.com/Louis-CFM/coucou). It is free, has no ads and no analytics.
+Coucou for Android, by Rhytam Biswas, is part of Coucou by Louis Raillé (https://github.com/Louis-CFM/coucou). It is free, has no ads and no analytics.
 
 1. The code of Coucou
 

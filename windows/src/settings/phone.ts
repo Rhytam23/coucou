@@ -10,6 +10,12 @@ import { t } from "../i18n/i18n";
 
 type Toggle = (on: boolean, onChange: (v: boolean) => void) => HTMLElement;
 
+/**
+ * The relay block ("Away from home Wi-Fi") is hidden until a relay is ready to use: the code and its tests stay, and
+ * turning this on shows it again. Nothing else changes.
+ */
+const SHOW_RELAY_SETTINGS = false;
+
 export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings): HTMLElement {
   const detail = h("div", {});
   const note = h("div", { class: "hint" });
@@ -58,7 +64,7 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
       h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
       h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
       h("div", { class: "hint", text: t("Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.") }),
-      relayBlock(makeToggle, () => void refreshPairing()),
+      ...(SHOW_RELAY_SETTINGS ? [relayBlock(makeToggle, () => void refreshPairing())] : []),
       detailsBlock(makeToggle),
       answersBlock(makeToggle),
       diffsBlock(makeToggle),

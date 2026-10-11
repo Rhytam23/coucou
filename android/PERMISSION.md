@@ -1,3 +1,5 @@
+> Update 2026-10-11: Android is now part of the official Coucou repository. Louis Raillé agreed (email) to the licence wording; the name, Mochi, the icon and the sounds are covered by `../LICENSE-ASSETS.md`, where Android is added on his side. This file keeps the history of the original permission, which still applies: the app is free, and nothing is published before both agree.
+
 # Permission from the author
 
 Coucou's name, the Mochi character, the app icon, the sounds and the visuals are

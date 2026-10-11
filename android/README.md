@@ -1,6 +1,6 @@
-# Coucou for Android (unofficial)
+# Coucou for Android
 
-An unofficial Android port based on [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé. It shows your coding
+The Android app of [Coucou](https://github.com/Louis-CFM/coucou) by Louis Raillé, by Rhytam Biswas. It shows your coding
 agents as Mochi on your phone and lets you approve or deny their permission requests, answer their questions and chat
 through your computer's AI providers.
 
