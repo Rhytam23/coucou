@@ -176,6 +176,8 @@
     "session_details": "Details",
     "session_last": "Last message",
     "session_steps": "Steps",
+    "session_step_working": "Working",
+    "session_step_done": "Step done",
     "session_no_steps": "No steps yet.",
     "session_hint": "Turn on “Show session details on the phone” in your computer's Settings to see the steps and the last message here.",
     "session_ended": "This session is no longer running.",
