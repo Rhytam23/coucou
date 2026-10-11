@@ -30,6 +30,13 @@ class ApprovalSheetPlanTest {
         assertFalse(ApprovalSheetPlan.action("Bash").contains("rm"))
     }
 
+    @Test fun aCommandThatWasCutIsNeverAllowedFromThePhone() {
+        assertTrue(ApprovalSheetPlan.canAllowHere(r("a")))
+        assertFalse(ApprovalSheetPlan.canAllowHere(r("a").copy(truncated = true)))
+        // 10,000 characters, as the computer would send them: the first 500 and the flag.
+        assertFalse(ApprovalSheetPlan.canAllowHere(ApprovalRequest("p", "a", "Bash", "x".repeat(500), 0L, truncated = true)))
+    }
+
     @Test fun earlyTapsAreIgnoredLikeOnTheIsland() {
         assertEquals(OverlayPolicy.TAP_GUARD_MS.toLong(), ApprovalSheetPlan.GUARD_MS)
     }

@@ -400,12 +400,14 @@ class IslandOverlay(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PillButton(stringResource(R.string.action_deny), { tap("Deny") { onDeny(fingerprint) } }, Modifier.weight(1f), onDark = true)
-                PillButton(
-                    stringResource(R.string.action_allow), { tap("Allow") { onAllow(fingerprint) } }, Modifier.weight(1f), PillKind.PRIMARY, onDark = true,
-                    icon = { CoucouIcon(IconKind.LOCK, tint = Color(IslandSurface.ON_PRIMARY), size = 18.dp) },
-                )
+                if (s.canAllow) {
+                    PillButton(
+                        stringResource(R.string.action_allow), { tap("Allow") { onAllow(fingerprint) } }, Modifier.weight(1f), PillKind.PRIMARY, onDark = true,
+                        icon = { CoucouIcon(IconKind.LOCK, tint = Color(IslandSurface.ON_PRIMARY), size = 18.dp) },
+                    )
+                }
             }
-            Text(stringResource(R.string.approval_hint), style = TypeScale.LABEL.style(dim), maxLines = 2)
+            Text(stringResource(if (s.canAllow) R.string.approval_hint else R.string.approval_on_computer), style = TypeScale.LABEL.style(dim), maxLines = 2)
         }
     }
 

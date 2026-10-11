@@ -57,6 +57,16 @@ class ProtocolTest {
         assertNull(Wire.decodeServer("""{"type":"approval","pillId":"p","fingerprint":"${fp.uppercase()}","tool":"Bash","command":"ls","createdAt":5}"""))
     }
 
+    @Test fun aCutCommandIsFlaggedAndAnOldComputerMeansNotCut() {
+        val cut = Wire.decodeServer("""{"type":"approval","pillId":"p","fingerprint":"$fp","tool":"Bash","command":"ls","truncated":true,"createdAt":5}""") as ServerMsg.Approval
+        assertTrue(cut.request.truncated)
+        val whole = Wire.decodeServer("""{"type":"approval","pillId":"p","fingerprint":"$fp","tool":"Bash","command":"ls","truncated":false,"createdAt":5}""") as ServerMsg.Approval
+        assertFalse(whole.request.truncated)
+        // A computer from before the flag sends nothing: that is how it always was, so not cut.
+        val old = Wire.decodeServer("""{"type":"approval","pillId":"p","fingerprint":"$fp","tool":"Bash","command":"ls","createdAt":5}""") as ServerMsg.Approval
+        assertFalse(old.request.truncated)
+    }
+
     @Test fun malformedInputNeverThrows() {
         for (bad in listOf("", "not json", "{}", """{"type":1}""", """{"type":"sessions"}""", """{"type":"welcome"}""", """{"type":"nope"}""", "[]")) {
             assertNull(bad, Wire.decodeServer(bad))

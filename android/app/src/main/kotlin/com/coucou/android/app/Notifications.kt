@@ -13,6 +13,7 @@ import android.net.Uri
 import android.util.Log
 import com.coucou.android.MainActivity
 import com.coucou.android.R
+import com.coucou.android.core.ApprovalSheetPlan
 import com.coucou.android.core.Glance
 import com.coucou.android.core.GlanceTone
 import com.coucou.android.core.OverlayPolicy
@@ -129,7 +130,10 @@ class Notifications(private val context: Context) {
             .setTimeoutAfter(com.coucou.android.link.Protocol.APPROVAL_TTL_MS)
             .setContentIntent(open(r.fingerprint, false, id))
             .addAction(Notification.Action.Builder(null, context.getString(R.string.action_deny), deny).build())
-            .addAction(Notification.Action.Builder(null, context.getString(R.string.action_allow), open(r.fingerprint, true, id + 1)).build())
+            .apply {
+                // A command the phone cannot show in full is answered on the computer: no Allow here.
+                if (ApprovalSheetPlan.canAllowHere(r)) addAction(Notification.Action.Builder(null, context.getString(R.string.action_allow), open(r.fingerprint, true, id + 1)).build())
+            }
             .build()
         runCatching { nm.notify(id, n) } // POST_NOTIFICATIONS may be denied: the in-app card still works
     }

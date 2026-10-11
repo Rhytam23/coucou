@@ -291,6 +291,7 @@ class MainActivity : ComponentActivity() {
     /** Allow: only after the biometric / screen-lock check. */
     private fun approve(r: ApprovalRequest) {
         if (confirming) return // a second tap must not open a second prompt
+        if (!ApprovalSheetPlan.canAllowHere(r)) { model.message = getString(R.string.approval_on_computer); return }
         confirming = true
         BiometricGate.confirm(
             this, getString(R.string.action_allow), "${r.tool}: ${r.command}", getString(R.string.msg_need_lock),

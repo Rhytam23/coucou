@@ -10,6 +10,7 @@ import com.coucou.android.link.ApprovalRequest
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.mochi.BotState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -21,6 +22,11 @@ class IslandPlanTest {
     private val request = ApprovalRequest("a", "f".repeat(64), "Bash", "ls", 0L)
     private val noon = 12 * 60
     private val settings = UserSettings()
+
+    @Test fun theIslandOffersAllowOnlyForACommandThatIsShownWhole() {
+        assertTrue(IslandPlan.active(emptyList(), listOf(request), true, name)!!.canAllow)
+        assertFalse(IslandPlan.active(emptyList(), listOf(request.copy(truncated = true)), true, name)!!.canAllow)
+    }
 
     @Test fun workingShowsWhenAllowedAndNeverWhenNot() {
         val list = listOf(s("a", BotState.WORKING, "Runs tests"))

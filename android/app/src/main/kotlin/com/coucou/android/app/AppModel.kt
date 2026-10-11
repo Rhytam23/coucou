@@ -599,6 +599,11 @@ class AppModel(private val context: Context) : LinkListener {
     /** True if the decision was sent (or applied to the demo). Allow is gated by the biometric prompt in the UI. */
     fun decide(fingerprint: String, allow: Boolean): Boolean {
         val request = approvals.firstOrNull { it.fingerprint == fingerprint }
+        if (allow && request != null && !com.coucou.android.core.ApprovalSheetPlan.canAllowHere(request)) {
+            // Whatever asked (a stale notification, a test): a command that was cut is never allowed from here. It stays pending.
+            message = context.getString(R.string.approval_on_computer)
+            return false
+        }
         val ok = link?.decide(fingerprint, allow) ?: false
         if (ok && request != null) {
             // The phone's own history never keeps the command: a label and at most the program's name.

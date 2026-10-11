@@ -52,7 +52,7 @@ Desktop to phone:
 | `welcome` | `v`, `desktop`, `os` | reply to a valid `hello`. The phone refuses a different `v` |
 | `error` | `code`, `message` | `auth` closes the link and the phone stops retrying quickly |
 | `sessions` | `sessions[]` | the full list, replacing the previous one |
-| `approval` | `pillId`, `fingerprint`, `tool`, `command`, `createdAt` (ms) | an agent waits for permission |
+| `approval` | `pillId`, `fingerprint`, `tool`, `command`, `createdAt` (ms), `truncated` (bool, optional) | an agent waits for permission |
 | `approvalResolved` | `fingerprint` | answered elsewhere or timed out; remove it |
 | `pong` | | reply to `ping` |
 
@@ -74,6 +74,11 @@ unknown value is shown as `idle`. `pillId` values come from the pill catalog
 - **Allow requires the user's biometric or screen lock on the phone.** Deny does not. With no
   screen lock set up, Allow is refused.
 - The command text is hidden on the lock screen.
+- **A command is sent in full up to 500 characters.** A longer one is cut to its first 500 and the approval carries
+  `"truncated": true` (additive: absent means false, and a phone that does not know the field ignores it). The fingerprint
+  is computed over the text as sent. For a truncated approval the phone says "Command is longer than shown", offers
+  **Deny only** (sheet, notification and island), and the request is answered on the computer. The computer enforces it too:
+  an `allow` for a truncated approval is ignored and the request stays pending (a `deny` works as usual).
 
 ## Capabilities and chat (optional, still protocol v1)
 

@@ -11,6 +11,8 @@ data class IslandSpec(
     val text: String,
     /** The request this is about (approvals only): what Allow and Deny act on. */
     val fingerprint: String? = null,
+    /** False for a request whose command could not be shown in full: the island offers Deny only. */
+    val canAllow: Boolean = true,
 ) {
     enum class Kind { WORKING, QUESTION, APPROVAL, FINISHED, ERROR, RATELIMIT }
 

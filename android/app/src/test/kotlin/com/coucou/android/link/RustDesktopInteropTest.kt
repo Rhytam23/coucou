@@ -172,6 +172,25 @@ class RustDesktopInteropTest {
         }
     }
 
+    @Test fun aCommandOf10000CharactersIsFlaggedAndCannotBeAllowedFromThePhone() {
+        val info = startDesktop()
+        val rec = Rec()
+        val client = connect(info, rec)
+        try {
+            assertNotNull(rec.welcome.poll(15, TimeUnit.SECONDS))
+            command("approval req-long " + "x".repeat(10_000))
+            val req = rec.approvals.poll(10, TimeUnit.SECONDS)!!
+            assertTrue(req.truncated)
+            assertEquals(500, req.command.length)
+            assertFalse(com.coucou.android.core.ApprovalSheetPlan.canAllowHere(req))
+            // Even a phone that asks anyway is not obeyed.
+            client.decide(req.fingerprint, allow = true)
+            assertFalse("the desktop must not apply Allow for a cut command", sawLine("DECISION allow req-long", 2))
+        } finally {
+            client.stop()
+        }
+    }
+
     @Test fun denyReachesTheDesktop() {
         val info = startDesktop()
         val rec = Rec()

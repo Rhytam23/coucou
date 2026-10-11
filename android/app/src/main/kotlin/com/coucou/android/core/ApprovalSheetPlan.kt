@@ -11,7 +11,14 @@ object ApprovalSheetPlan {
     /** Taps in the first moments are ignored: the sheet must not catch a tap meant for what was under it. Same as the island's. */
     const val GUARD_MS = 600L
 
-    const val MAX_COMMAND_LINES = 8
+    /** The command box scrolls past this height instead of cutting the text: the whole command that was sent is always readable. */
+    const val COMMAND_BOX_MAX_DP = 220
+
+    /**
+     * Allow from the phone is offered only when the whole command is on the phone. When the computer cut it (a flag it sends with the
+     * request), the phone could show only the start of what would run, so the request is answered on the computer. Deny is always offered.
+     */
+    fun canAllowHere(r: ApprovalRequest): Boolean = !r.truncated
 
     /** The request to show: the first one the user has not closed, or null. */
     fun next(approvals: List<ApprovalRequest>, closed: String?): ApprovalRequest? =

@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
@@ -146,18 +148,29 @@ fun ApprovalSheet(model: AppModel, r: ApprovalRequest, onAllow: (ApprovalRequest
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(r.tool, style = TypeScale.LABEL.style(dim), maxLines = 1)
-                Text(r.command, style = TypeScale.MONO.style(white).copy(fontFamily = FontFamily.Monospace), maxLines = ApprovalSheetPlan.MAX_COMMAND_LINES)
+                // The whole command that was sent, scrollable: never cut by a line limit.
+                Column(Modifier.heightIn(max = ApprovalSheetPlan.COMMAND_BOX_MAX_DP.dp).verticalScroll(rememberScrollState())) {
+                    Text(r.command, style = TypeScale.MONO.style(white).copy(fontFamily = FontFamily.Monospace))
+                }
             }
             Box(Modifier.size(8.dp))
         }
+        val canAllow = ApprovalSheetPlan.canAllowHere(r)
+        if (!canAllow) {
+            // Shown without a tap: the user must know the command is not all here before reading anything else.
+            Text(stringResource(R.string.approval_too_long), Modifier.padding(bottom = 4.dp), style = TypeScale.TITLE.style(white))
+            Text(stringResource(R.string.approval_on_computer), Modifier.padding(bottom = 10.dp), style = TypeScale.SECONDARY.style(dim))
+        }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PillButton(stringResource(R.string.action_deny), { model.decide(r.fingerprint, allow = false) }, Modifier.weight(1f), onDark = true, enabled = armed)
-            PillButton(
-                stringResource(R.string.action_allow), { onAllow(r) }, Modifier.weight(1f), PillKind.PRIMARY, enabled = armed, onDark = true,
-                icon = { CoucouIcon(IconKind.LOCK, tint = Color(IslandSurface.ON_PRIMARY), size = 18.dp) },
-            )
+            if (canAllow) {
+                PillButton(
+                    stringResource(R.string.action_allow), { onAllow(r) }, Modifier.weight(1f), PillKind.PRIMARY, enabled = armed, onDark = true,
+                    icon = { CoucouIcon(IconKind.LOCK, tint = Color(IslandSurface.ON_PRIMARY), size = 18.dp) },
+                )
+            }
         }
-        Text(stringResource(R.string.approval_hint), Modifier.padding(top = 10.dp), style = TypeScale.LABEL.style(dim))
+        if (canAllow) Text(stringResource(R.string.approval_hint), Modifier.padding(top = 10.dp), style = TypeScale.LABEL.style(dim))
         Text(
             stringResource(R.string.approval_later),
             Modifier.heightIn(min = Spacing.MIN_TOUCH.dp).clickable(role = Role.Button, onClick = onDismiss).padding(vertical = 14.dp),

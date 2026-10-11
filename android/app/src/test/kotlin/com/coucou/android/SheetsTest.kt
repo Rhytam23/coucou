@@ -18,8 +18,25 @@ class SheetsTest {
     @Test fun theCommandIsOnlyDrawnAfterShowExactCommand() {
         assertEquals("the command is drawn in exactly one place", 1, Regex("""r\.command""").findAll(sheets).count())
         val before = sheets.substringBefore("r.command")
-        assertTrue(before.substringAfterLast("if (showCommand)").length < 400)
+        assertTrue(before.substringAfterLast("if (showCommand)").length < 600)
         assertTrue(before.contains("if (showCommand)"))
+    }
+
+    @Test fun aCutCommandIsSaidClearlyAndAllowIsOnlyOfferedWhenTheWholeCommandIsHere() {
+        assertTrue(sheets.contains("R.string.approval_too_long"))
+        // Allow is drawn only under the check, and the notice is not behind a tap.
+        assertTrue(sheets.substringAfter("val canAllow").substringBefore("PillKind.PRIMARY").contains("if (canAllow)"))
+        assertFalse(sheets.substringAfter("approval_too_long").substringBefore("canAllow").contains("showCommand"))
+        // The same rule at every door: the sheet's callback, the model, the notification and the island.
+        assertTrue(main.contains("ApprovalSheetPlan.canAllowHere(r)"))
+        assertTrue(src("app/AppModel.kt").substringAfter("fun decide(fingerprint").substringBefore("link?.decide").contains("canAllowHere(request)"))
+        assertTrue(src("app/Notifications.kt").contains("if (ApprovalSheetPlan.canAllowHere(r)) addAction"))
+        assertTrue(src("ui/IslandOverlay.kt").contains("if (s.canAllow)"))
+    }
+
+    @Test fun theCommandIsNeverCutByALineLimit() {
+        assertFalse(sheets.contains("maxLines = ApprovalSheetPlan.MAX"))
+        assertTrue(sheets.contains("verticalScroll(rememberScrollState())"))
     }
 
     @Test fun homeNoLongerDrawsARawCommand() {

@@ -28,6 +28,8 @@
     "paste_hint": "Copy it from Coucou on your computer (Settings, Android phone).",
     "approval_later": "Not now",
     "approval_wants": "Wants to %1$s",
+    "approval_too_long": "Command is longer than shown",
+    "approval_on_computer": "Answer this request on your computer. Allow is not offered here, because the whole command cannot be shown on the phone.",
     "approval_caution": "Allow only if you asked for this.",
     "approval_show_cmd": "Show exact command",
     "approval_hide_cmd": "Hide exact command",

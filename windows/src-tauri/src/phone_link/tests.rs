@@ -1754,3 +1754,28 @@ fn pairing_again_disconnects_the_phones_even_when_the_keystore_refuses_to_save()
         assert!(phone.closed().await);
     });
 }
+
+#[test]
+fn over_the_wire_a_10000_character_command_is_flagged_and_allow_does_nothing() {
+    block_on(async {
+        let rig = Rig::start().await;
+        let mut c = Client::paired(&rig).await;
+        c.expect("sessions").await;
+        let command = format!("echo {}", "x".repeat(10_000));
+        rig.approval("req-long", &command, 0);
+        let approval = c.expect("approval").await;
+        assert_eq!(approval["truncated"], true);
+        assert_eq!(approval["command"].as_str().unwrap().chars().count(), 500);
+        let fp = approval["fingerprint"].as_str().unwrap().to_string();
+
+        c.send(json!({ "type": "decision", "fingerprint": fp, "decision": "allow" })).await;
+        c.send(json!({ "type": "ping" })).await;
+        c.expect("pong").await; // the decision before it was read, and ignored
+        assert!(rig.decisions().is_empty(), "Allow from the phone must not reach the agent");
+
+        // Deny still works.
+        c.send(json!({ "type": "decision", "fingerprint": fp, "decision": "deny" })).await;
+        c.expect("approvalResolved").await;
+        assert_eq!(rig.decisions(), vec![("req-long".to_string(), false)]);
+    });
+}

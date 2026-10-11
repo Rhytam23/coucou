@@ -104,6 +104,8 @@ data class ApprovalRequest(
     val tool: String,
     val command: String,
     val createdAtMs: Long,
+    /** The computer cut the command to fit (it sends at most 500 characters): what is shown is not all of it. Additive; absent means false. */
+    val truncated: Boolean = false,
 )
 
 /** One option of a question Claude Code asked. */
@@ -201,6 +203,7 @@ object Wire {
                         tool = o.getString("tool"),
                         command = o.getString("command"),
                         createdAtMs = o.getLong("createdAt"),
+                        truncated = o.optBoolean("truncated", false),
                     ),
                 )
                 "approvalResolved" -> ServerMsg.ApprovalResolved(o.getString("fingerprint"))

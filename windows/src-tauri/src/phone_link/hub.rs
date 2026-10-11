@@ -387,6 +387,8 @@ struct Approval {
     pill_id: String,
     tool: String,
     command: String,
+    /// The command was longer than [`MAX_COMMAND_CHARS`] and the phone is shown only the start.
+    truncated: bool,
     created_at: u64,
 }
 
@@ -462,6 +464,8 @@ pub enum Outcome {
     Late,
     /// Neither `allow` nor `deny`.
     Invalid,
+    /// `allow` for a request whose command was cut to fit the phone: refused, and the request stays pending so it is answered here.
+    TooLong,
 }
 
 pub struct Hub {
@@ -527,6 +531,7 @@ impl Hub {
         }
         if let Some(a) = approval.filter(|a| !a.request_id.is_empty()) {
             let tool = clip(&a.tool, 64);
+            let truncated = a.command.chars().count() > MAX_COMMAND_CHARS;
             let command = clip(&a.command, MAX_COMMAND_CHARS);
             let approval = Approval {
                 fingerprint: fingerprint(&a.pill_id, &a.session_id, &tool, &command, &a.request_id),
@@ -534,6 +539,7 @@ impl Hub {
                 pill_id: a.pill_id,
                 tool,
                 command,
+                truncated,
                 created_at: now,
             };
             let line = approval_line(&approval);
@@ -633,6 +639,10 @@ impl Hub {
             let mut inner = self.inner.lock().unwrap();
             let late = match &inner.approval {
                 Some(a) if constant_eq(a.fingerprint.as_bytes(), fingerprint.as_bytes()) => {
+                    // A command the phone could not show in full is never allowed from the phone, whatever the phone says.
+                    if allow && a.truncated {
+                        return Outcome::TooLong;
+                    }
                     now.saturating_sub(a.created_at) > APPROVAL_TTL_MS
                 }
                 _ => return Outcome::NoMatch,
@@ -1045,7 +1055,7 @@ fn is_color(c: &str) -> bool {
 fn approval_line(a: &Approval) -> String {
     json!({
         "type": "approval", "pillId": a.pill_id, "fingerprint": a.fingerprint,
-        "tool": a.tool, "command": a.command, "createdAt": a.created_at,
+        "tool": a.tool, "command": a.command, "truncated": a.truncated, "createdAt": a.created_at,
     })
     .to_string()
 }
@@ -1292,6 +1302,54 @@ mod tests {
             fingerprint("integration_claude", "s1", "Bash", "npm test", "r1"),
             "fa8a3bd8b520efb235b0d275403779ce580d2acbb934f4874f222f434b639c54"
         );
+    }
+
+    #[test]
+    fn a_command_longer_than_the_phone_shows_is_flagged_and_cannot_be_allowed_from_the_phone() {
+        for len in [MAX_COMMAND_CHARS + 1, 10_000] {
+            let (hub, rec) = hub();
+            let (tx, mut rx) = mpsc::channel(16);
+            hub.subscribe(tx, 0, false);
+            drain(&mut rx);
+            let command = format!("{}{}", "a".repeat(MAX_COMMAND_CHARS - 1), "é".repeat(len - MAX_COMMAND_CHARS + 1));
+            hub.publish(vec![], Some(approval("r1", &command)), 1_000);
+            let line = drain(&mut rx).into_iter().find(|l| l["type"] == "approval").expect("the approval is sent");
+            assert_eq!(line["truncated"], true, "{len} characters");
+            assert_eq!(line["command"].as_str().unwrap().chars().count(), MAX_COMMAND_CHARS);
+            let fp = fp_of(&hub);
+            // Allow is refused, whatever the phone says; nothing reaches the agent and the request stays pending.
+            assert_eq!(hub.decide(&fp, "allow", 2_000), Outcome::TooLong);
+            assert!(rec.0.lock().unwrap().is_empty());
+            assert_eq!(fp_of(&hub), fp);
+            // Deny is always possible, and so is answering on the computer.
+            assert_eq!(hub.decide(&fp, "deny", 2_100), Outcome::Applied);
+            assert_eq!(*rec.0.lock().unwrap(), vec![("r1".to_string(), false)]);
+        }
+    }
+
+    #[test]
+    fn a_command_that_fits_is_not_flagged_and_can_be_allowed() {
+        for len in [0, 1, MAX_COMMAND_CHARS] {
+            let (hub, rec) = hub();
+            let (tx, mut rx) = mpsc::channel(16);
+            hub.subscribe(tx, 0, false);
+            drain(&mut rx);
+            hub.publish(vec![], Some(approval("r1", &"é".repeat(len))), 1_000);
+            let line = drain(&mut rx).into_iter().find(|l| l["type"] == "approval").unwrap();
+            assert_eq!(line["truncated"], false, "{len} characters");
+            assert_eq!(hub.decide(&fp_of(&hub), "allow", 2_000), Outcome::Applied);
+            assert_eq!(rec.0.lock().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn a_phone_that_connects_later_is_also_told_the_command_is_cut() {
+        let (hub, _rec) = hub();
+        hub.publish(vec![], Some(approval("r1", &"x".repeat(10_000))), 1_000);
+        let (tx, mut rx) = mpsc::channel(16);
+        hub.subscribe(tx, 1_001, false);
+        let line = drain(&mut rx).into_iter().find(|l| l["type"] == "approval").expect("the pending request is offered");
+        assert_eq!(line["truncated"], true);
     }
 
     #[test]

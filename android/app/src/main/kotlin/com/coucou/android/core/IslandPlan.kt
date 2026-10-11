@@ -27,7 +27,7 @@ object IslandPlan {
     ): IslandSpec? {
         if (!allowed) return null
         approvals.firstOrNull()?.let {
-            return IslandSpec(IslandSpec.Kind.APPROVAL, it.pillId, name(it.pillId), BotState.APPROVAL, ToolLabels.action(it.tool), it.fingerprint)
+            return IslandSpec(IslandSpec.Kind.APPROVAL, it.pillId, name(it.pillId), BotState.APPROVAL, ToolLabels.action(it.tool), it.fingerprint, ApprovalSheetPlan.canAllowHere(it))
         }
         val question = sessions.firstOrNull { it.state == BotState.QUESTION }
         if (question != null) return spec(IslandSpec.Kind.QUESTION, question, name)
