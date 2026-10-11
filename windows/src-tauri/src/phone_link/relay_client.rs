@@ -1038,6 +1038,13 @@ mod tests {
             let hub = Hub::new(host.clone());
             let shared = Shared::with_features(hub.clone(), "e2e-token-0123456789abcdef".to_string(), "E2E PC".to_string(), None, Arc::new(server::NoFeatures));
             let handle = start(shared, Target::parse(&url).unwrap(), credentials(&store).unwrap());
+            // The phone side is a Gradle run that may take minutes to compile on a cold runner, and an approval expires after about two
+            // minutes: ask for the decision only once the phone is connected.
+            let mut connecting = 0;
+            while hub.clients() == 0 && connecting < 6000 {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                connecting += 1;
+            }
             hub.publish(
                 vec![],
                 Some(ApprovalIn {

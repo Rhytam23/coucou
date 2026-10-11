@@ -1799,7 +1799,8 @@ fn only_the_right_window_may_call_a_command_that_changes_something() {
 /// without the check fails here, which is how phone_link_set_enabled (it starts a network server) was found.
 #[test]
 fn every_command_that_changes_something_checks_the_calling_window() {
-    let source = include_str!("mod.rs");
+    // The Windows runner checks files out with CRLF line endings.
+    let source = include_str!("mod.rs").replace("\r\n", "\n");
     let mut seen = 0;
     for chunk in source.split("#[tauri::command]\n").skip(1) {
         let name = chunk.split("pub fn ").nth(1).and_then(|r| r.split('(').next()).expect("a command has a name");
