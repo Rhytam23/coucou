@@ -172,8 +172,9 @@ class MainActivity : ComponentActivity() {
                             Screen.SETTINGS -> SettingsScreen(
                                 model, onHistory = { screen = Screen.HISTORY },
                                 onGallery = { screen = Screen.GALLERY }, onWardrobe = { screen = Screen.WARDROBE }, onOverlay = ::setOverlay,
-                                onDiagnostics = { screen = Screen.DIAGNOSTICS },
+                                onDiagnostics = { screen = Screen.DIAGNOSTICS }, onLicences = { screen = Screen.LICENCES },
                             )
+                            Screen.LICENCES -> LicencesScreen(onBack = { screen = Screen.SETTINGS })
                             Screen.WARDROBE -> WardrobeScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.DIAGNOSTICS -> DiagnosticsScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })

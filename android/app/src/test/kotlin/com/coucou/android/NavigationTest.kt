@@ -16,7 +16,7 @@ class NavigationTest {
 
     @Test fun theBarShowsOnTheThreeRootsOnly() {
         for (s in listOf(Screen.HOME, Screen.CHAT, Screen.SETTINGS)) assertTrue("$s", Nav.barVisible(s, keyboardOpen = false))
-        for (s in listOf(Screen.HISTORY, Screen.GALLERY, Screen.DIAGNOSTICS, Screen.SESSION, Screen.SCAN)) assertFalse("$s", Nav.barVisible(s, false))
+        for (s in listOf(Screen.HISTORY, Screen.GALLERY, Screen.DIAGNOSTICS, Screen.LICENCES, Screen.SESSION, Screen.SCAN)) assertFalse("$s", Nav.barVisible(s, false))
     }
 
     @Test fun theBarHidesWhileTheKeyboardIsOpen() {

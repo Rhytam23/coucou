@@ -130,7 +130,7 @@ val BarClearance = 96.dp
  * from the everyday switches), the island, sound, notices, more, and About (Louis Raillé's required notice).
  */
 @Composable
-fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit, onWardrobe: () -> Unit, onOverlay: (Boolean) -> Unit, onDiagnostics: () -> Unit) {
+fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit, onWardrobe: () -> Unit, onOverlay: (Boolean) -> Unit, onDiagnostics: () -> Unit, onLicences: () -> Unit) {
     val s = model.settings
     val uri = LocalUriHandler.current
     val t = tokens()
@@ -238,6 +238,8 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
                     )
                     Text(stringResource(R.string.about_assets), style = TypeScale.SECONDARY.style(t.textDim.c()))
                 }
+                RowDivider()
+                LinkRow(stringResource(R.string.licences_title), onLicences)
             }
         }
         item { Spacer(Modifier.height(Gutter)) }
