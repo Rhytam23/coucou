@@ -48,7 +48,7 @@ Gradle and Compose compile only in CI in a cloud session; the pure Kotlin files 
 ## What has and has not been seen on a real phone
 
 Seen (Samsung Galaxy A12s, Android 13, earlier stages): Mochi renders, demo mode, pairing over Wi-Fi, Allow reaches the computer.
-**Not seen on a device**: the keep-alive alarm and "Can't connect?" (the Galaxy A12s with the screen off for 10+ minutes is the test), the redesigned screens, the island and its motion, the widget/tile/notification, QR scan, chat, answers,
+**Not seen on a device**: a release (R8) build, which has never been installed (CI builds it unsigned and checks the logs are gone, nothing more); the keep-alive alarm and "Can't connect?" (the Galaxy A12s with the screen off for 10+ minutes is the test), the redesigned screens, the island and its motion, the widget/tile/notification, QR scan, chat, answers,
 file changes, the relay path (and Doze/battery with it), anything on real Cloudflare. CI proves compilation, lint and the unit and
 interop tests, not how it looks or feels.
 

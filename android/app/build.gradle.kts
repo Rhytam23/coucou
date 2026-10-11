@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Release signing comes from the environment or from Gradle properties (-P on the command line, or ~/.gradle/gradle.properties), never
+// from a file in this repository. Without all of them the release build is made unsigned (it cannot be installed) rather than
+// signed with a debug key.
+fun signingValue(name: String): String? = (System.getenv(name) ?: providers.gradleProperty(name).orNull)?.takeIf { it.isNotBlank() }
+val releaseKeystore = signingValue("COUCOU_KEYSTORE_FILE")
+val releaseStorePassword = signingValue("COUCOU_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingValue("COUCOU_KEY_ALIAS")
+val releaseKeyPassword = signingValue("COUCOU_KEY_PASSWORD") ?: releaseStorePassword
+
 android {
     namespace = "com.coucou.android"
     compileSdk = 35
@@ -15,6 +24,29 @@ android {
         versionName = "0.1.0"
         // English only: libraries' other languages are left out of the app too.
         resourceConfigurations += listOf("en")
+    }
+    signingConfigs {
+        val keystore = releaseKeystore
+        val storePass = releaseStorePassword
+        val alias = releaseKeyAlias
+        if (keystore != null && storePass != null && alias != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+    buildTypes {
+        release {
+            // Shrink, obfuscate and optimise with R8; unused resources go too. The rules (and why there are so few) are in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDebuggable = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release") // null: unsigned
+        }
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -44,3 +76,24 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303") // android.jar stubs org.json in JVM tests
 }
+
+// Proves the release build in CI without a workflow change: CI runs `lint`, and lint now needs a release build that R8 has processed and
+// whose code no longer carries the debug logs (the Log calls are removed by the rules, so their tags and messages must not be in the dex).
+val verifyReleaseNoLogs by tasks.registering {
+    group = "verification"
+    description = "Builds the release APK and fails if a debug log tag or message is still in it."
+    dependsOn("assembleRelease")
+    val apkDir = layout.buildDirectory.dir("outputs/apk/release")
+    doLast {
+        val apks = apkDir.get().asFile.walkTopDown().filter { it.extension == "apk" }.toList()
+        check(apks.size == 1) { "expected one release APK, found ${apks.size}" }
+        val leftovers = listOf("CoucouOverlay", "CoucouLaunch", "CoucouDiscovery", "CoucouIsland", "island failed", "cannot browse", "ignored an early tap")
+        java.util.zip.ZipFile(apks.single()).use { zip ->
+            for (entry in zip.entries().asSequence().filter { it.name.endsWith(".dex") }) {
+                val text = String(zip.getInputStream(entry).readBytes(), Charsets.ISO_8859_1)
+                for (word in leftovers) check(!text.contains(word)) { "'$word' is still in ${entry.name}: the debug logs were not stripped" }
+            }
+        }
+    }
+}
+tasks.matching { it.name == "lint" }.configureEach { dependsOn(verifyReleaseNoLogs) }

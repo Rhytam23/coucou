@@ -17,6 +17,12 @@ Needs JDK 17 and the Android SDK (platform 35). From this folder:
 node scripts/gen-strings.mjs --check      # res/values/strings.xml is generated from i18n/app-strings.json
 ```
 
+A release build (R8 shrinking and obfuscation, resources shrunk, `android.util.Log` calls removed, not debuggable) is `./gradlew assembleRelease`;
+`lint` already depends on it in CI, with a check that no debug log text is left in the APK. Signing keys are never in the repository: set
+`COUCOU_KEYSTORE_FILE`, `COUCOU_KEYSTORE_PASSWORD`, `COUCOU_KEY_ALIAS` (and `COUCOU_KEY_PASSWORD` if it differs) in the environment or in
+`~/.gradle/gradle.properties`. Without them the release APK is unsigned (it cannot be installed), never signed with a debug key. Keep
+`app/build/outputs/mapping/release/mapping.txt` with the build you ship. Nothing is published from here.
+
 Without a computer: open the app and tap *Try the demo*. Or run the pretend computer (fake sessions, a fake approval; a test tool):
 
 ```bash
