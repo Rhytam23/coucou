@@ -17,6 +17,7 @@ import com.coucou.android.core.ApprovalSheetPlan
 import com.coucou.android.core.Glance
 import com.coucou.android.core.GlanceTone
 import com.coucou.android.core.OverlayPolicy
+import com.coucou.android.core.PostOnChange
 import com.coucou.android.core.SafeText
 import com.coucou.android.core.ToolLabels
 import com.coucou.android.link.ApprovalRequest
@@ -82,7 +83,14 @@ class Notifications(private val context: Context) {
      * when expanded, one line per agent ("Claude Code: Working"). Only states, never a command or a path. On a locked
      * screen it shows the plain "Connected" line, like the other notifications of the app.
      */
-    fun ongoing(model: AppModel?): Notification = ongoing(model?.glance())
+    fun ongoing(model: AppModel?): Notification {
+        val g = model?.glance()
+        shown.remember(g) // the service posts this one itself, so the next identical refresh is skipped
+        return ongoing(g)
+    }
+
+    /** What the ongoing notification was last drawn from; it is posted again only when that changes. */
+    private val shown = PostOnChange<Glance?>()
 
     private fun ongoing(g: Glance?): Notification {
         val title = g?.headline ?: context.getString(R.string.status_connecting)
@@ -110,7 +118,8 @@ class Notifications(private val context: Context) {
     }
 
     fun updateOngoing(model: AppModel, g: Glance = model.glance()) {
-        if (model.mode == Mode.PAIRED) runCatching { nm.notify(ONGOING_ID, ongoing(g)) }
+        if (model.mode != Mode.PAIRED || !shown.shouldPost(g)) return
+        runCatching { nm.notify(ONGOING_ID, ongoing(g)) }.onFailure { shown.forget() }
     }
 
     fun showApproval(r: ApprovalRequest, agentName: String, alert: OverlayPolicy.ApprovalAlert = OverlayPolicy.ApprovalAlert.HEADS_UP) {
