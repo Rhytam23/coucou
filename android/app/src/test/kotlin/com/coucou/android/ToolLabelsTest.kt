@@ -47,6 +47,13 @@ class ToolLabelsTest {
         assertEquals("", ToolLabels.label("AbCdEfGhIjKlMnOpQrStUvWxYz0123"))
     }
 
+    @Test fun aFileNameIsAFileNotWords() {
+        assertEquals("A file", ToolLabels.label("SessionScreen.kt"))
+        assertEquals("A file", ToolLabels.label("src/ui/SessionScreen.kt"))
+        assertEquals("A file", ToolLabels.label("notes.md"))
+        assertEquals("Reading files", ToolLabels.label("Read"))
+    }
+
     @Test fun emptyStaysEmpty() {
         assertEquals("", ToolLabels.label(""))
         assertEquals("", ToolLabels.label("   "))

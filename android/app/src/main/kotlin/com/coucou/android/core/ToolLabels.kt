@@ -73,6 +73,8 @@ object ToolLabels {
         val at = text.indexOf(SEP)
         val head = if (at > 0) text.substring(0, at).trim() else text
         val rest = if (at > 0) text.substring(at + SEP.length).trim() else ""
+        // A step that is only a file name ("SessionScreen.kt") is not a tool: "A file", never the name cleaned into words.
+        if (KNOWN[key(head)] == null && FILE_NAME.matches(head)) return "A file"
         if (!looksLikeAName(head)) return ""
         // An unknown word shows only if it can be a tool's name: a key or a token pasted in its place never does.
         if (KNOWN[key(head)] == null && !plausibleToolName(head)) return ""
@@ -81,6 +83,7 @@ object ToolLabels {
         return if (program.isNotEmpty()) "$tool$SEP$program" else tool
     }
 
+    private val FILE_NAME = Regex("""[\w.\-/\\]*[\w\-]\.[A-Za-z][A-Za-z0-9]{0,7}""")
     private val DIGIT_RUN = Regex("[0-9]{3,}")
 
     private fun plausibleToolName(s: String): Boolean =
