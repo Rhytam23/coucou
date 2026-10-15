@@ -20,8 +20,32 @@ enum class LostReason {
     SILENT,
     /** The computer closed the connection (it restarted, or dropped a connection that had been silent for too long). */
     CLOSED,
-    /** The network under it failed (reset, unreachable, Wi-Fi changed). */
+    /** The network under it failed (unreachable, Wi-Fi changed). */
     NETWORK,
+}
+
+/** Why a connection attempt failed before the computer answered, from the kind of error the socket raised. */
+enum class ConnectFailure {
+    /** Something at the address answered "no": the computer is on but Coucou is closed, or its Phone link is off. */
+    REFUSED,
+    /** No route, or nobody answered in time: the computer is off or asleep, or the phone is on another network. */
+    UNREACHABLE,
+    OTHER;
+
+    companion object {
+        fun of(e: Throwable): ConnectFailure = when (e) {
+            is java.net.ConnectException -> if (e.message.orEmpty().contains("refused", ignoreCase = true)) REFUSED else UNREACHABLE
+            is java.net.SocketTimeoutException, is java.net.NoRouteToHostException, is java.net.UnknownHostException -> UNREACHABLE
+            else -> OTHER
+        }
+    }
+}
+
+/** A link that ended with an error: a reset or a broken pipe is the computer's side hanging up, not the network. */
+internal fun lostReasonOf(e: java.io.IOException): LostReason {
+    val m = e.message.orEmpty()
+    return if (e is java.net.SocketException && (m.contains("reset", true) || m.contains("broken pipe", true))) LostReason.CLOSED
+    else LostReason.NETWORK
 }
 
 interface LinkListener {
@@ -47,6 +71,8 @@ interface LinkListener {
     fun onError(code: String, message: String) {}
     /** A connection attempt failed before the computer answered; [consecutive] counts the failures in a row (1 for the first). */
     fun onConnectFailed(consecutive: Int) {}
+    /** Called just before [onConnectFailed] with what kind of error the attempt raised. */
+    fun onConnectFailure(kind: ConnectFailure) {}
     /** A link that had been working ended without the user asking for it (not for a wrong token or version: see [onError]). */
     fun onLinkLost(reason: LostReason) {}
     fun onChatModels(models: List<ChatModel>) {}
@@ -260,6 +286,7 @@ class LinkClient(
             listener.onState(LinkState.CONNECTING)
             var connectedOnce = false
             var lost: LostReason? = null
+            var failure: ConnectFailure? = null
             probeKilled = false
             try {
                 val s = connector.connect(connectTimeoutMs)
@@ -279,9 +306,9 @@ class LinkClient(
                     pinger.interrupt()
                 }
             } catch (e: java.net.SocketTimeoutException) {
-                lost = LostReason.SILENT
-            } catch (_: IOException) {
-                lost = LostReason.NETWORK
+                if (connectedOnce) lost = LostReason.SILENT else failure = ConnectFailure.UNREACHABLE
+            } catch (e: IOException) {
+                if (connectedOnce) lost = lostReasonOf(e) else failure = ConnectFailure.of(e)
             } catch (_: InterruptedException) {
                 // stop() was called
             } finally {
@@ -301,7 +328,10 @@ class LinkClient(
             // A link that had been working and ended on its own: say why (a clean end of the stream is the computer closing it).
             if (connectedOnce) listener.onLinkLost(if (probeKilled) LostReason.SILENT else lost ?: LostReason.CLOSED)
             listener.onState(LinkState.DISCONNECTED)
-            if (connectedOnce) attempt = 0 else listener.onConnectFailed(attempt + 1)
+            if (connectedOnce) attempt = 0 else {
+                listener.onConnectFailure(failure ?: ConnectFailure.OTHER)
+                listener.onConnectFailed(attempt + 1)
+            }
             val wait = backoffMs[minOf(attempt, backoffMs.size - 1)]
             attempt++
             wake.drainPermits()

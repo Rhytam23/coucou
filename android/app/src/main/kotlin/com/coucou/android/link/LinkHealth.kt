@@ -12,14 +12,18 @@ data class LinkHealth(
     val attempts: Int = 0,
     /** How many times a link ended on its own after the screen had been off (this is what the battery hint is about). */
     val dropsWhileScreenOff: Int = 0,
+    /** What the latest failed attempt to reconnect raised (null: none yet). */
+    val failure: ConnectFailure? = null,
 ) {
     fun lost(atMs: Long, why: LostReason, screenWasOff: Boolean) =
-        copy(lostAtMs = atMs, reason = why, attempts = 0, dropsWhileScreenOff = dropsWhileScreenOff + if (screenWasOff) 1 else 0)
+        copy(lostAtMs = atMs, reason = why, attempts = 0, failure = null, dropsWhileScreenOff = dropsWhileScreenOff + if (screenWasOff) 1 else 0)
 
     fun failedAttempt(count: Int) = copy(attempts = count)
 
+    fun failedWith(kind: ConnectFailure) = copy(failure = kind)
+
     /** Connected again: the story is over (the number of drops while the screen was off stays). */
-    fun recovered() = copy(lostAtMs = null, reason = null, attempts = 0)
+    fun recovered() = copy(lostAtMs = null, reason = null, attempts = 0, failure = null)
 }
 
 object LinkHealthText {
@@ -34,19 +38,38 @@ object LinkHealthText {
         }
     }
 
-    private fun why(reason: LostReason?) = when (reason) {
-        LostReason.SILENT -> "The computer stopped answering. This is usual after the phone slept."
-        LostReason.CLOSED -> "The computer closed the connection."
-        LostReason.NETWORK -> "The network dropped."
-        null -> ""
+    /** What the phone itself knows about its network when the link is judged. */
+    enum class PhoneNet { OFFLINE, WIFI, CELLULAR }
+
+    /**
+     * The most likely cause, from the most certain clue to the least: the phone has no network at all; the address answered "no" (the
+     * computer is on, Coucou is closed or its Phone link is off); nobody answered (computer off or asleep, or another network - on
+     * mobile data without a relay, certainly another network); then what the ended link itself showed.
+     */
+    fun why(health: LinkHealth, net: PhoneNet, hasRelay: Boolean): String = when {
+        net == PhoneNet.OFFLINE -> "The phone has no network."
+        health.failure == ConnectFailure.REFUSED ->
+            "The computer answers, but Coucou does not: its app is closed, or Phone link is off in its Settings."
+        health.failure == ConnectFailure.UNREACHABLE && net == PhoneNet.CELLULAR && !hasRelay ->
+            "The phone is on mobile data, not on the computer's Wi-Fi."
+        health.failure == ConnectFailure.UNREACHABLE ->
+            "The computer cannot be reached: it is off or asleep, or the phone is on another network."
+        health.reason == LostReason.SILENT -> "The computer stopped answering. This is usual after the phone slept."
+        health.reason == LostReason.CLOSED -> "Coucou on the computer closed the connection: it was closed, restarted, or the computer went to sleep."
+        health.reason == LostReason.NETWORK && net == PhoneNet.CELLULAR && !hasRelay -> "The phone left the computer's Wi-Fi."
+        health.reason == LostReason.NETWORK -> "The connection broke on the way to the computer."
+        else -> ""
     }
 
     /** The two lines for Home while the link is down after having worked; null when there is nothing to say. */
-    fun lines(connected: Boolean, health: LinkHealth, nowMs: Long): Pair<String, String>? {
+    fun lines(
+        connected: Boolean, health: LinkHealth, nowMs: Long,
+        net: PhoneNet = PhoneNet.WIFI, hasRelay: Boolean = false,
+    ): Pair<String, String>? {
         val at = health.lostAtMs ?: return null
         if (connected) return null
         val head = "Connection lost ${ago(nowMs - at)} ago, reconnecting" + if (health.attempts >= 3) " (${health.attempts} tries)" else ""
-        return head to why(health.reason)
+        return head to why(health, net, hasRelay)
     }
 }
 

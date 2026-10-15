@@ -46,12 +46,14 @@ import com.coucou.android.link.LinkClient
 import com.coucou.android.link.LinkListener
 import com.coucou.android.link.LinkState
 import com.coucou.android.link.BatteryHint
+import com.coucou.android.link.LinkHealthText
 import com.coucou.android.link.DiagResult
 import com.coucou.android.link.DiagStep
 import com.coucou.android.link.Diagnostics
 import com.coucou.android.link.Found
 import com.coucou.android.link.LanDiagnostics
 import com.coucou.android.link.LinkHealth
+import com.coucou.android.link.ConnectFailure
 import com.coucou.android.link.LostReason
 import com.coucou.android.link.PairingPayload
 import com.coucou.android.link.ReconnectPolicy
@@ -845,6 +847,14 @@ class AppModel(private val context: Context) : LinkListener {
             kv.put("link_drops_off", health.dropsWhileScreenOff)
         }
     }
+
+    override fun onConnectFailure(kind: ConnectFailure) {
+        main.post { health = health.failedWith(kind) }
+    }
+
+    /** Why the link is down, in words: the phone's own network and whether a relay is paired shape the sentence. */
+    fun healthLines(connected: Boolean, nowMs: Long) =
+        LinkHealthText.lines(connected, health, nowMs, netWatch.net(), currentPairing?.relay != null)
 
     override fun onConnectFailed(consecutive: Int) {
         main.post { health = health.failedAttempt(consecutive) }

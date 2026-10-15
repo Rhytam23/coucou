@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import com.coucou.android.link.LinkHealthText
 
 /**
  * Tells the model when the network changes (a new Wi-Fi, a hotspot) and whether a Wi-Fi or cable is up at all.
@@ -30,6 +31,14 @@ class NetworkWatch(
     fun isCellular(): Boolean {
         val n = cm.activeNetwork ?: return false
         return cm.getNetworkCapabilities(n)?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
+    }
+
+    /** What the phone has right now, for the sentence that says why the link is down. */
+    fun net(): LinkHealthText.PhoneNet = when {
+        isWifiUp() -> LinkHealthText.PhoneNet.WIFI
+        isCellular() -> LinkHealthText.PhoneNet.CELLULAR
+        cm.activeNetwork == null -> LinkHealthText.PhoneNet.OFFLINE
+        else -> LinkHealthText.PhoneNet.WIFI // another kind (VPN, Bluetooth): do not blame the phone's network
     }
 
     @Synchronized

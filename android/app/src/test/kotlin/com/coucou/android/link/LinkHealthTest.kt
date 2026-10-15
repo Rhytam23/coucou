@@ -27,7 +27,38 @@ class LinkHealthTest {
         assertEquals("Connection lost 2 min ago, reconnecting", head)
         assertTrue(why.contains("phone slept"))
         assertTrue(LinkHealthText.lines(false, h.copy(reason = LostReason.CLOSED), 1_000_000)!!.second.contains("closed"))
-        assertTrue(LinkHealthText.lines(false, h.copy(reason = LostReason.NETWORK), 1_000_000)!!.second.contains("network"))
+        assertTrue(LinkHealthText.lines(false, h.copy(reason = LostReason.NETWORK), 1_000_000)!!.second.contains("broke"))
+    }
+
+    private fun why(h: LinkHealth, net: LinkHealthText.PhoneNet = LinkHealthText.PhoneNet.WIFI, relay: Boolean = false) =
+        LinkHealthText.lines(false, h, h.lostAtMs!!, net, relay)!!.second
+
+    @Test fun theSentenceNamesTheRealCause() {
+        val lost = LinkHealth().lost(1_000, LostReason.NETWORK, false)
+        // No network on the phone beats everything.
+        assertTrue(why(lost.failedWith(ConnectFailure.REFUSED), LinkHealthText.PhoneNet.OFFLINE).contains("no network"))
+        // The address says "no": the computer is on, the app is closed or Phone link is off.
+        val refused = why(lost.failedWith(ConnectFailure.REFUSED))
+        assertTrue(refused.contains("app is closed") && refused.contains("Phone link is off"))
+        // Nobody answers: mobile data without a relay is the wrong network; on Wi-Fi the computer is off or asleep.
+        assertTrue(why(lost.failedWith(ConnectFailure.UNREACHABLE), LinkHealthText.PhoneNet.CELLULAR).contains("mobile data"))
+        assertTrue(why(lost.failedWith(ConnectFailure.UNREACHABLE), LinkHealthText.PhoneNet.CELLULAR, relay = true).contains("off or asleep"))
+        assertTrue(why(lost.failedWith(ConnectFailure.UNREACHABLE)).contains("off or asleep"))
+        // A link that ended with a reset was the computer hanging up; a network change on mobile data is a change of network.
+        assertTrue(why(LinkHealth().lost(1_000, LostReason.CLOSED, false)).contains("closed"))
+        assertTrue(why(lost, LinkHealthText.PhoneNet.CELLULAR).contains("left the computer's Wi-Fi"))
+        // "The network dropped." is gone: it blamed the network when the computer's app was simply closed.
+        assertTrue(!why(lost).contains("dropped"))
+    }
+
+    @Test fun errorsAreSortedByTheirKind() {
+        assertEquals(ConnectFailure.REFUSED, ConnectFailure.of(java.net.ConnectException("Connection refused")))
+        assertEquals(ConnectFailure.UNREACHABLE, ConnectFailure.of(java.net.ConnectException("Network is unreachable")))
+        assertEquals(ConnectFailure.UNREACHABLE, ConnectFailure.of(java.net.SocketTimeoutException()))
+        assertEquals(ConnectFailure.OTHER, ConnectFailure.of(javax.net.ssl.SSLHandshakeException("pin")))
+        assertEquals(LostReason.CLOSED, lostReasonOf(java.net.SocketException("Connection reset")))
+        assertEquals(LostReason.CLOSED, lostReasonOf(java.net.SocketException("Broken pipe")))
+        assertEquals(LostReason.NETWORK, lostReasonOf(java.io.IOException("Network is unreachable")))
     }
 
     @Test fun nothingIsSaidWhenConnectedOrWhenNothingWasLost() {
