@@ -46,6 +46,7 @@ import com.coucou.android.app.Mode
 import com.coucou.android.core.HistoryDays
 import com.coucou.android.core.HomeText
 import com.coucou.android.core.QuietHours
+import com.coucou.android.core.ApprovalVibration
 import com.coucou.android.core.RelayLineKind
 import com.coucou.android.core.RelayStatus
 import com.coucou.android.link.LinkState
@@ -209,6 +210,25 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
                 }
                 TimeRow(stringResource(R.string.quiet_to), s.quiet.toMin, s.quiet.enabled) {
                     model.updateSettings(s.copy(quiet = s.quiet.copy(toMin = QuietHours.wrap(it))))
+                }
+                RowDivider()
+                SettingSwitch(stringResource(R.string.wake_off), stringResource(R.string.wake_off_hint), s.noWakeScreen) {
+                    model.updateSettings(s.copy(noWakeScreen = it))
+                }
+                RowDivider()
+                Column(Modifier.padding(horizontal = Spacing.INSIDE.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.vibration_title), style = TypeScale.BODY.style(t.text.c()))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (v in ApprovalVibration.entries) {
+                            val label = stringResource(when (v) {
+                                ApprovalVibration.DEFAULT -> R.string.vibration_default
+                                ApprovalVibration.SHORT -> R.string.vibration_short
+                                ApprovalVibration.OFF -> R.string.vibration_off
+                            })
+                            PillButton(label, { model.updateSettings(s.copy(vibration = v)) }, Modifier.weight(1f), if (s.vibration == v) PillKind.PRIMARY else PillKind.SECONDARY)
+                        }
+                    }
+                    Text(stringResource(R.string.vibration_hint), style = TypeScale.SECONDARY.style(t.textDim.c()))
                 }
                 Spacer(Modifier.height(8.dp))
             }

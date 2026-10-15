@@ -314,6 +314,13 @@
     "battery_title": "Keep the connection while the screen is off",
     "battery_body": "Android pauses background apps to save battery. If requests stop reaching you when the phone is locked, let Coucou run without restrictions. This is only a suggestion.",
     "battery_open": "Open settings",
-    "battery_not_now": "Not now"
+    "battery_not_now": "Not now",
+    "wake_off": "Don't wake the screen for a request",
+    "wake_off_hint": "The request still shows in your notifications and in the app. The screen of a sleeping phone stays dark.",
+    "vibration_title": "Vibration for a request",
+    "vibration_hint": "Requests always make a sound and show a notification. This only changes the buzz.",
+    "vibration_default": "Default",
+    "vibration_short": "Short",
+    "vibration_off": "Off"
   }
 }

@@ -31,6 +31,36 @@ class UserSettingsTest {
 
     // ── settings ────────────────────────────────────────────────────────────
 
+    @Test fun theNewNoticeSettingsKeepTodayByDefaultAndAreRemembered() {
+        val fresh = UserSettings.load(Memory())
+        assertFalse(fresh.noWakeScreen)
+        assertEquals(com.coucou.android.core.ApprovalVibration.DEFAULT, fresh.vibration)
+        val m = Memory()
+        UserSettings.save(m, UserSettings(noWakeScreen = true, vibration = com.coucou.android.core.ApprovalVibration.SHORT))
+        val back = UserSettings.load(m)
+        assertTrue(back.noWakeScreen)
+        assertEquals(com.coucou.android.core.ApprovalVibration.SHORT, back.vibration)
+        m.map["approval_vibration"] = "garbage"
+        assertEquals(com.coucou.android.core.ApprovalVibration.DEFAULT, UserSettings.load(m).vibration)
+    }
+
+    @Test fun eachVibrationHasItsOwnChannelAndTheDefaultKeepsTodaysIdAndPattern() {
+        val v = com.coucou.android.core.ApprovalVibration
+        assertEquals("approvals_v3", v.DEFAULT.channelId)
+        assertEquals(listOf(0L, 500L, 150L, 500L), v.DEFAULT.pattern!!.toList())
+        assertEquals(3, v.entries.map { it.channelId }.toSet().size)
+        assertEquals(null, v.OFF.pattern)
+        assertTrue(v.SHORT.pattern!!.sum() < v.DEFAULT.pattern!!.sum())
+    }
+
+    @Test fun approvalsStayLoudWhateverTheChoice() {
+        val n = java.io.File("src/main/kotlin/com/coucou/android/app/Notifications.kt").readText()
+        val make = n.substringAfter("fun useVibration").substringBefore("private fun open(")
+        assertTrue("the same sound and importance for every choice", make.contains("IMPORTANCE_HIGH") && make.contains("R.raw.approval"))
+        assertTrue("the old channels are deleted", make.contains("deleteNotificationChannel"))
+        assertTrue("the quiet-hours and quiet-pill rules are not involved", !make.contains("quiet"))
+    }
+
     @Test fun defaultsKeepTheAppAsItWas() {
         val loaded = UserSettings.load(Memory())
         assertTrue(loaded.soundOn)

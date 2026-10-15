@@ -140,10 +140,16 @@ class AppModel(private val context: Context) : LinkListener {
     /** What the user chose in Settings (sound, notices, quiet hours). */
     var settings by mutableStateOf(UserSettings.load(kv)); private set
 
+    init { notifier.useVibration(settings.vibration) }
+
     fun updateSettings(next: UserSettings) {
         val relayChanged = next.useRelay != settings.useRelay
         settings = next
         UserSettings.save(kv, next)
+        // A new buzz is a new channel; the notifications of the old one went with it, so the waiting requests are shown again (quietly).
+        if (notifier.useVibration(next.vibration)) {
+            for (r in approvals) notifier.showApproval(r, agentName(r.pillId), OverlayPolicy.ApprovalAlert.QUIET, wake = false)
+        }
         applySound()
         // Switching the relay on or off rebuilds the connection with the right routes.
         if (relayChanged) currentPairing?.let { restartLink(it) }
@@ -749,7 +755,7 @@ class AppModel(private val context: Context) : LinkListener {
             approvals = approvals.filter { it.fingerprint != request.fingerprint } + request
             // One announcement only: the island if it can show, else the heads-up notification.
             refreshIsland()
-            notifier.showApproval(request, agentName(request.pillId), OverlayPolicy.approvalAlert(overlay.isShowingRequest()))
+            notifier.showApproval(request, agentName(request.pillId), OverlayPolicy.approvalAlert(overlay.isShowingRequest()), wake = !settings.noWakeScreen)
             // Offered for 120 s from now, by this phone's clock (the notification times out then too).
             expiry.remove(request.fingerprint)?.let { main.removeCallbacks(it) }
             val gone = Runnable { removeApproval(request.fingerprint) }

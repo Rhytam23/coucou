@@ -315,4 +315,11 @@
     <string name="battery_body">Android pauses background apps to save battery. If requests stop reaching you when the phone is locked, let Coucou run without restrictions. This is only a suggestion.</string>
     <string name="battery_open">Open settings</string>
     <string name="battery_not_now">Not now</string>
+    <string name="wake_off">Don\'t wake the screen for a request</string>
+    <string name="wake_off_hint">The request still shows in your notifications and in the app. The screen of a sleeping phone stays dark.</string>
+    <string name="vibration_title">Vibration for a request</string>
+    <string name="vibration_hint">Requests always make a sound and show a notification. This only changes the buzz.</string>
+    <string name="vibration_default">Default</string>
+    <string name="vibration_short">Short</string>
+    <string name="vibration_off">Off</string>
 </resources>

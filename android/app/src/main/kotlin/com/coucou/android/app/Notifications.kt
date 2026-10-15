@@ -14,6 +14,7 @@ import android.util.Log
 import com.coucou.android.MainActivity
 import com.coucou.android.R
 import com.coucou.android.core.ApprovalSheetPlan
+import com.coucou.android.core.ApprovalVibration
 import com.coucou.android.core.Glance
 import com.coucou.android.core.GlanceTone
 import com.coucou.android.core.OverlayPolicy
@@ -54,20 +55,34 @@ class Notifications(private val context: Context) {
                 setShowBadge(false)
             },
         )
+    }
+
+    /** The vibration the approval channel was made with; the channel itself is made (once) by [useVibration]. */
+    private var vibration: ApprovalVibration? = null
+
+    /**
+     * The approval channel for [v]. A channel cannot change after it is made, so a different choice means a different id: the
+     * channels of the other choices are deleted (their notifications go with them, which is why the caller shows the waiting
+     * requests again) and this one is made. Mochi's own sound and the heads-up importance are the same for every choice.
+     */
+    fun useVibration(v: ApprovalVibration): Boolean {
+        if (vibration == v) return false
+        val changed = vibration != null
+        for (id in ApprovalVibration.allChannelIds) if (id != v.channelId) nm.deleteNotificationChannel(id)
         nm.createNotificationChannel(
-            NotificationChannel(CH_APPROVAL, "Approvals", NotificationManager.IMPORTANCE_HIGH).apply {
+            NotificationChannel(v.channelId, "Approvals", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "An agent is waiting for your permission"
-                // A short buzz, so a request is felt even when the notification volume is 0 (a channel cannot change
-                // later, which is why this one has a new id).
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 500, 150, 500)
-                // Mochi's own approval sound, bundled in res/raw.
+                val pattern = v.pattern
+                enableVibration(pattern != null)
+                if (pattern != null) vibrationPattern = pattern
                 setSound(
                     Uri.parse("${ContentResolver.SCHEME_ANDROID_RESOURCE}://${context.packageName}/${R.raw.approval}"),
                     AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build(),
                 )
             },
         )
+        vibration = v
+        return changed
     }
 
     private fun open(fp: String?, allow: Boolean, code: Int): PendingIntent {
@@ -122,8 +137,13 @@ class Notifications(private val context: Context) {
         runCatching { nm.notify(ONGOING_ID, ongoing(g)) }.onFailure { shown.forget() }
     }
 
-    fun showApproval(r: ApprovalRequest, agentName: String, alert: OverlayPolicy.ApprovalAlert = OverlayPolicy.ApprovalAlert.HEADS_UP) {
-        val channel = if (alert == OverlayPolicy.ApprovalAlert.QUIET) CH_APPROVAL_QUIET else CH_APPROVAL
+    fun showApproval(
+        r: ApprovalRequest, agentName: String, alert: OverlayPolicy.ApprovalAlert = OverlayPolicy.ApprovalAlert.HEADS_UP,
+        /** False when the user chose not to light a sleeping phone's screen for a request. */
+        wake: Boolean = true,
+    ) {
+        useVibration(vibration ?: ApprovalVibration.DEFAULT)
+        val channel = if (alert == OverlayPolicy.ApprovalAlert.QUIET) CH_APPROVAL_QUIET else (vibration ?: ApprovalVibration.DEFAULT).channelId
         Log.d("CoucouOverlay", "approval notification: $alert")
         val id = idFor(r.fingerprint)
         val deny = PendingIntent.getBroadcast(
@@ -151,7 +171,7 @@ class Notifications(private val context: Context) {
             }
             .build()
         runCatching { nm.notify(id, n) } // POST_NOTIFICATIONS may be denied: the in-app card still works
-        if (alert == OverlayPolicy.ApprovalAlert.HEADS_UP) wakeScreen()
+        if (wake && alert == OverlayPolicy.ApprovalAlert.HEADS_UP) wakeScreen()
     }
 
     /**
@@ -218,7 +238,6 @@ class Notifications(private val context: Context) {
     companion object {
         const val CH_LINK = "link"
         private const val WAKE_MS = 6_000L
-        const val CH_APPROVAL = "approvals_v3"
         const val CH_APPROVAL_QUIET = "approvals_quiet"
         const val CH_UPDATES = "updates"
         private const val STATUS_TAG = "status"
