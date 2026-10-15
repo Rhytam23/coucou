@@ -12,6 +12,13 @@ class RelayStatusTest {
     private fun kind(hasRelay: Boolean = true, use: Boolean = true, connected: Boolean = false, route: Route? = null, issue: RelayIssue = RelayIssue.NONE) =
         RelayStatus.kind(hasRelay, use, connected, route, issue)
 
+    @Test fun theSectionShowsOnlyWhenTheComputerOffersTheRelayOrThePairingHasOne() {
+        assertTrue(RelayStatus.sectionVisible(paired = true, hasRelay = true, computerOffersRelay = false))
+        assertTrue(RelayStatus.sectionVisible(paired = true, hasRelay = false, computerOffersRelay = true))
+        assertTrue(!RelayStatus.sectionVisible(paired = true, hasRelay = false, computerOffersRelay = false))
+        assertTrue(!RelayStatus.sectionVisible(paired = false, hasRelay = true, computerOffersRelay = true))
+    }
+
     @Test fun aPairingWithoutARelayExplainsHowToGetOne() = assertEquals(RelayLineKind.NO_RELAY_IN_PAIRING, kind(hasRelay = false, connected = true))
 
     @Test fun switchedOffSaysSo() = assertEquals(RelayLineKind.SWITCHED_OFF, kind(use = false, connected = true, route = Route.LAN))

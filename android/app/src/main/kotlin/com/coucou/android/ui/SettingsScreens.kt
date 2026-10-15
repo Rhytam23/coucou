@@ -166,7 +166,7 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
             }
         }
 
-        if (model.mode == Mode.PAIRED) {
+        if (RelayStatus.sectionVisible(model.mode == Mode.PAIRED, model.hasRelay, model.relayOffered)) {
             item { SectionHeading(stringResource(R.string.settings_section_away)) }
             item { RelayCard(model) }
         }

@@ -101,6 +101,8 @@ class AppModel(private val context: Context) : LinkListener {
 
     /** Whether the pairing in force includes a relay (shown in Settings > Away from home Wi-Fi). */
     val hasRelay: Boolean get() = currentPairing?.relay != null
+    /** The computer's latest welcome offered the relay (kept while the link is down, replaced by the next welcome). */
+    var relayOffered by mutableStateOf(false); private set
     val relayHost: String? get() = currentPairing?.relay?.relayUrl()?.host
 
     private val netWatch = NetworkWatch(context, { up -> main.post { onNetworkChanged(up) } }, { main.post { onWake(Wake.NEW_NETWORK) } })
@@ -669,6 +671,7 @@ class AppModel(private val context: Context) : LinkListener {
 
     override fun onCaps(caps: Set<String>) {
         main.post {
+            relayOffered = Protocol.CAP_RELAY in caps
             chatOffered = Protocol.CAP_CHAT in caps
             detailsOffered = Protocol.CAP_DETAILS in caps
             diffsOffered = Protocol.CAP_DIFFS in caps
