@@ -55,4 +55,19 @@ class NavigationTest {
     @Test fun everyTabLeadsToItsOwnScreen() {
         for (t in Tab.entries) assertEquals(t, Nav.tabOf(Nav.screenOf(t)))
     }
+
+    @Test fun predictiveBackIsOnAndBackFromEveryScreenReachesHomeThenLeaves() {
+        // android:enableOnBackInvokedCallback shows the system's back preview; it needs every screen to answer Back through a handler.
+        assertTrue(java.io.File("src/main/AndroidManifest.xml").readText().contains("""android:enableOnBackInvokedCallback="true""""))
+        for (s in Screen.entries) {
+            var at = s
+            var steps = 0
+            while (Nav.back(at) != null) { at = Nav.back(at)!!; steps++; assertTrue("$s loops", steps <= 2) }
+            assertEquals("$s ends on Home", Screen.HOME, at)
+        }
+        assertNull("Back on Home leaves the app", Nav.back(Screen.HOME))
+        // Every sheet closes itself on Back (BottomSheetHost) and every dialog through its dismiss request.
+        val sheets = java.io.File("src/main/kotlin/com/coucou/android/ui/Sheets.kt").readText()
+        assertTrue(sheets.contains("BackHandler(onBack = onDismiss)"))
+    }
 }
