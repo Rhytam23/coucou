@@ -13,6 +13,8 @@ import { registerVoiceHandlers } from "./island/voice";
 import { applySpotify, registerSpotifyHandlers } from "./island/spotify";
 import { SPOTIFY_ID } from "./core/spotify";
 import { Recap } from "./recap/recap";
+import { Updates } from "./island/update";
+import { WhatsNew } from "./whats-new/controller";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
 /** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
@@ -84,6 +86,11 @@ async function main() {
         setPaused(false);
         island.alert("wardrobe");
         break;
+      // "Update Coucou to X…", only in the menu while a new version is out.
+      case "update":
+        setPaused(false);
+        Updates.show();
+        break;
       case "pause":
         setPaused(!State.paused);
         if (State.paused) island.fsm.forceHidden();
@@ -141,6 +148,8 @@ async function main() {
   registerShortcutHandlers(island, () => setPaused(false));
   registerVoiceHandlers();
   registerSpotifyHandlers(island);
+  // New versions: Rust offers the card, the island opens it when nothing else waits.
+  await Updates.register(island);
   // Rust may have read Spotify before this page listened: ask once.
   if (State.settings.activeIntegrations.includes(SPOTIFY_ID)) {
     void Bridge.spotifyRefresh().then((s) => s && applySpotify(island, s));
@@ -148,7 +157,14 @@ async function main() {
 
   // Monday recap: app start (greeting over), an agent starting work, waking up.
   const checkRecap = () => void Recap.check(island);
-  island.onGreetingDone = checkRecap;
+  // What's new, once after an update: when the greeting is over, or a few
+  // seconds in when there is no greeting (the card waits for a quiet island).
+  const whatsNew = () => void WhatsNew.launch(island);
+  island.onGreetingDone = () => {
+    checkRecap();
+    whatsNew();
+  };
+  window.setTimeout(whatsNew, 8000);
   island.onWake = checkRecap;
   await onEvent<null>("recap-check", checkRecap);
 
