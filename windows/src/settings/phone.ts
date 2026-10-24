@@ -6,6 +6,7 @@ import { modelId, modelsOf, toggleModel, usableProviders } from "../core/phone-c
 import { PROVIDERS, type ProviderDef } from "../core/providers";
 import type { Settings } from "../core/state";
 import { h } from "../views/dom";
+import { statusDot } from "./parts";
 import { t } from "../i18n/i18n";
 
 type Toggle = (on: boolean, onChange: (v: boolean) => void) => HTMLElement;
@@ -15,6 +16,25 @@ type Toggle = (on: boolean, onChange: (v: boolean) => void) => HTMLElement;
  * turning this on shows it again. Nothing else changes.
  */
 const SHOW_RELAY_SETTINGS = false;
+
+/**
+ * One setting: its label and switch on a line, its explanation right under it (smaller, muted), then any note, so it
+ * is always clear which text belongs to which switch.
+ */
+function setting(label: string, switchEl: HTMLElement, hint: string, ...rest: (HTMLElement | null)[]): HTMLElement {
+  return h(
+    "div",
+    { class: "phone-setting" },
+    h("div", { class: "row" }, h("label", { text: label }), switchEl),
+    h("div", { class: "hint", text: hint }),
+    ...rest.filter((x): x is HTMLElement => x !== null),
+  );
+}
+
+/** A group of settings under a small heading (Link, What the phone may see, Chat). */
+function group(title: string, ...children: HTMLElement[]): HTMLElement {
+  return h("div", { class: "phone-group" }, h("div", { class: "subhead", text: title }), ...children);
+}
 
 export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings): HTMLElement {
   const detail = h("div", {});
@@ -56,32 +76,45 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
     const show = h("button", { text: t("Show pairing code") });
     show.addEventListener("click", () => void reveal(status, false));
     const address = status.host ? `${status.host}:${status.port}` : `:${status.port}`;
-    clients.textContent = t("Phones connected: {count}", { count: status.clients });
+    showClients(status.clients);
     detail.append(
-      h("div", { class: "row" }, show),
-      pairingBox,
-      clients,
-      h("div", { class: "hint", text: t("The phone connects to {address}", { address }) }),
-      h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
-      h("div", { class: "hint", text: t("Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.") }),
-      ...(SHOW_RELAY_SETTINGS ? [relayBlock(makeToggle, () => void refreshPairing())] : []),
-      detailsBlock(makeToggle),
-      answersBlock(makeToggle),
-      diffsBlock(makeToggle),
-      usageBlock(makeToggle),
-      recapBlock(makeToggle),
-      servicesBlock(),
-      chatBlock(makeToggle, settings),
+      group(
+        t("Link"),
+        h("div", { class: "row" }, show),
+        pairingBox,
+        h("div", { class: "phone-status" }, clientsDot, clients),
+        h("div", { class: "phone-status" }, statusDot(true), h("span", { text: t("The phone connects to {address}", { address }) })),
+        h("div", { class: "hint", text: t("If Windows asks about the firewall, allow Coucou on private networks. The phone and this computer must be on the same Wi-Fi.") }),
+        h("div", { class: "hint", text: t("Your phone finds this computer again by itself when the network changes. It is announced on your local network only while this switch is on. Some hotspots and guest networks block this.") }),
+        ...(SHOW_RELAY_SETTINGS ? [relayBlock(makeToggle, () => void refreshPairing())] : []),
+      ),
+      group(
+        t("What the phone may see"),
+        detailsBlock(makeToggle),
+        answersBlock(makeToggle),
+        diffsBlock(makeToggle),
+        usageBlock(makeToggle),
+        recapBlock(makeToggle),
+        servicesBlock(makeToggle),
+      ),
+      group(t("Chat"), chatBlock(makeToggle, settings)),
     );
   };
 
   /** Kept up to date while the window is open and the link is on; nothing runs otherwise. */
-  const clients = h("div", { class: "hint" });
+  const clients = h("span", {});
+  let clientsDot = statusDot(false);
+  const showClients = (count: number) => {
+    clients.textContent = t("Phones connected: {count}", { count });
+    const next = statusDot(count > 0);
+    clientsDot.replaceWith(next);
+    clientsDot = next;
+  };
   const watch = window.setInterval(() => {
     if (!section.isConnected) return window.clearInterval(watch);
     if (document.visibilityState !== "visible" || !clients.isConnected) return;
     void Bridge.phoneLinkStatus().then((s) => {
-      if (s?.running) clients.textContent = t("Phones connected: {count}", { count: s.clients });
+      if (s?.running) showClients(s.clients);
     });
   }, 5000);
 
@@ -105,10 +138,13 @@ export function phoneSection(on: boolean, makeToggle: Toggle, settings: Settings
     "section",
     {},
     h("h2", {}, h("span", { text: t("Android phone") })),
-    h("div", { class: "hint", text: t("Send your agents' sessions to Coucou for Android and answer permission requests from the phone. Off by default; it only listens on your local network.") }),
-    h("div", { class: "hint", text: t("Allow on the phone asks for the fingerprint or the screen lock. Deny does not.") }),
-    h("div", { class: "row" }, h("label", { text: t("Phone link") }), switchEl),
-    note,
+    setting(
+      t("Phone link"),
+      switchEl,
+      t("Send your agents' sessions to Coucou for Android and answer permission requests from the phone. Off by default; it only listens on your local network."),
+      h("div", { class: "hint", text: t("Allow on the phone asks for the fingerprint or the screen lock. Deny does not.") }),
+      note,
+    ),
     detail,
   );
   return section;
@@ -228,13 +264,7 @@ function detailsBlock(makeToggle: Toggle): HTMLElement {
     switchEl.classList.toggle("on", status.enabled);
     switchEl.setAttribute("aria-pressed", String(status.enabled));
   });
-  return h(
-    "div",
-    {},
-    h("div", { class: "row" }, h("label", { text: t("Show session details on the phone") }), switchEl),
-    h("div", { class: "hint", text: t("Sends the last steps (as shown on the island, so they can include commands), the final line, the project's folder name and the colour. Never a path.") }),
-    note,
-  );
+  return setting(t("Show session details on the phone"), switchEl, t("Sends the last steps (as shown on the island, so they can include commands), the final line, the project's folder name and the colour. Never a path."), note);
 }
 
 /**
@@ -260,13 +290,7 @@ function answersBlock(makeToggle: Toggle): HTMLElement {
     switchEl.classList.toggle("on", status.enabled);
     switchEl.setAttribute("aria-pressed", String(status.enabled));
   });
-  return h(
-    "div",
-    {},
-    h("div", { class: "row" }, h("label", { text: t("Let the phone answer Claude Code's questions") }), switchEl),
-    h("div", { class: "hint", text: t("The phone shows each question with its options. Every answer is confirmed with the phone's fingerprint or screen lock.") }),
-    note,
-  );
+  return setting(t("Let the phone answer Claude Code's questions"), switchEl, t("The phone shows each question with its options. Every answer is confirmed with the phone's fingerprint or screen lock."), note);
 }
 
 /** The service pills the phone may show, with the names the pills carry (brand names, not translated). */
@@ -280,36 +304,39 @@ const PHONE_SERVICES: [string, string][] = [
  * says is a headline and three short lines, never an address, a link or a secret. Rust re-reads the ticks for every
  * connection and sends a phone only the services ticked here.
  */
-function servicesBlock(): HTMLElement {
+function servicesBlock(makeToggle: Toggle): HTMLElement {
   const note = h("div", { class: "hint" });
   let ticked: string[] = [];
+  const setOn = (el: HTMLElement, on: boolean) => {
+    el.classList.toggle("on", on);
+    el.setAttribute("aria-pressed", String(on));
+  };
   const boxes = PHONE_SERVICES.map(([id, name]) => {
-    const box = h("input", { type: "checkbox" }) as HTMLInputElement;
-    box.addEventListener("change", () => {
+    const box = makeToggle(false, (checked) => {
       void (async () => {
         note.textContent = "";
-        const next = box.checked ? [...new Set([...ticked, id])] : ticked.filter((x) => x !== id);
+        const next = checked ? [...new Set([...ticked, id])] : ticked.filter((x) => x !== id);
         try {
           ticked = (await Bridge.phoneServicesSet(next)).services;
         } catch (err) {
-          box.checked = ticked.includes(id);
+          setOn(box, ticked.includes(id));
           note.textContent = String(err);
         }
       })();
     });
-    return { id, box, row: h("div", { class: "row" }, h("label", {}, box, h("span", { text: ` ${name}` }))) };
+    return { id, box, row: h("div", { class: "row phone-service" }, h("label", { text: name }), box) };
   });
   void Bridge.phoneServicesStatus().then((status) => {
     if (!status) return;
     ticked = status.services;
-    for (const b of boxes) b.box.checked = ticked.includes(b.id);
+    for (const b of boxes) setOn(b.box, ticked.includes(b.id));
   });
   return h(
     "div",
-    {},
+    { class: "phone-setting" },
     h("div", { class: "row" }, h("label", { text: t("Show these services on the phone") })),
     h("div", { class: "hint", text: t("Each tick lets your paired phone see that service's card: a headline and up to three short lines, read-only. Nothing is shown until you tick it. No addresses, subjects, links or keys are ever sent.") }),
-    ...boxes.map((b) => b.row),
+    h("div", { class: "phone-sub" }, ...boxes.map((b) => b.row)),
     note,
   );
 }
@@ -337,13 +364,7 @@ function usageBlock(makeToggle: Toggle): HTMLElement {
     switchEl.classList.toggle("on", status.enabled);
     switchEl.setAttribute("aria-pressed", String(status.enabled));
   });
-  return h(
-    "div",
-    {},
-    h("div", { class: "row" }, h("label", { text: t("Show my plan usage on the phone") }), switchEl),
-    h("div", { class: "hint", text: t("The phone shows how much of your Claude and Codex plans is used and when they reset: the same percentages as the pills here, nothing else.") }),
-    note,
-  );
+  return setting(t("Show my plan usage on the phone"), switchEl, t("The phone shows how much of your Claude and Codex plans is used and when they reset: the same percentages as the pills here, nothing else."), note);
 }
 
 /**
@@ -370,13 +391,7 @@ function recapBlock(makeToggle: Toggle): HTMLElement {
     switchEl.classList.toggle("on", status.enabled);
     switchEl.setAttribute("aria-pressed", String(status.enabled));
   });
-  return h(
-    "div",
-    {},
-    h("div", { class: "row" }, h("label", { text: t("Show my weekly recap on the phone") }), switchEl),
-    h("div", { class: "hint", text: t("The phone shows last week's recap: time coding, sessions, files, lines, commands, permissions and the agent you used most. Counts only. The project's name is added only if you also show session details.") }),
-    note,
-  );
+  return setting(t("Show my weekly recap on the phone"), switchEl, t("The phone shows last week's recap: time coding, sessions, files, lines, commands, permissions and the agent you used most. Counts only. The project's name is added only if you also show session details."), note);
 }
 
 /**
@@ -402,13 +417,7 @@ function diffsBlock(makeToggle: Toggle): HTMLElement {
     switchEl.classList.toggle("on", status.enabled);
     switchEl.setAttribute("aria-pressed", String(status.enabled));
   });
-  return h(
-    "div",
-    {},
-    h("div", { class: "row" }, h("label", { text: t("Show the files an agent changed on the phone") }), switchEl),
-    h("div", { class: "hint", text: t("The phone lists the files each agent changed and, when you tap one, shows what changed in it (200 lines at most, long lines cut). File names and lines go only to your paired phone, over the pinned encrypted link, and only when it asks.") }),
-    note,
-  );
+  return setting(t("Show the files an agent changed on the phone"), switchEl, t("The phone lists the files each agent changed and, when you tap one, shows what changed in it (200 lines at most, long lines cut). File names and lines go only to your paired phone, over the pinned encrypted link, and only when it asks."), note);
 }
 
 /**
@@ -417,7 +426,7 @@ function diffsBlock(makeToggle: Toggle): HTMLElement {
  */
 function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
   let allowed: string[] = [];
-  const body = h("div", {});
+  const body = h("div", { class: "phone-sub" });
   const note = h("div", { class: "hint" });
 
   const save = async (next: string[]) => {
@@ -432,9 +441,9 @@ function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
 
   /** One provider: a button that asks it for its models (only now), then a tick box per model. */
   const providerRow = (p: ProviderDef): HTMLElement => {
-    const list = h("div", {});
+    const list = h("div", { class: "phone-sub" });
     const button = h("button", { text: t("Choose models") });
-    const head = h("div", { class: "row" }, h("label", { text: p.name }), button);
+    const head = h("div", { class: "row phone-provider" }, h("label", { text: p.name }), button);
     const show = (models: string[]) => {
       list.replaceChildren(
         ...[...new Set([...models, ...modelsOf(allowed, p.id)])].map((model) => {
@@ -442,7 +451,7 @@ function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
           const box = h("input", { type: "checkbox" }) as HTMLInputElement;
           box.checked = allowed.includes(id);
           box.addEventListener("change", () => void save(toggleModel(allowed, id, box.checked)));
-          return h("div", { class: "row" }, h("label", {}, box, h("span", { text: ` ${model}` })));
+          return h("div", { class: "row phone-model" }, box, h("label", { text: model }));
         }),
       );
     };
@@ -463,7 +472,7 @@ function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
     const hasKey: Record<string, boolean> = {};
     for (const p of usableProvidersCandidates()) hasKey[p.id] = (await Bridge.secretPresent(p.key!)) ?? false;
     const providers = usableProviders(settings, hasKey);
-    body.append(h("div", { class: "hint", text: t("Models the phone may use") }));
+    body.append(h("div", { class: "phone-label", text: t("Models the phone may use") }));
     if (providers.length === 0) body.append(h("div", { class: "hint", text: t("No provider is ready: add an API key or connect a local model first.") }));
     for (const p of providers) body.append(providerRow(p));
     emptyNote.hidden = allowed.length > 0;
@@ -493,7 +502,7 @@ function chatBlock(makeToggle: Toggle, settings: Settings): HTMLElement {
 
   return h(
     "div",
-    {},
+    { class: "phone-setting" },
     h("div", { class: "row" }, h("label", { text: t("Let the phone chat with my AI providers") }), switchEl),
     h("div", { class: "hint", text: t("Chat uses the API keys saved on this computer. The phone never sees them, and each message may cost money.") }),
     note,

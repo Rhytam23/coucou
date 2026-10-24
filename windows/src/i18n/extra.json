@@ -6091,6 +6091,32 @@
       "id": "Matikan pil lain untuk memberi tempat bagi WhatsApp (maksimal {max}).",
       "de": "Schalte eine andere Pill aus, um Platz für WhatsApp zu schaffen (höchstens {max}).",
       "tr": "WhatsApp’a yer açmak için başka bir hapı kapat (en fazla {max})."
+    },
+    "Link": {
+      "zh-Hans": "连接",
+      "hi": "लिंक",
+      "es": "Enlace",
+      "ar": "الربط",
+      "fr": "Liaison",
+      "bn": "সংযোগ",
+      "pt-BR": "Conexão",
+      "ru": "Связь",
+      "id": "Tautan",
+      "de": "Verbindung",
+      "tr": "Bağlantı"
+    },
+    "What the phone may see": {
+      "zh-Hans": "手机可以看到什么",
+      "hi": "फ़ोन क्या देख सकता है",
+      "es": "Lo que el móvil puede ver",
+      "ar": "ما يمكن للهاتف رؤيته",
+      "fr": "Ce que le téléphone peut voir",
+      "bn": "ফোন কী দেখতে পারে",
+      "pt-BR": "O que o celular pode ver",
+      "ru": "Что может видеть телефон",
+      "id": "Yang boleh dilihat ponsel",
+      "de": "Was das Handy sehen darf",
+      "tr": "Telefonun görebilecekleri"
     }
   }
 }
