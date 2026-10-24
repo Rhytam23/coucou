@@ -431,3 +431,18 @@ html[dir="rtl"] :is(.diff, .path, .keycap, input[type="password"], input[type="t
 /* Settings → Android phone: the pairing QR code (an SVG from Rust, black on white). */
 .qr { width: 220px; max-width: 100%; background: #fff; border-radius: 8px; padding: 4px; }
 .qr svg { display: block; width: 100%; height: auto; }
+
+/* Settings → Android phone: groups, one explanation under each switch, a status row, aligned sub-lists. */
+.phone-group { display: flex; flex-direction: column; gap: 14px; }
+.phone-group + .phone-group { border-top: 1px solid var(--hairline); padding-top: 14px; }
+.phone-setting { display: flex; flex-direction: column; gap: 4px; }
+.phone-setting .row { flex-wrap: nowrap; justify-content: space-between; }
+.phone-setting > .row > label { flex: 1 1 auto; min-width: 0; color: var(--ink); font-weight: 500; }
+.phone-setting .hint, .phone-group > .hint { max-width: 62ch; }
+.phone-status { display: flex; align-items: center; gap: 8px; font: 500 12.5px var(--font); color: var(--ink); }
+.phone-sub { display: flex; flex-direction: column; gap: 8px; padding-left: 12px; margin-top: 4px; border-left: 1px solid var(--hairline); }
+.phone-sub .row { flex-wrap: nowrap; justify-content: space-between; min-height: 28px; }
+.phone-sub .row > label { flex: 1 1 auto; min-width: 0; color: var(--ink); }
+.phone-model { justify-content: flex-start !important; gap: 8px; }
+.phone-model > label { flex: 0 1 auto !important; }
+.phone-label { font: 500 12.5px var(--font); color: var(--ink); }
