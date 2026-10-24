@@ -25,6 +25,9 @@ pub struct Settings {
     pub main_pill: String,
     /// "primary" = the main display, "cursor" = whichever display the mouse is on.
     pub screen: String,
+    /// How far the island is moved sideways from the middle of the top edge, in logical px
+    /// (negative: left). The window stays fully on the display whatever this says.
+    pub island_offset: f64,
     pub autostart: bool,
     pub hooks_installed: bool,
     /// Claude model used by the chat. Changeable in the settings window.
@@ -140,6 +143,7 @@ impl Default for Settings {
             ],
             main_pill: "integration_claude".into(),
             screen: "primary".into(),
+            island_offset: 0.0,
             autostart: false,
             hooks_installed: false,
             model: default_model(),

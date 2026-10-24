@@ -978,6 +978,33 @@ function generalSection(): HTMLElement {
     void save();
   });
 
+  // Moving the island along the top edge: it follows the slider while you drag, and the window never leaves the display.
+  const offsetLabel = h("span", { class: "hint" });
+  const showOffset = () =>
+    (offsetLabel.textContent = settings.islandOffset === 0 ? t("Centred") : `${settings.islandOffset > 0 ? "→" : "←"} ${Math.abs(Math.round(settings.islandOffset))} px`);
+  const offsetSlider = h("input", {
+    type: "range", min: "-600", max: "600", step: "10",
+    value: String(Math.round(settings.islandOffset || 0)),
+    style: "width:200px", "aria-label": t("Island position"),
+  }) as HTMLInputElement;
+  let offsetTimer = 0;
+  offsetSlider.addEventListener("input", () => {
+    settings.islandOffset = Number(offsetSlider.value);
+    showOffset();
+    window.clearTimeout(offsetTimer);
+    offsetTimer = window.setTimeout(() => void save(), 80);
+  });
+  const offsetReset = h("button", {
+    text: t("Centre"),
+    onclick: () => {
+      settings.islandOffset = 0;
+      offsetSlider.value = "0";
+      showOffset();
+      void save();
+    },
+  });
+  showOffset();
+
   return h(
     "section",
     {},
@@ -1008,6 +1035,13 @@ function generalSection(): HTMLElement {
       h("label", { text: t("Island lives on") }),
       screen,
     ),
+    h("div", { class: "row" },
+      h("label", { text: t("Island position") }),
+      offsetSlider,
+      offsetLabel,
+      offsetReset,
+    ),
+    h("div", { class: "hint", text: t("Slide the island along the top edge of the screen. It always stays fully on the screen.") }),
     h("div", { class: "row" },
       h("label", { text: t("Launch at startup") }),
       toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
