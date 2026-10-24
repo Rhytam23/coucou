@@ -6117,6 +6117,84 @@
       "id": "Yang boleh dilihat ponsel",
       "de": "Was das Handy sehen darf",
       "tr": "Telefonun görebilecekleri"
+    },
+    "Hide the pill until I dictate": {
+      "zh-Hans": "听写前隐藏胶囊",
+      "hi": "बोलने तक पिल छिपाएँ",
+      "es": "Ocultar la píldora hasta que dicte",
+      "ar": "إخفاء الكبسولة حتى أبدأ الإملاء",
+      "fr": "Masquer la pastille jusqu'à ce que je dicte",
+      "bn": "বলা শুরু না করা পর্যন্ত পিল লুকান",
+      "pt-BR": "Ocultar a pílula até eu ditar",
+      "ru": "Скрывать капсулу, пока я не диктую",
+      "id": "Sembunyikan pil sampai saya mendikte",
+      "de": "Pille ausblenden, bis ich diktiere",
+      "tr": "Ben dikte edene kadar hapı gizle"
+    },
+    "It shows only while you dictate, record a call or get a message. The dictation key still works.": {
+      "zh-Hans": "仅在听写、录制通话或收到消息时显示。听写键仍然有效。",
+      "hi": "यह केवल बोलते, कॉल रिकॉर्ड करते या संदेश आने पर दिखता है। डिक्टेशन कुंजी पहले की तरह काम करती है।",
+      "es": "Solo aparece cuando dictas, grabas una llamada o recibes un mensaje. La tecla de dictado sigue funcionando.",
+      "ar": "تظهر فقط عند الإملاء أو تسجيل مكالمة أو وصول رسالة. يظل مفتاح الإملاء يعمل.",
+      "fr": "Elle n'apparaît que quand tu dictes, enregistres un appel ou reçois un message. La touche de dictée fonctionne toujours.",
+      "bn": "এটি শুধু বলার সময়, কল রেকর্ড করার সময় বা বার্তা এলে দেখা যায়। ডিক্টেশন কী আগের মতোই কাজ করে।",
+      "pt-BR": "Aparece só quando você dita, grava uma chamada ou recebe uma mensagem. A tecla de ditado continua funcionando.",
+      "ru": "Показывается только при диктовке, записи звонка или сообщении. Клавиша диктовки по-прежнему работает.",
+      "id": "Hanya muncul saat Anda mendikte, merekam panggilan, atau menerima pesan. Tombol dikte tetap berfungsi.",
+      "de": "Sie erscheint nur beim Diktieren, bei einer Anrufaufnahme oder einer Nachricht. Die Diktiertaste funktioniert weiterhin.",
+      "tr": "Yalnızca dikte ederken, bir görüşmeyi kaydederken veya mesaj gelince görünür. Dikte tuşu yine çalışır."
+    },
+    "Island position": {
+      "zh-Hans": "岛的位置",
+      "hi": "आइलैंड की स्थिति",
+      "es": "Posición de la isla",
+      "ar": "موضع الجزيرة",
+      "fr": "Position de l'îlot",
+      "bn": "আইল্যান্ডের অবস্থান",
+      "pt-BR": "Posição da ilha",
+      "ru": "Положение острова",
+      "id": "Posisi pulau",
+      "de": "Position der Insel",
+      "tr": "Ada konumu"
+    },
+    "Centred": {
+      "zh-Hans": "居中",
+      "hi": "बीच में",
+      "es": "Centrada",
+      "ar": "في المنتصف",
+      "fr": "Centré",
+      "bn": "মাঝখানে",
+      "pt-BR": "Centralizada",
+      "ru": "По центру",
+      "id": "Di tengah",
+      "de": "Zentriert",
+      "tr": "Ortada"
+    },
+    "Centre": {
+      "zh-Hans": "居中",
+      "hi": "बीच में लाएँ",
+      "es": "Centrar",
+      "ar": "توسيط",
+      "fr": "Centrer",
+      "bn": "মাঝখানে আনুন",
+      "pt-BR": "Centralizar",
+      "ru": "По центру",
+      "id": "Tengahkan",
+      "de": "Zentrieren",
+      "tr": "Ortala"
+    },
+    "Slide the island along the top edge of the screen. It always stays fully on the screen.": {
+      "zh-Hans": "沿屏幕顶部边缘滑动该岛。它始终完整显示在屏幕内。",
+      "hi": "आइलैंड को स्क्रीन के ऊपरी किनारे पर खिसकाएँ। यह हमेशा पूरी तरह स्क्रीन पर रहता है।",
+      "es": "Desliza la isla por el borde superior de la pantalla. Siempre queda completa dentro de la pantalla.",
+      "ar": "حرّك الجزيرة على طول الحافة العلوية للشاشة. تبقى دائمًا ضمن الشاشة بالكامل.",
+      "fr": "Fais glisser l'îlot le long du bord supérieur de l'écran. Il reste toujours entièrement à l'écran.",
+      "bn": "পর্দার উপরের কিনারা ধরে আইল্যান্ড সরান। এটি সবসময় পুরোপুরি পর্দার ভেতরে থাকে।",
+      "pt-BR": "Deslize a ilha pela borda superior da tela. Ela sempre fica inteira dentro da tela.",
+      "ru": "Сдвигайте остров вдоль верхнего края экрана. Он всегда остаётся на экране целиком.",
+      "id": "Geser pulau di sepanjang tepi atas layar. Pulau selalu tetap sepenuhnya di layar.",
+      "de": "Schiebe die Insel am oberen Bildschirmrand entlang. Sie bleibt immer vollständig auf dem Bildschirm.",
+      "tr": "Adayı ekranın üst kenarı boyunca kaydırın. Her zaman tamamen ekranda kalır."
     }
   }
 }

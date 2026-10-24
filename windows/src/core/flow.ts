@@ -28,6 +28,8 @@ export interface FlowPrefs {
   enabled: boolean;
   key: FlowKey;
   edge: Edge;
+  /** Hide the pill until a dictation, a call or a message needs it. */
+  hidePill: boolean;
   mic: string;
   keepDays: number;
   cleanup: boolean;

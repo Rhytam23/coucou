@@ -90,6 +90,8 @@ pub struct Prefs {
     pub enabled: bool,
     pub key: FlowKey,
     pub edge: Edge,
+    /// Hide the pill while nothing is dictated: it shows only for a dictation, a call being recorded or a message.
+    pub hide_pill: bool,
     /// The microphone by name; empty is the system's default.
     pub mic: String,
     /// Days the history is kept: 0 = not kept, -1 = forever.
@@ -115,6 +117,7 @@ impl Default for Prefs {
             enabled: false,
             key: FlowKey::default(),
             edge: Edge::Bottom,
+            hide_pill: false,
             mic: String::new(),
             keep_days: 30,
             cleanup: false,
