@@ -1,0 +1,1 @@
+CI: checkout v7, setup-node v7, cache v6, upload-artifact v7, download-artifact v8
