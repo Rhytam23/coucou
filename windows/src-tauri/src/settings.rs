@@ -115,19 +115,6 @@ pub struct Settings {
     /// the screen wakes it). Kept as it comes, like `mochi_outfit`: the island
     /// reads what it doesn't know as "mochi".
     pub closed_island: String,
-    /// Where the user moved the island: dropping Mochi somewhere, or sliding
-    /// the island along the top. None: the top centre. Owned by the Rust side
-    /// (island.rs), like `desktop_mochi`: what a webview sends back is ignored.
-    pub island_spot: Option<IslandSpot>,
-}
-
-/// The island's place on its display, in logical pixels: its centre from the
-/// display's centre, and its top from the top of the work area.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct IslandSpot {
-    pub dx: f64,
-    pub top: f64,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -199,7 +186,6 @@ impl Default for Settings {
             phone_relay_url: String::new(),
             show_clock: false,
             closed_island: "mochi".into(),
-            island_spot: None,
         }
     }
 }
@@ -597,14 +583,6 @@ mod tests {
         assert_eq!(loaded.mochi_outfit, "auto");
         assert_eq!(loaded.model, "some-model");
         assert!(!loaded.sound_enabled);
-    }
-
-    #[test]
-    fn a_file_from_before_the_moved_island_keeps_it_at_the_top_centre() {
-        let loaded = parse(&custom_with("islandSpot", None)).unwrap();
-        assert_eq!(loaded.island_spot, None);
-        let moved = parse(&custom_with("islandSpot", Some(serde_json::json!({ "dx": -300.0, "top": 0.0 })))).unwrap();
-        assert_eq!(moved.island_spot, Some(IslandSpot { dx: -300.0, top: 0.0 }));
     }
 
     #[test]

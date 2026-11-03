@@ -57,9 +57,8 @@ You can also [build it yourself](#build-it-yourself).
 | Click Mochi | It gets annoyed. Three times in a row and it goes dizzy |
 | Rest the pointer on Mochi for two seconds | Hearts |
 | Right-click Mochi | The wardrobe: rest the pointer on an outfit to try it on, click to keep it. **Auto** dresses him for the season (witch hat in October, Santa hat in December…) |
-| Drag Mochi out of the island and drop him anywhere | The whole island moves there and stays, after a restart too. Drop him near the top centre to bring it back (or **Settings → General → Back to the top centre**). Dropped on the island itself, nothing moves. Where windows can't be placed (KDE, Hyprland and other layer-shell desktops), he goes onto the desktop alone instead |
-| Drag the island itself (not Mochi, not a button) | It slides left or right along the top of the screen, and snaps back to the centre when let go close to it |
-| On the desktop: click / right-click / double-click Mochi | Poke him / the wardrobe / he flies home. Drag him to move him. `Ctrl+Alt+D` sends him there, in his outfit, watching your cursor |
+| Drag Mochi out of the island | He moves onto your desktop and hangs out there, in his outfit, watching your cursor. Drop him back on the island to bring him home |
+| On the desktop: click / right-click / double-click Mochi | The island opens beside him, on his left (on his right near the left edge), and goes back to the top when it closes; click him again to close it / the wardrobe / he flies home. Drag him to move him. Where windows can't be placed (KDE, Hyprland and other layer-shell desktops) the island opens at the top |
 | Drag a file onto the island | Mochi turns into a box, swallows it, then offers to answer questions about it |
 | Click a file in the session ticker | Its diff opens in the island; ↗ opens the file in VS Code, ‹ or `Esc` goes back |
 | `Esc` | Closes the island |

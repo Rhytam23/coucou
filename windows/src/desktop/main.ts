@@ -266,14 +266,15 @@ class DesktopMochi {
         this.endDrag(e);
         return;
       }
-      // Single click → poke, once it is clear it isn't a double click.
+      // Single click → the island opens beside him, once it is clear it isn't
+      // a double click (that one sends him home).
       this.cancelPoke();
       this.pokeTimer = window.setTimeout(() => {
         this.pokeTimer = null;
         this.lastAgentActive = performance.now();
         this.wake();
-        this.engine.slap();
         this.schedule();
+        void emitToWindow(ISLAND, DESKTOP_EVENTS.open);
       }, DOUBLE_CLICK_MS);
     });
 

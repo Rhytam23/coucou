@@ -33,6 +33,8 @@ export const DESKTOP_EVENTS = {
   home: "desktop-mochi-home",
   wardrobe: "desktop-mochi-wardrobe",
   dizzy: "desktop-mochi-dizzy",
+  /** A click on him: the island opens beside him (or folds, if it is open there). */
+  open: "desktop-mochi-open",
   /** Rust → island: a drag ended, `{ from: "island" | "desktop", home }`. */
   dropped: "desktop-mochi-dropped",
   /** Rust → desktop window */

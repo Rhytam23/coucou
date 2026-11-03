@@ -13,7 +13,6 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 use crate::platform::{self, cursor_physical, left_button_down};
-use crate::settings::{self as prefs, IslandSpot};
 
 /// Logical size of the full window — the largest island view, like the macOS panel.
 pub const PANEL_W: f64 = 720.0;
@@ -427,44 +426,6 @@ fn top_inset_from(monitor_y: i32, work_y: i32) -> i32 {
 }
 
 pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>) {
-    place_window(app, pref, collapsed, effective_spot(app), false);
-}
-
-/// Where the island goes: the user's spot, except where the island can't be
-/// moved, and while it is hidden — only the top centre wakes a hidden island.
-fn effective_spot(app: &AppHandle) -> Option<IslandSpot> {
-    if !movable(app) {
-        return None;
-    }
-    let shared = app.try_state::<crate::Shared>()?;
-    let s = shared.settings.lock().unwrap();
-    let spot = if s.closed_island == "hidden" { None } else { s.island_spot };
-    spot
-}
-
-/// Whether this system lets the island leave the top centre: Windows, and
-/// Linux where windows are placed where they are asked (X11). A layer surface
-/// is anchored to the top edge, and GNOME on Wayland places nothing.
-pub fn movable(app: &AppHandle) -> bool {
-    app.try_state::<Arc<crate::desktop::Desktop>>()
-        .map(|d| matches!(d.mode, platform::DesktopMode::Poll | platform::DesktopMode::Window))
-        .unwrap_or(false)
-}
-
-/// The room the island has on `m`, in logical pixels: the display's width, and
-/// the height of its work area under the island's top.
-fn room(m: &Monitor) -> spot::Room {
-    let scale = m.scale_factor();
-    let top = m.position().y + top_inset(m);
-    let work = m.work_area();
-    let bottom = work.position.y + work.size.height as i32;
-    let bottom = if bottom > top { bottom } else { m.position().y + m.size().height as i32 };
-    spot::Room { width: m.size().width as f64 / scale, height: (bottom - top) as f64 / scale }
-}
-
-/// Places and sizes the window at `at` (None: the top centre). `light`: only
-/// moves it, for each step of a slide.
-fn place_window(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>, at: Option<IslandSpot>, light: bool) {
     let Some(win) = window(app) else { return };
     let Some(m) = target_monitor(app, pref) else { return };
 
@@ -475,13 +436,18 @@ fn place_window(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>, at: 
     let (lw, lh) = collapsed.map(clamp_collapsed).unwrap_or((PANEL_W, PANEL_H));
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
-    let at = at.map(|s| spot::clamp(s, room(&m))).unwrap_or_default();
-    let x = mp.x + (ms.width as i32 - pw as i32) / 2 + (at.dx * scale).round() as i32;
-    let y = mp.y + top_inset(&m) + (at.top * scale).round() as i32;
-    if light {
-        let _ = win.set_position(PhysicalPosition::new(x, y));
-        return;
-    }
+    let x = mp.x + (ms.width as i32 - pw as i32) / 2;
+    let y = mp.y + top_inset(&m);
+    // Opened from the desktop Mochi: the open island stands beside him. Folded,
+    // it is back at the top as always.
+    let beside = {
+        let mut b = BESIDE.lock().unwrap();
+        if collapsed.is_some() {
+            *b = None;
+        }
+        *b
+    };
+    let (x, y) = beside.unwrap_or((x, y));
 
     // GTK never sizes a non-resizable window below its natural size (200 px
     // here), so on Linux the 6 px wake strip would stay a 200 px block. tao
@@ -510,6 +476,29 @@ fn place_window(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>, at: 
             let _ = win.set_position(PhysicalPosition::new(x, y));
         }
     }
+}
+
+/// Top-left corner of the full window beside the desktop Mochi, physical
+/// pixels, while the island is open from a click on him. None: the top centre.
+static BESIDE: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+
+/// Opens the island beside the desktop Mochi (`Some`), or sends it back to the
+/// top (`None`), and places it again at once if it is not folded.
+pub fn set_beside(app: &AppHandle, at: Option<(i32, i32)>) {
+    {
+        let mut b = BESIDE.lock().unwrap();
+        if *b == at {
+            return;
+        }
+        *b = at;
+    }
+    let Some(shared) = app.try_state::<crate::Shared>() else { return };
+    if shared.gate.collapsed.load(Ordering::Relaxed) {
+        return;
+    }
+    let pref = shared.settings.lock().unwrap().screen.clone();
+    apply_geometry(app, &pref, None);
+    refresh_click_through(app, &shared.gate);
 }
 
 /// A closed island never grows past the panel, and never shrinks below one
@@ -708,211 +697,4 @@ pub fn set_ignore_cursor(app: &AppHandle, ignore: bool) {
     if let Some(win) = window(app) {
         let _ = win.set_ignore_cursor_events(ignore);
     }
-}
-
-// ── Moving the island ─────────────────────────────────────────────────────────
-
-/// Where the island may go on its display, and where a drop or a slide puts it.
-/// Pure geometry, logical pixels.
-pub mod spot {
-    use super::{PANEL_H, PANEL_W};
-    use crate::settings::IslandSpot;
-
-    /// A drop or a slide this close to the top centre puts the island back there.
-    pub const SNAP_HOME: f64 = 48.0;
-    /// Mochi sits about this far under the island's top: dropped somewhere,
-    /// the island comes with him in its usual place around him.
-    pub const MOCHI_BELOW_TOP: f64 = 20.0;
-
-    /// A display's width, and the height of its work area under the island's top.
-    #[derive(Clone, Copy, Debug, PartialEq)]
-    pub struct Room {
-        pub width: f64,
-        pub height: f64,
-    }
-
-    /// Keeps the whole open panel on the display, whatever the island shows.
-    pub fn clamp(s: IslandSpot, room: Room) -> IslandSpot {
-        let max_dx = ((room.width - PANEL_W) / 2.0).max(0.0);
-        let max_top = (room.height - PANEL_H).max(0.0);
-        let ok = |v: f64| if v.is_finite() { v } else { 0.0 };
-        IslandSpot { dx: ok(s.dx).clamp(-max_dx, max_dx), top: ok(s.top).clamp(0.0, max_top) }
-    }
-
-    /// The spot kept once the user lets go: None (the top centre) close to it.
-    pub fn settle(s: IslandSpot, room: Room) -> Option<IslandSpot> {
-        let c = clamp(s, room);
-        if c.dx.abs() <= SNAP_HOME && c.top <= SNAP_HOME { None } else { Some(c) }
-    }
-
-    /// Mochi dropped at `p`: from the display's left edge, and from the top of
-    /// its work area.
-    pub fn for_drop(p: (f64, f64), room: Room) -> Option<IslandSpot> {
-        settle(IslandSpot { dx: p.0 - room.width / 2.0, top: p.1 - MOCHI_BELOW_TOP }, room)
-    }
-
-    /// The island pushed sideways by `delta` from where the slide began: it
-    /// keeps its height and only travels along it.
-    pub fn slid(start: Option<IslandSpot>, delta: f64) -> IslandSpot {
-        let s = start.unwrap_or_default();
-        IslandSpot { dx: s.dx + delta, top: s.top }
-    }
-}
-
-#[cfg(test)]
-mod spot_tests {
-    use super::spot::*;
-    use super::{PANEL_H, PANEL_W};
-    use crate::settings::IslandSpot;
-
-    const FHD: Room = Room { width: 1920.0, height: 1040.0 };
-
-    fn at(dx: f64, top: f64) -> IslandSpot {
-        IslandSpot { dx, top }
-    }
-
-    #[test]
-    fn the_open_panel_always_stays_on_the_display() {
-        let far = clamp(at(5000.0, 5000.0), FHD);
-        assert_eq!(far, at((1920.0 - PANEL_W) / 2.0, 1040.0 - PANEL_H));
-        assert_eq!(clamp(at(-5000.0, -30.0), FHD), at(-(1920.0 - PANEL_W) / 2.0, 0.0));
-        assert_eq!(clamp(at(f64::NAN, f64::INFINITY), FHD), at(0.0, 0.0));
-        // A display narrower than the panel: it can only sit in the middle.
-        assert_eq!(clamp(at(200.0, 100.0), Room { width: 640.0, height: 300.0 }), at(0.0, 0.0));
-    }
-
-    #[test]
-    fn mochi_dropped_somewhere_brings_the_island_there() {
-        assert_eq!(for_drop((400.0, 600.0), FHD), Some(at(400.0 - 960.0, 600.0 - MOCHI_BELOW_TOP)));
-        // Past the edge: as far as the panel fits.
-        assert_eq!(for_drop((1910.0, 1030.0), FHD), Some(at(600.0, 1040.0 - PANEL_H)));
-    }
-
-    #[test]
-    fn a_drop_near_the_top_centre_brings_the_island_home() {
-        assert_eq!(for_drop((960.0, 10.0), FHD), None);
-        assert_eq!(for_drop((960.0 + SNAP_HOME, MOCHI_BELOW_TOP + SNAP_HOME), FHD), None);
-        assert!(for_drop((960.0 + SNAP_HOME + 1.0, 10.0), FHD).is_some());
-    }
-
-    #[test]
-    fn a_slide_keeps_the_height_and_snaps_back_to_the_centre() {
-        assert_eq!(slid(None, -300.0), at(-300.0, 0.0));
-        assert_eq!(slid(Some(at(-300.0, 0.0)), 280.0), at(-20.0, 0.0));
-        assert_eq!(settle(slid(Some(at(-300.0, 0.0)), 280.0), FHD), None);
-        assert_eq!(settle(slid(Some(at(-300.0, 0.0)), 200.0), FHD), Some(at(-100.0, 0.0)));
-        // Lower down, a slide past the middle stays where it was let go.
-        assert_eq!(settle(slid(Some(at(-300.0, 400.0)), 300.0), FHD), Some(at(0.0, 400.0)));
-    }
-}
-
-/// Saves a change to the island's place, then tells every window.
-fn store(app: &AppHandle, change: impl FnOnce(&mut prefs::Settings)) {
-    let Some(shared) = app.try_state::<crate::Shared>() else { return };
-    let snapshot = {
-        let mut s = shared.settings.lock().unwrap();
-        change(&mut s);
-        s.clone()
-    };
-    if let Err(err) = prefs::save(&snapshot) {
-        crate::log::line(format!("could not save settings: {err}"));
-    }
-    let _ = app.emit("settings-changed", snapshot);
-}
-
-/// Places the island again with what it shows now (closed, or the full panel).
-fn reapply(app: &AppHandle, at: Option<IslandSpot>, light: bool) {
-    let Some(shared) = app.try_state::<crate::Shared>() else { return };
-    let pref = shared.settings.lock().unwrap().screen.clone();
-    let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
-    let size = *shared.gate.collapsed_size.lock().unwrap();
-    place_window(app, &pref, collapsed.then_some(size), at, light);
-    if !light {
-        refresh_click_through(app, &shared.gate);
-    }
-}
-
-/// Mochi was dragged out of the island and dropped at `point` (physical
-/// desktop pixels): the island goes there, on whichever display that is.
-/// False where the island can't move; Mochi then stays on the desktop.
-pub fn move_to(app: &AppHandle, point: (f64, f64)) -> bool {
-    if !movable(app) {
-        return false;
-    }
-    let Ok(monitors) = app.available_monitors() else { return false };
-    let Some(m) = monitors.iter().find(|m| monitor_contains(m, point.0, point.1)).cloned() else { return false };
-    let scale = m.scale_factor();
-    let p = m.position();
-    let local = ((point.0 - p.x as f64) / scale, (point.1 - (p.y + top_inset(&m)) as f64) / scale);
-    let at = spot::for_drop(local, room(&m));
-    let key = describe(&m).key();
-    let current = target_monitor(app, &current_pref(app)).map(|c| describe(&c).key());
-    store(app, |s| {
-        // Dropped on another display: the island lives there now. "Under the
-        // cursor" already follows the user, and keeps its word.
-        if s.screen != "cursor" && current.as_deref() != Some(key.as_str()) {
-            s.screen = key.clone();
-        }
-        s.island_spot = at;
-    });
-    crate::log::line(match at {
-        Some(a) => format!("island moved to {:.0},{:.0}", a.dx, a.top),
-        None => "island back at the top centre".to_string(),
-    });
-    reapply(app, effective_spot(app), false);
-    true
-}
-
-/// Where the current slide began (None: no slide going on).
-static SLIDE: Mutex<Option<Option<IslandSpot>>> = Mutex::new(None);
-
-/// The page saw the island itself (not Mochi) being dragged. False where it
-/// can't move, or while it is hidden.
-#[tauri::command]
-pub fn island_slide_begin(app: AppHandle) -> bool {
-    if !movable(&app) {
-        return false;
-    }
-    let Some(shared) = app.try_state::<crate::Shared>() else { return false };
-    let s = shared.settings.lock().unwrap();
-    if s.closed_island == "hidden" {
-        return false;
-    }
-    *SLIDE.lock().unwrap() = Some(s.island_spot);
-    true
-}
-
-/// The pointer is `delta` logical pixels sideways from where the slide began.
-#[tauri::command]
-pub fn island_slide_move(app: AppHandle, delta: f64) {
-    let Some(start) = *SLIDE.lock().unwrap() else { return };
-    reapply(&app, Some(spot::slid(start, delta)), true);
-}
-
-/// The button went up `delta` logical pixels from where the slide began.
-#[tauri::command]
-pub fn island_slide_end(app: AppHandle, delta: f64) {
-    let Some(start) = SLIDE.lock().unwrap().take() else { return };
-    let at = target_monitor(&app, &current_pref(&app)).and_then(|m| spot::settle(spot::slid(start, delta), room(&m)));
-    store(&app, |s| s.island_spot = at);
-    reapply(&app, effective_spot(&app), false);
-}
-
-/// Settings → Back to the top centre.
-#[tauri::command]
-pub fn island_reset_spot(app: AppHandle) {
-    store(&app, |s| s.island_spot = None);
-    reapply(&app, None, false);
-}
-
-/// Whether Settings may offer to move the island on this system.
-#[tauri::command]
-pub fn island_movable(app: AppHandle) -> bool {
-    movable(&app)
-}
-
-fn current_pref(app: &AppHandle) -> String {
-    app.try_state::<crate::Shared>()
-        .map(|s| s.settings.lock().unwrap().screen.clone())
-        .unwrap_or_else(|| "primary".into())
 }

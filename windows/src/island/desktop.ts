@@ -24,6 +24,8 @@ export interface DesktopHost {
   wardrobeFromDesktop(): void;
   /** Three pokes on the desktop Mochi. */
   dizzyFromDesktop(): void;
+  /** A click on the desktop Mochi: the island opens beside him, or folds. */
+  openFromDesktop(): void;
 }
 
 export class DesktopLink {
@@ -76,6 +78,7 @@ export class DesktopLink {
     await onEvent<null>(DESKTOP_EVENTS.home, () => void this.controller.flyHome());
     await onEvent<null>(DESKTOP_EVENTS.wardrobe, () => this.host.wardrobeFromDesktop());
     await onEvent<null>(DESKTOP_EVENTS.dizzy, () => this.host.dizzyFromDesktop());
+    await onEvent<null>(DESKTOP_EVENTS.open, () => this.host.openFromDesktop());
     // The window's page (re)loaded: it knows nothing yet.
     await onEvent<null>(DESKTOP_EVENTS.ready, () => {
       this.pushed = "";

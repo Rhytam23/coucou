@@ -187,6 +187,33 @@ pub mod logic {
     pub fn lerp(a: (f64, f64), b: (f64, f64), t: f64) -> (f64, f64) {
         (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
     }
+
+    /// Width of the open island inside its panel (layout.ts EXPANDED_W).
+    pub const OPEN_W: f64 = 640.0;
+    /// Room between his body and the island opened beside him, logical pixels.
+    pub const BESIDE_GAP: f64 = 8.0;
+    /// The island's top, from the top of his window, logical pixels: level
+    /// with the top of his head.
+    pub const BESIDE_TOP: f64 = 20.0;
+
+    /// Top-left corner of the island's panel opened from a click on him (his
+    /// window is `mochi`): on his left, or on his right when the left has no
+    /// room, and the whole panel inside `work`. Everything in one space, with
+    /// `scale` of its units to a logical pixel.
+    pub fn beside_origin(mochi: Rect, work: Rect, scale: f64) -> (f64, f64) {
+        let (pw, ph) = (HOME_ZONE_W * scale, HOME_ZONE_H * scale);
+        // The panel is wider than the open island: this much is empty on each side.
+        let side = (HOME_ZONE_W - OPEN_W) / 2.0 * scale;
+        let body = mochi.w * BODY_RADIUS_FRACTION;
+        let (cx, _) = mochi.center();
+        let gap = BESIDE_GAP * scale;
+        let left = cx - body - gap - (pw - side);
+        let right = cx + body + gap - side;
+        let x = if left + side >= work.x { left } else { right };
+        let x = x.max(work.x - side).min(work.x + work.w - pw + side);
+        let y = (mochi.y + BESIDE_TOP * scale).min(work.y + work.h - ph).max(work.y);
+        (x, y)
+    }
 }
 
 use logic::{Display, Rect};
@@ -590,15 +617,38 @@ fn target_spot(app: &AppHandle, d: &Desktop, anywhere: bool) -> Option<(f64, f64
     }
 }
 
-/// Whether his window is placed in physical desktop pixels, the space
-/// `island::move_to` takes.
+/// Whether his window is placed in physical desktop pixels, like the island's.
 fn physical(d: &Desktop) -> bool {
     matches!(d.mode, DesktopMode::Poll | DesktopMode::Window)
 }
 
-/// The drop, wherever it came from: home if it is over the island's panel;
-/// from the island, the island's new place (where it can move); otherwise his
-/// new spot.
+/// A click on him: the island opens beside him (`on`), or goes back to the top
+/// (`!on`). False where windows can't be placed (the island then opens at the
+/// top as usual), or while he is not sitting on the desktop.
+#[tauri::command]
+pub fn desktop_mochi_island_beside(app: AppHandle, on: bool) -> bool {
+    let d = app.state::<Arc<Desktop>>().inner().clone();
+    if !on || !physical(&d) {
+        island::set_beside(&app, None);
+        return false;
+    }
+    let (pos, sitting) = {
+        let i = d.inner.lock().unwrap();
+        (i.pos, i.shown && i.landed)
+    };
+    if !sitting {
+        return false;
+    }
+    let s = side(&app, &d);
+    let mochi = Rect { x: pos.0, y: pos.1, w: s, h: s };
+    let Some(display) = logic::display_near(mochi.center(), &displays(&app, &d)) else { return false };
+    let (x, y) = logic::beside_origin(mochi, display.work, display.scale);
+    island::set_beside(&app, Some((x.round() as i32, y.round() as i32)));
+    true
+}
+
+/// The drop, wherever it came from: home if it is over the island's panel,
+/// otherwise his new spot.
 async fn finish_drop(app: &AppHandle, d: &Desktop, pos: (f64, f64), from: Source) {
     let s = side(app, d);
     let center = (pos.0 + s / 2.0, pos.1 + s / 2.0);
@@ -618,13 +668,6 @@ async fn finish_drop(app: &AppHandle, d: &Desktop, pos: (f64, f64), from: Source
             // The island page flies him home (and forgets the spot).
             refresh(app, d);
         }
-    } else if from == Source::Island && physical(d) && island::move_to(app, center) {
-        // Dragged out of the island and dropped elsewhere: the whole island
-        // goes there, and he is back in it. The desktop shortcut still sends
-        // him out alone.
-        hide(app, d);
-        let _ = app.emit_to(island::WINDOW_LABEL, "desktop-mochi-dropped", Dropped { from, home: true });
-        return;
     } else {
         let spot = logic::settle(pos, &displays(app, d), SIZE, MARGIN);
         refresh(app, d);
@@ -910,6 +953,40 @@ mod tests {
 
     // Mirrors tests/DesktopMochiTests.swift (isOverBody, clampOrigin), in the
     // y-down coordinates every PC uses.
+
+    fn near(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-6
+    }
+
+    #[test]
+    fn a_click_opens_the_island_on_his_left_or_else_on_his_right() {
+        let work = Rect { x: 0.0, y: 0.0, w: 1920.0, h: 1040.0 };
+        let side = (HOME_ZONE_W - OPEN_W) / 2.0;
+        let body = 120.0 * BODY_RADIUS_FRACTION;
+        // Room on his left: the island's right edge is just short of his body.
+        let mochi = Rect { x: 1500.0, y: 500.0, w: 120.0, h: 120.0 };
+        let (x, y) = beside_origin(mochi, work, 1.0);
+        assert!(near(x + HOME_ZONE_W - side, 1560.0 - body - BESIDE_GAP));
+        assert!(near(y, 500.0 + BESIDE_TOP));
+        // Near the left edge: on his right.
+        let mochi = Rect { x: 50.0, y: 500.0, w: 120.0, h: 120.0 };
+        let (x, _) = beside_origin(mochi, work, 1.0);
+        assert!(near(x + side, 110.0 + body + BESIDE_GAP));
+        // Low on the screen: the whole panel stays above the taskbar.
+        let mochi = Rect { x: 1500.0, y: 960.0, w: 120.0, h: 120.0 };
+        assert!(near(beside_origin(mochi, work, 1.0).1, 1040.0 - HOME_ZONE_H));
+    }
+
+    #[test]
+    fn at_150_percent_the_island_still_sits_beside_him() {
+        let work = Rect { x: -2880.0, y: 0.0, w: 2880.0, h: 1560.0 };
+        let mochi = Rect { x: -900.0, y: 300.0, w: 180.0, h: 180.0 };
+        let (x, y) = beside_origin(mochi, work, 1.5);
+        let side = (HOME_ZONE_W - OPEN_W) / 2.0 * 1.5;
+        assert!(near(x + HOME_ZONE_W * 1.5 - side, -810.0 - 180.0 * BODY_RADIUS_FRACTION - BESIDE_GAP * 1.5));
+        assert!(near(y, 300.0 + BESIDE_TOP * 1.5));
+        assert!(x + side >= work.x);
+    }
 
     #[test]
     fn is_over_body() {
