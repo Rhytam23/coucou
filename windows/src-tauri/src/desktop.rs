@@ -590,8 +590,15 @@ fn target_spot(app: &AppHandle, d: &Desktop, anywhere: bool) -> Option<(f64, f64
     }
 }
 
-/// The drop, wherever it came from: home if it is over the island's panel,
-/// otherwise his new spot.
+/// Whether his window is placed in physical desktop pixels, the space
+/// `island::move_to` takes.
+fn physical(d: &Desktop) -> bool {
+    matches!(d.mode, DesktopMode::Poll | DesktopMode::Window)
+}
+
+/// The drop, wherever it came from: home if it is over the island's panel;
+/// from the island, the island's new place (where it can move); otherwise his
+/// new spot.
 async fn finish_drop(app: &AppHandle, d: &Desktop, pos: (f64, f64), from: Source) {
     let s = side(app, d);
     let center = (pos.0 + s / 2.0, pos.1 + s / 2.0);
@@ -611,6 +618,13 @@ async fn finish_drop(app: &AppHandle, d: &Desktop, pos: (f64, f64), from: Source
             // The island page flies him home (and forgets the spot).
             refresh(app, d);
         }
+    } else if from == Source::Island && physical(d) && island::move_to(app, center) {
+        // Dragged out of the island and dropped elsewhere: the whole island
+        // goes there, and he is back in it. The desktop shortcut still sends
+        // him out alone.
+        hide(app, d);
+        let _ = app.emit_to(island::WINDOW_LABEL, "desktop-mochi-dropped", Dropped { from, home: true });
+        return;
     } else {
         let spot = logic::settle(pos, &displays(app, d), SIZE, MARGIN);
         refresh(app, d);

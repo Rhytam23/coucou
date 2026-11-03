@@ -443,6 +443,15 @@ export const Bridge = {
   desktopFlyOut: (anywhere = false) => call<boolean>("desktop_mochi_fly_out", { anywhere }),
   /** To the island, then hidden. `forget`: he lives in the island again. */
   desktopFlyHome: (forget: boolean) => call<boolean>("desktop_mochi_fly_home", { forget }),
+  /** Sliding the island itself along the top: false where it can't move (or while it is hidden). */
+  islandSlideBegin: () => call<boolean>("island_slide_begin"),
+  /** `delta`: logical px sideways from where the slide began. */
+  islandSlideMove: (delta: number) => call<void>("island_slide_move", { delta }),
+  islandSlideEnd: (delta: number) => call<void>("island_slide_end", { delta }),
+  /** Settings → Back to the top centre. */
+  islandResetSpot: () => call<void>("island_reset_spot"),
+  /** Whether this system lets the island leave the top centre (not a layer surface, not GNOME on Wayland). */
+  islandMovable: () => call<boolean>("island_movable"),
   /** Asleep, the cursor poll stops. */
   desktopSetAsleep: (asleep: boolean) => call<void>("desktop_mochi_set_asleep", { asleep }),
 

@@ -1116,6 +1116,7 @@ function generalSection(): HTMLElement {
       h("label", { text: t("Island lives on") }),
       screen,
     ),
+    ...positionRows(closed),
     h("div", { class: "row" },
       h("label", { text: t("Launch at startup") }),
       toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
@@ -1124,6 +1125,47 @@ function generalSection(): HTMLElement {
     ...updateRows(toggle, version),
     languageRow(),
   );
+}
+
+/**
+ * Settings → General → Position: the top centre, or where the user moved the
+ * island (Mochi dropped somewhere, the island slid along the top), and hiding
+ * it. "Hide the island" is the same setting as that choice under Closed island
+ * shows: both stay in step.
+ */
+function positionRows(closed: HTMLSelectElement): HTMLElement[] {
+  const hidden = () => closedIsland(settings.closedIsland) === "hidden";
+  // What the closed island showed before it was hidden, for the switch to bring back.
+  let shown = hidden() ? "mochi" : closedIsland(settings.closedIsland);
+  const where = h("span", { class: "hint" });
+  const back = h("button", { text: t("Back to the top centre"), onclick: () => void Bridge.islandResetSpot() }) as HTMLButtonElement;
+  const hide = toggle(hidden(), (v) => {
+    settings.closedIsland = v ? "hidden" : shown;
+    closed.value = settings.closedIsland;
+    void save();
+  });
+  const hint = h("div", { class: "hint", text: t("Drag Mochi out of the island and drop him anywhere: the island moves there. Drag the island itself to slide it along the top. The desktop shortcut still sends Mochi alone to the desktop.") });
+  const draw = () => {
+    if (!hidden()) shown = closedIsland(settings.closedIsland);
+    where.textContent = settings.islandSpot ? t("Where you left it") : t("Top centre");
+    back.disabled = !settings.islandSpot;
+    hide.classList.toggle("on", hidden());
+    hide.setAttribute("aria-pressed", String(hidden()));
+  };
+  closed.addEventListener("change", draw);
+  declaredViews.push(draw);
+  draw();
+  const position = h("div", { class: "row" }, h("label", { text: t("Position") }), where, back);
+  void Bridge.islandMovable().then((movable) => {
+    if (movable !== false) return;
+    position.remove();
+    hint.textContent = t("This desktop keeps the island at the top centre: it can't be moved here.");
+  });
+  return [
+    position,
+    h("div", { class: "row" }, h("label", { text: t("Hide the island") }), hide),
+    hint,
+  ];
 }
 
 /**

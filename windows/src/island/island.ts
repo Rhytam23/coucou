@@ -138,6 +138,17 @@ export class Island {
   /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
 
+  /**
+   * A press on the island itself (not Mochi, not a button) while it is not
+   * open: moving past DRAG_THRESHOLD sideways slides it along the top. Screen
+   * coordinates, since the window moves under the pointer.
+   */
+  private slidePress: { screenX: number; screenY: number } | null = null;
+  /** The slide has begun: Rust said the island may move. */
+  private sliding = false;
+  private slideDelta = 0;
+  private slideFrame = false;
+
   /** The next reveal from hidden makes no peek (music starting, as on macOS). */
   private silentReveal = false;
 
@@ -948,6 +959,8 @@ export class Island {
       // A press on Mochi may become a drag out to the desktop.
       if (e.button === 0 && this.isBotHit(e.clientX, e.clientY)) {
         this.botPress = { x: e.clientX, y: e.clientY };
+      } else if (e.button === 0 && this.canSlide(e.target)) {
+        this.slidePress = { screenX: e.screenX, screenY: e.screenY };
       }
       // Right-click on Mochi opens the wardrobe, and closes it again.
       if (e.button === 2 && this.isBotHit(e.clientX, e.clientY)) {
@@ -977,6 +990,10 @@ export class Island {
         this.desktop.carry(e.clientX, e.clientY);
         return;
       }
+      if (this.slidePress) {
+        this.slideMove(e);
+        return;
+      }
       const press = this.botPress;
       if (!press) return;
       if (!(e.buttons & 1)) {
@@ -991,6 +1008,7 @@ export class Island {
     });
     window.addEventListener("mouseup", (e) => {
       this.botPress = null;
+      if (this.slidePress) this.slideEnd(e.screenX);
       if (this.desktop.carrying) this.desktop.carryEnd(e.clientX, e.clientY);
     });
 
@@ -1084,6 +1102,49 @@ export class Island {
     }
 
     this.ensureRunning();
+  }
+
+  // ── Sliding the island along the top ────────────────────────────────────────
+
+  /** The island itself, closed or compact: not Mochi, not something to click or type in. */
+  private canSlide(target: EventTarget | null): boolean {
+    if (State.mode === "expanded" || State.paused) return false;
+    const el = target instanceof Element ? target : null;
+    return !el?.closest("button, a, input, textarea, select, [contenteditable], [role=button]");
+  }
+
+  private slideMove(e: MouseEvent) {
+    const press = this.slidePress!;
+    if (!(e.buttons & 1)) {
+      this.slideEnd(e.screenX);
+      return;
+    }
+    this.slideDelta = e.screenX - press.screenX;
+    if (!this.sliding) {
+      if (Math.hypot(this.slideDelta, e.screenY - press.screenY) <= DRAG_THRESHOLD) return;
+      this.sliding = true;
+      void Bridge.islandSlideBegin().then((ok) => {
+        if (!ok && this.slidePress === press) {
+          this.slidePress = null;
+          this.sliding = false;
+        }
+      });
+    }
+    // One move per frame: the window follows the pointer, no faster.
+    if (this.slideFrame) return;
+    this.slideFrame = true;
+    requestAnimationFrame(() => {
+      this.slideFrame = false;
+      if (this.sliding) void Bridge.islandSlideMove(this.slideDelta);
+    });
+  }
+
+  private slideEnd(screenX: number) {
+    const press = this.slidePress;
+    this.slidePress = null;
+    if (!press || !this.sliding) return;
+    this.sliding = false;
+    void Bridge.islandSlideEnd(screenX - press.screenX);
   }
 
   /** The greeting and the drop sequence draw a Mochi of their own: not that one. */

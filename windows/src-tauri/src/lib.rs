@@ -96,12 +96,17 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
 fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     let (settings, screen_changed, autostart_changed, shortcuts_changed) = {
         let mut current = shared.settings.lock().unwrap();
-        let screen_changed = current.screen != settings.screen;
+        // Hidden, the island waits at the top centre whatever its spot: a change
+        // either way places it again, like a change of display.
+        let screen_changed = current.screen != settings.screen
+            || (current.closed_island == "hidden") != (settings.closed_island == "hidden");
         let autostart_changed = current.autostart != settings.autostart;
         let shortcuts_changed = current.shortcuts != settings.shortcuts;
         // Where Mochi sits on the desktop is desktop.rs's to say, not a webview's.
         let mut settings = settings.clone();
         settings.desktop_mochi = current.desktop_mochi.clone();
+        // And where the island was moved is island.rs's.
+        settings.island_spot = current.island_spot;
         // Same for the phone link: only its own commands turn it on or off.
         settings.phone_link = current.phone_link;
         settings.phone_chat = current.phone_chat;
@@ -989,6 +994,11 @@ pub fn run() {
             recap::recap_save_png,
             recap::recap_reveal_saved,
             desktop::desktop_mochi_info,
+            island::island_slide_begin,
+            island::island_slide_move,
+            island::island_slide_end,
+            island::island_reset_spot,
+            island::island_movable,
             desktop::desktop_mochi_pick_up,
             desktop::desktop_mochi_carry,
             desktop::desktop_mochi_carry_end,

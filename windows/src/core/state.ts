@@ -172,6 +172,8 @@ export interface Settings {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
+  /** Where the user moved the island (logical px: centre from the display's centre, top from the top). Null: the top centre. Rust owns it too. */
+  islandSpot?: { dx: number; top: number } | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
