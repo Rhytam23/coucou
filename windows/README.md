@@ -58,7 +58,7 @@ You can also [build it yourself](#build-it-yourself).
 | Rest the pointer on Mochi for two seconds | Hearts |
 | Right-click Mochi | The wardrobe: rest the pointer on an outfit to try it on, click to keep it. **Auto** dresses him for the season (witch hat in October, Santa hat in December…) |
 | Drag Mochi out of the island | He moves onto your desktop and hangs out there, in his outfit, watching your cursor. Drop him back on the island to bring him home |
-| On the desktop: click / right-click / double-click Mochi | The island opens beside him, on his left (on his right near the left edge), and goes back to the top when it closes; click him again to close it / the wardrobe / he flies home. Drag him to move him. Where windows can't be placed (KDE, Hyprland and other layer-shell desktops) the island opens at the top |
+| On the desktop: click / right-click / double-click Mochi | The other pills' Mochis come out on a half circle beside him (on his left, or his right near the left edge); click one to swap it with him, that pill comes into focus; click him again or beside them to put them away (with no other pill, or where windows can't be placed, the island opens at the top) / the wardrobe / he flies home. Drag him to move him |
 | Drag a file onto the island | Mochi turns into a box, swallows it, then offers to answer questions about it |
 | Click a file in the session ticker | Its diff opens in the island; ↗ opens the file in VS Code, ‹ or `Esc` goes back |
 | `Esc` | Closes the island |

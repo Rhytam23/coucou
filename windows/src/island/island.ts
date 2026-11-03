@@ -138,9 +138,6 @@ export class Island {
   /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
 
-  /** Open beside the desktop Mochi (a click on him), not at the top. */
-  private besideMochi = false;
-
   /** The next reveal from hidden makes no peek (music starting, as on macOS). */
   private silentReveal = false;
 
@@ -447,11 +444,6 @@ export class Island {
       // Another pill's alert borrowed the front: the pill you had comes back (Mac).
       restoreAlertFocus();
     }
-    // Opened beside the desktop Mochi: closing sends it back to the top.
-    if (mode !== "expanded" && this.besideMochi) {
-      this.besideMochi = false;
-      void Bridge.desktopIslandBeside(false);
-    }
     if (mode !== "expanded") {
       closePlanCard();
       this.engine.resetMorph();
@@ -574,23 +566,15 @@ export class Island {
   }
 
   /**
-   * A click on the desktop Mochi: the island opens beside him, on his left (on
-   * his right with no room there), or folds if it is already open there.
-   * Where windows can't be placed it opens at the top, as a click on it would.
+   * A click on the desktop Mochi where his window can't grow to show the
+   * other Mochis (layer-shell desktops): the island opens at the top, as a
+   * click on it would.
    */
   openFromDesktop() {
-    if (State.paused) return;
-    if (State.mode === "expanded" && this.besideMochi) {
-      this.collapse();
-      return;
-    }
-    void Bridge.desktopIslandBeside(true).then((beside) => {
-      this.besideMochi = beside === true;
-      if (State.mode === "expanded") return;
-      this.fsm.pinned = State.isPinned;
-      this.fsm.forceHome();
-      this.expand(this.openingView());
-    });
+    if (State.paused || State.mode === "expanded") return;
+    this.fsm.pinned = State.isPinned;
+    this.fsm.forceHome();
+    this.expand(this.openingView());
   }
 
   /**

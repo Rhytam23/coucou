@@ -9,7 +9,7 @@ import { Sound } from "../core/sound";
 import { State } from "../core/state";
 import { desktopDances } from "../core/spotify";
 import {
-  DESKTOP_EVENTS, DesktopMochiController, alertActive, type DesktopSnapshot,
+  DESKTOP_EVENTS, DesktopMochiController, FAN_MAX, alertActive, type DesktopSnapshot,
 } from "../mochi/desktop-logic";
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
 
@@ -79,6 +79,8 @@ export class DesktopLink {
     await onEvent<null>(DESKTOP_EVENTS.wardrobe, () => this.host.wardrobeFromDesktop());
     await onEvent<null>(DESKTOP_EVENTS.dizzy, () => this.host.dizzyFromDesktop());
     await onEvent<null>(DESKTOP_EVENTS.open, () => this.host.openFromDesktop());
+    // One of the other Mochis clicked beside him: that pill comes into focus.
+    await onEvent<string>(DESKTOP_EVENTS.focus, (id) => State.setFocus(id));
     // The window's page (re)loaded: it knows nothing yet.
     await onEvent<null>(DESKTOP_EVENTS.ready, () => {
       this.pushed = "";
@@ -175,6 +177,12 @@ export class DesktopLink {
       soundVolume: State.settings.soundVolume,
       paused: State.paused,
       dancing: desktopDances(State.spotifyPlaying, State.effectiveState),
+      // Everything but the pill in focus, which is him (State.focusTask falls
+      // back to the first pill while none is chosen).
+      others: State.tasks
+        .filter((t) => t.id !== State.focusTask?.id)
+        .slice(0, FAN_MAX * 2)
+        .map((t) => ({ id: t.id, name: t.name, color: t.color, state: t.state, emote: t.emote ?? null })),
     };
     const key = JSON.stringify(snapshot);
     if (key === this.pushed) return;

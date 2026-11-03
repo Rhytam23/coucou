@@ -6,9 +6,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  BODY_RADIUS_FRACTION, DesktopMochiController, PANEL_SIZE, RETRACT_DELAY_MS, RETURN_DELAY_MS,
-  agentActive, alertActive, gaze, isOverBody, layerDragTopLeft, lookOrigin, pointerDistance,
-  shouldRetractOnLanding, shouldSleep, windowDragTopLeft,
+  BODY_RADIUS_FRACTION, DesktopMochiController, FAN_MAX, FAN_RADIUS, PANEL_SIZE, RETRACT_DELAY_MS,
+  RETURN_DELAY_MS, agentActive, alertActive, fanOrder, fanPoints, gaze, isOverBody, layerDragTopLeft,
+  lookOrigin, pointerDistance, shouldRetractOnLanding, shouldSleep, windowDragTopLeft,
 } from "../src/mochi/desktop-logic.ts";
 
 // ── shouldSleep ───────────────────────────────────────────────────────────────
@@ -401,4 +401,40 @@ test("a finished task gets a happy jump, only on the desktop", () => {
   w.c.updateState("finished");
   w.c.updateState("finished");
   assert.deepEqual(w.log, ["emote:happy"]);
+});
+
+// ── The other Mochis around him ───────────────────────────────────────────────
+
+test("fanPoints: on his left, the middle one level with him, the others above and below", () => {
+  const c = { x: 190, y: 130 };
+  const one = fanPoints(1, c, false);
+  assert.deepEqual(one, [{ x: 190 - FAN_RADIUS, y: 130 }]);
+  const five = fanPoints(5, c, false);
+  assert.equal(five.length, 5);
+  for (const p of five) {
+    assert.ok(p.x < c.x, "all on his left");
+    assert.ok(Math.abs(Math.hypot(p.x - c.x, p.y - c.y) - FAN_RADIUS) < 1e-9, "on the circle");
+  }
+  assert.ok(Math.abs(five[2].y - c.y) < 1e-9, "the middle one is level with him");
+  assert.ok(five[0].y < c.y && five[4].y > c.y, "first above, last below");
+  assert.ok(Math.abs(five[0].y - c.y - (c.y - five[4].y)) < 1e-9, "symmetric");
+  // Inside the grown window (130 px of room beside his 120 px square, 260 px tall).
+  for (const p of five) assert.ok(p.x - 12 >= 0 && p.y - 12 >= 0 && p.y + 12 <= 260);
+});
+
+test("fanPoints: on his right when there is no room on his left", () => {
+  const c = { x: 60, y: 130 };
+  for (const p of fanPoints(4, c, true)) assert.ok(p.x > c.x);
+  assert.deepEqual(fanPoints(0, c, true), []);
+});
+
+test("fanOrder: places kept across a swap, the one that was in focus takes the free place", () => {
+  assert.deepEqual(fanOrder([], ["a", "b", "c"], null), ["a", "b", "c"]);
+  // "b" (place 1) swapped with the focused "z": "z" arrives in place 1.
+  assert.deepEqual(fanOrder(["a", "b", "c"], ["a", "c", "z"], 1), ["a", "z", "c"]);
+  // A new pill without a swap goes to the end; one that ended leaves its place.
+  assert.deepEqual(fanOrder(["a", "z", "c"], ["c", "a", "z", "d"], null), ["a", "z", "c", "d"]);
+  assert.deepEqual(fanOrder(["a", "z", "c"], ["a", "c"], null), ["a", "c"]);
+  // Room for five.
+  assert.equal(fanOrder([], ["1", "2", "3", "4", "5", "6", "7"], null).length, FAN_MAX);
 });

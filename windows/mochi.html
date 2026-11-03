@@ -24,10 +24,40 @@
         height: 120px;
         transition: opacity 0.45s ease-in-out;
       }
+      /* The other pills' Mochis, out on a half circle beside him after a click. */
+      #fan {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .fan-mini {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        pointer-events: auto;
+        cursor: pointer;
+        animation: fan-in 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) backwards;
+        transition: transform 0.4s ease-in, opacity 0.4s ease-in;
+      }
+      .fan-mini .mini {
+        position: relative;
+        display: block;
+      }
+      .fan-mini .mini canvas {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+      @keyframes fan-in {
+        from { transform: scale(0.2); opacity: 0; }
+      }
     </style>
   </head>
   <body>
     <canvas id="mochi"></canvas>
+    <div id="fan"></div>
     <script type="module" src="/src/desktop/main.ts"></script>
   </body>
 </html>

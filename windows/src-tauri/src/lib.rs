@@ -989,7 +989,7 @@ pub fn run() {
             recap::recap_save_png,
             recap::recap_reveal_saved,
             desktop::desktop_mochi_info,
-            desktop::desktop_mochi_island_beside,
+            desktop::desktop_mochi_fan,
             desktop::desktop_mochi_pick_up,
             desktop::desktop_mochi_carry,
             desktop::desktop_mochi_carry_end,

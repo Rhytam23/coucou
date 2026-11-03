@@ -21,7 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 use crate::island::{self, PollGate};
 use crate::platform::{self, DesktopMode, MouseShape};
@@ -187,33 +187,6 @@ pub mod logic {
     pub fn lerp(a: (f64, f64), b: (f64, f64), t: f64) -> (f64, f64) {
         (a.0 + (b.0 - a.0) * t, a.1 + (b.1 - a.1) * t)
     }
-
-    /// Width of the open island inside its panel (layout.ts EXPANDED_W).
-    pub const OPEN_W: f64 = 640.0;
-    /// Room between his body and the island opened beside him, logical pixels.
-    pub const BESIDE_GAP: f64 = 8.0;
-    /// The island's top, from the top of his window, logical pixels: level
-    /// with the top of his head.
-    pub const BESIDE_TOP: f64 = 20.0;
-
-    /// Top-left corner of the island's panel opened from a click on him (his
-    /// window is `mochi`): on his left, or on his right when the left has no
-    /// room, and the whole panel inside `work`. Everything in one space, with
-    /// `scale` of its units to a logical pixel.
-    pub fn beside_origin(mochi: Rect, work: Rect, scale: f64) -> (f64, f64) {
-        let (pw, ph) = (HOME_ZONE_W * scale, HOME_ZONE_H * scale);
-        // The panel is wider than the open island: this much is empty on each side.
-        let side = (HOME_ZONE_W - OPEN_W) / 2.0 * scale;
-        let body = mochi.w * BODY_RADIUS_FRACTION;
-        let (cx, _) = mochi.center();
-        let gap = BESIDE_GAP * scale;
-        let left = cx - body - gap - (pw - side);
-        let right = cx + body + gap - side;
-        let x = if left + side >= work.x { left } else { right };
-        let x = x.max(work.x - side).min(work.x + work.w - pw + side);
-        let y = (mochi.y + BESIDE_TOP * scale).min(work.y + work.h - ph).max(work.y);
-        (x, y)
-    }
 }
 
 use logic::{Display, Rect};
@@ -252,6 +225,9 @@ struct Inner {
     display: Option<(f64, f64)>,
     /// Poll mode: the click-through state last applied.
     ignoring: Option<bool>,
+    /// The other pills' Mochis are out beside him: where his square sits
+    /// inside his grown window (physical pixels). `pos` stays his square's.
+    fan: Option<(f64, f64)>,
 }
 
 pub struct Desktop {
@@ -458,11 +434,16 @@ fn from_island_client(app: &AppHandle, d: &Desktop, x: f64, y: f64) -> Option<(f
 // ── Window operations ─────────────────────────────────────────────────────────
 
 fn place(app: &AppHandle, d: &Desktop, pos: (f64, f64)) {
-    d.inner.lock().unwrap().pos = pos;
+    let fan = {
+        let mut i = d.inner.lock().unwrap();
+        i.pos = pos;
+        i.fan.unwrap_or((0.0, 0.0))
+    };
     let Some(win) = window(app) else { return };
     match d.mode {
         DesktopMode::Poll | DesktopMode::Window => {
-            let _ = win.set_position(PhysicalPosition::new(pos.0.round() as i32, pos.1.round() as i32));
+            let (x, y) = (pos.0 - fan.0, pos.1 - fan.1);
+            let _ = win.set_position(PhysicalPosition::new(x.round() as i32, y.round() as i32));
         }
         DesktopMode::Layer => {
             let _ = app.run_on_main_thread(move || platform::set_layer_margins(&win, pos.0, pos.1));
@@ -486,6 +467,7 @@ fn show(app: &AppHandle, d: &Desktop, at: (f64, f64)) {
 }
 
 fn hide(app: &AppHandle, d: &Desktop) {
+    unfan(app, d);
     {
         let mut i = d.inner.lock().unwrap();
         i.shown = false;
@@ -512,6 +494,9 @@ fn refresh(app: &AppHandle, d: &Desktop) {
             Some(true)
         } else if let Some(c) = i.carry {
             Some(c.from == Source::Island)
+        } else if i.fan.is_some() {
+            // The other Mochis are out: the whole grown window takes the mouse.
+            Some(false)
         } else if i.asleep {
             // Asleep, nothing polls: the whole little window takes the mouse
             // and acts as his own wake area — the first move over it wakes
@@ -529,6 +514,8 @@ fn refresh(app: &AppHandle, d: &Desktop) {
             MouseShape::Whole
         } else if matches!(i.carry, Some(Carry { from: Source::Island, .. })) {
             MouseShape::Empty
+        } else if i.fan.is_some() {
+            MouseShape::Whole
         } else {
             body_disc()
         };
@@ -622,29 +609,66 @@ fn physical(d: &Desktop) -> bool {
     matches!(d.mode, DesktopMode::Poll | DesktopMode::Window)
 }
 
-/// A click on him: the island opens beside him (`on`), or goes back to the top
-/// (`!on`). False where windows can't be placed (the island then opens at the
-/// top as usual), or while he is not sitting on the desktop.
+/// Room the other pills' Mochis take beside him, and his grown window's
+/// height, logical pixels (the page lays them out on a half circle in it).
+const FAN_W: f64 = 130.0;
+const FAN_H: f64 = 260.0;
+
+/// Where his square sits inside his grown window while the other Mochis are
+/// out (logical pixels), and whether they are on his right (no room on his left).
+#[derive(Clone, Copy, Debug, Serialize)]
+pub struct Fan {
+    pub x: f64,
+    pub y: f64,
+    pub right: bool,
+}
+
+/// A click on him: his window grows to show the other pills' Mochis around
+/// him (`open`), or shrinks back. None where windows can't be resized and
+/// placed freely (layer shell), or while he is not sitting on the desktop.
 #[tauri::command]
-pub fn desktop_mochi_island_beside(app: AppHandle, on: bool) -> bool {
+pub async fn desktop_mochi_fan(app: AppHandle, open: bool) -> Option<Fan> {
     let d = app.state::<Arc<Desktop>>().inner().clone();
-    if !on || !physical(&d) {
-        island::set_beside(&app, None);
-        return false;
+    if !open || !physical(&d) {
+        unfan(&app, &d);
+        return None;
     }
     let (pos, sitting) = {
         let i = d.inner.lock().unwrap();
-        (i.pos, i.shown && i.landed)
+        (i.pos, i.shown && i.landed && i.carry.is_none())
     };
     if !sitting {
-        return false;
+        return None;
     }
-    let s = side(&app, &d);
-    let mochi = Rect { x: pos.0, y: pos.1, w: s, h: s };
-    let Some(display) = logic::display_near(mochi.center(), &displays(&app, &d)) else { return false };
-    let (x, y) = logic::beside_origin(mochi, display.work, display.scale);
-    island::set_beside(&app, Some((x.round() as i32, y.round() as i32)));
-    true
+    let win = window(&app)?;
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let s = SIZE * scale;
+    let work = logic::display_near((pos.0 + s / 2.0, pos.1 + s / 2.0), &displays(&app, &d)).map(|x| x.work);
+    let right = work.map(|w| pos.0 - FAN_W * scale < w.x).unwrap_or(false);
+    let fan = Fan { x: if right { 0.0 } else { FAN_W }, y: (FAN_H - SIZE) / 2.0, right };
+    d.inner.lock().unwrap().fan = Some((fan.x * scale, fan.y * scale));
+    let _ = win.set_size(PhysicalSize::new(((SIZE + FAN_W) * scale).round() as u32, (FAN_H * scale).round() as u32));
+    place(&app, &d, pos);
+    refresh(&app, &d);
+    Some(fan)
+}
+
+/// The other Mochis go back in: his window is his own square again, where it was.
+fn unfan(app: &AppHandle, d: &Desktop) {
+    let pos = {
+        let mut i = d.inner.lock().unwrap();
+        if i.fan.take().is_none() {
+            return;
+        }
+        i.pos
+    };
+    if let Some(win) = window(app) {
+        let side = (SIZE * win.scale_factor().unwrap_or(1.0)).round() as u32;
+        let _ = win.set_size(PhysicalSize::new(side, side));
+    }
+    place(app, d, pos);
+    refresh(app, d);
+    let _ = app.emit_to(LABEL, "desktop-fan-closed", ());
 }
 
 /// The drop, wherever it came from: home if it is over the island's panel,
@@ -717,7 +741,8 @@ fn spawn_poll(app: AppHandle, d: Arc<Desktop>) {
             let Ok(origin) = win.outer_position() else { continue };
             let scale = win.scale_factor().unwrap_or(1.0);
             let local = ((cx - origin.x as f64) / scale, (cy - origin.y as f64) / scale);
-            let accept = logic::is_over_body(local, SIZE);
+            // With the other Mochis out, the whole grown window takes the mouse.
+            let accept = d.inner.lock().unwrap().fan.is_some() || logic::is_over_body(local, SIZE);
             {
                 let mut i = d.inner.lock().unwrap();
                 if i.ignoring != Some(!accept) {
@@ -798,6 +823,8 @@ pub async fn desktop_mochi_carry_end(app: AppHandle, x: f64, y: f64) {
 #[tauri::command]
 pub async fn desktop_mochi_drag_begin(app: AppHandle) -> Option<(f64, f64)> {
     let d = app.state::<Arc<Desktop>>().inner().clone();
+    // Dragged with the other Mochis out: they go back in first.
+    unfan(&app, &d);
     let pos = {
         let i = d.inner.lock().unwrap();
         if !i.landed || i.carry.is_some() {
@@ -903,6 +930,7 @@ pub async fn desktop_mochi_fly_out(app: AppHandle, anywhere: Option<bool>) -> bo
 #[tauri::command]
 pub async fn desktop_mochi_fly_home(app: AppHandle, forget: bool) -> bool {
     let d = app.state::<Arc<Desktop>>().inner().clone();
+    unfan(&app, &d);
     if !d.inner.lock().unwrap().shown {
         if forget {
             remember(&app, |p| p.on_desktop = false);
@@ -953,40 +981,6 @@ mod tests {
 
     // Mirrors tests/DesktopMochiTests.swift (isOverBody, clampOrigin), in the
     // y-down coordinates every PC uses.
-
-    fn near(a: f64, b: f64) -> bool {
-        (a - b).abs() < 1e-6
-    }
-
-    #[test]
-    fn a_click_opens_the_island_on_his_left_or_else_on_his_right() {
-        let work = Rect { x: 0.0, y: 0.0, w: 1920.0, h: 1040.0 };
-        let side = (HOME_ZONE_W - OPEN_W) / 2.0;
-        let body = 120.0 * BODY_RADIUS_FRACTION;
-        // Room on his left: the island's right edge is just short of his body.
-        let mochi = Rect { x: 1500.0, y: 500.0, w: 120.0, h: 120.0 };
-        let (x, y) = beside_origin(mochi, work, 1.0);
-        assert!(near(x + HOME_ZONE_W - side, 1560.0 - body - BESIDE_GAP));
-        assert!(near(y, 500.0 + BESIDE_TOP));
-        // Near the left edge: on his right.
-        let mochi = Rect { x: 50.0, y: 500.0, w: 120.0, h: 120.0 };
-        let (x, _) = beside_origin(mochi, work, 1.0);
-        assert!(near(x + side, 110.0 + body + BESIDE_GAP));
-        // Low on the screen: the whole panel stays above the taskbar.
-        let mochi = Rect { x: 1500.0, y: 960.0, w: 120.0, h: 120.0 };
-        assert!(near(beside_origin(mochi, work, 1.0).1, 1040.0 - HOME_ZONE_H));
-    }
-
-    #[test]
-    fn at_150_percent_the_island_still_sits_beside_him() {
-        let work = Rect { x: -2880.0, y: 0.0, w: 2880.0, h: 1560.0 };
-        let mochi = Rect { x: -900.0, y: 300.0, w: 180.0, h: 180.0 };
-        let (x, y) = beside_origin(mochi, work, 1.5);
-        let side = (HOME_ZONE_W - OPEN_W) / 2.0 * 1.5;
-        assert!(near(x + HOME_ZONE_W * 1.5 - side, -810.0 - 180.0 * BODY_RADIUS_FRACTION - BESIDE_GAP * 1.5));
-        assert!(near(y, 300.0 + BESIDE_TOP * 1.5));
-        assert!(x + side >= work.x);
-    }
 
     #[test]
     fn is_over_body() {

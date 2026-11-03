@@ -438,16 +438,6 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>
     let ph = (lh * scale).round().max(1.0) as u32;
     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
     let y = mp.y + top_inset(&m);
-    // Opened from the desktop Mochi: the open island stands beside him. Folded,
-    // it is back at the top as always.
-    let beside = {
-        let mut b = BESIDE.lock().unwrap();
-        if collapsed.is_some() {
-            *b = None;
-        }
-        *b
-    };
-    let (x, y) = beside.unwrap_or((x, y));
 
     // GTK never sizes a non-resizable window below its natural size (200 px
     // here), so on Linux the 6 px wake strip would stay a 200 px block. tao
@@ -476,29 +466,6 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>
             let _ = win.set_position(PhysicalPosition::new(x, y));
         }
     }
-}
-
-/// Top-left corner of the full window beside the desktop Mochi, physical
-/// pixels, while the island is open from a click on him. None: the top centre.
-static BESIDE: Mutex<Option<(i32, i32)>> = Mutex::new(None);
-
-/// Opens the island beside the desktop Mochi (`Some`), or sends it back to the
-/// top (`None`), and places it again at once if it is not folded.
-pub fn set_beside(app: &AppHandle, at: Option<(i32, i32)>) {
-    {
-        let mut b = BESIDE.lock().unwrap();
-        if *b == at {
-            return;
-        }
-        *b = at;
-    }
-    let Some(shared) = app.try_state::<crate::Shared>() else { return };
-    if shared.gate.collapsed.load(Ordering::Relaxed) {
-        return;
-    }
-    let pref = shared.settings.lock().unwrap().screen.clone();
-    apply_geometry(app, &pref, None);
-    refresh_click_through(app, &shared.gate);
 }
 
 /// A closed island never grows past the panel, and never shrinks below one

@@ -21,6 +21,17 @@ export interface DesktopSnapshot {
   paused: boolean;
   /** Music plays: he dances (the compact island's rules, core/spotify.ts). */
   dancing: boolean;
+  /** The other pills' Mochis, which a click on him brings out around him. */
+  others: FanMochi[];
+}
+
+/** One of the other pills' Mochis, as his window draws it. */
+export interface FanMochi {
+  id: string;
+  name: string;
+  color: string;
+  state: BotStateName;
+  emote?: BotEmoteName | null;
 }
 
 /** Events between the two windows. Rust adds `desktop-mochi-dropped`. */
@@ -33,8 +44,12 @@ export const DESKTOP_EVENTS = {
   home: "desktop-mochi-home",
   wardrobe: "desktop-mochi-wardrobe",
   dizzy: "desktop-mochi-dizzy",
-  /** A click on him: the island opens beside him (or folds, if it is open there). */
+  /** A click on him with nothing to bring out, or no room to: the island opens at the top. */
   open: "desktop-mochi-open",
+  /** One of the other Mochis clicked: that pill comes into focus (it swaps with him). */
+  focus: "desktop-mochi-focus",
+  /** Rust → desktop window: his window is his own square again. */
+  fanClosed: "desktop-fan-closed",
   /** Rust → island: a drag ended, `{ from: "island" | "desktop", home }`. */
   dropped: "desktop-mochi-dropped",
   /** Rust → desktop window */
@@ -329,4 +344,47 @@ export class DesktopMochiController {
       this.port.revealIsland();
     }
   }
+}
+
+// ── The other Mochis around him ───────────────────────────────────────────────
+// A click on him brings the other pills' Mochis out on a half circle beside
+// him, like the Mac's corner island (CornerIsland.swift); a click on one swaps
+// it with him: that pill comes into focus, and the one that was takes its place.
+
+/** Room for five around him, as on the Mac. */
+export const FAN_MAX = 5;
+/** Distance from his centre to theirs, and the size of their bodies (px). */
+export const FAN_RADIUS = 84;
+export const FAN_BODY = 24;
+/** Degrees between two neighbours, and the widest the half circle opens. */
+const FAN_STEP = 40;
+const FAN_SPAN = 160;
+
+/**
+ * Centres of `n` Mochis on the half circle beside him, around `center`
+ * (y down): on his left, or on his right when `right`. The middle one is level
+ * with him, the others spread evenly above and below.
+ */
+export function fanPoints(n: number, center: Point, right: boolean, radius = FAN_RADIUS): Point[] {
+  const span = Math.min(FAN_SPAN, FAN_STEP * Math.max(0, n - 1));
+  const points: Point[] = [];
+  for (let i = 0; i < n; i++) {
+    const deg = n === 1 ? 0 : -span / 2 + (span * i) / (n - 1);
+    const a = (deg * Math.PI) / 180;
+    const dx = Math.cos(a) * radius;
+    points.push({ x: center.x + (right ? dx : -dx), y: center.y + Math.sin(a) * radius });
+  }
+  return points;
+}
+
+/**
+ * Their order on the half circle, kept across swaps (CornerArcView.order):
+ * the ones still there keep their places; one arriving after a swap takes the
+ * place `slot` the swapped one left; others are added at the end.
+ */
+export function fanOrder(previous: string[], present: string[], slot: number | null): string[] {
+  const order = previous.filter((id) => present.includes(id));
+  const fresh = present.filter((id) => !order.includes(id));
+  if (slot != null && fresh.length > 0) order.splice(Math.min(slot, order.length), 0, fresh.shift()!);
+  return [...order, ...fresh].slice(0, FAN_MAX);
 }

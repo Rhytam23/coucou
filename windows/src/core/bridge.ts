@@ -444,10 +444,10 @@ export const Bridge = {
   /** To the island, then hidden. `forget`: he lives in the island again. */
   desktopFlyHome: (forget: boolean) => call<boolean>("desktop_mochi_fly_home", { forget }),
   /**
-   * The island opens beside the desktop Mochi (`on`), or goes back to the top.
-   * False where windows can't be placed, or while he is not on the desktop.
+   * A click on the desktop Mochi: his window grows to show the other Mochis
+   * (`open`), or shrinks back. Null where it can't (layer shell).
    */
-  desktopIslandBeside: (on: boolean) => call<boolean>("desktop_mochi_island_beside", { on }),
+  desktopFan: (open: boolean) => call<DesktopFan | null>("desktop_mochi_fan", { open }),
   /** Asleep, the cursor poll stops. */
   desktopSetAsleep: (asleep: boolean) => call<void>("desktop_mochi_set_asleep", { asleep }),
 
@@ -525,6 +525,13 @@ export interface ShortcutsReport {
 }
 
 /** How the desktop Mochi's window works here (platform::DesktopMode). */
+/** Where the desktop Mochi's square sits in his grown window, and on which side the others are. */
+export interface DesktopFan {
+  x: number;
+  y: number;
+  right: boolean;
+}
+
 export type DesktopMode = "poll" | "window" | "layer" | "off";
 
 export interface DesktopInfo {
