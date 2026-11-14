@@ -363,7 +363,64 @@ class AppModel(private val context: Context) : LinkListener {
         chatChanged(save = false)
     }
 
+    // ── Starting a Claude Code session on the computer (cap `launch`; rules in core/LaunchFlow.kt) ──
+
+    /** The computer lets this phone start sessions right now (its switch is on and we are connected). */
+    var launchOffered by mutableStateOf(false); private set
+    /** The projects the computer offers: folder names and its own ids, never a path. Held in memory only. */
+    var launchProjects by mutableStateOf<List<com.coucou.android.link.LaunchProject>>(emptyList()); private set
+    /** What became of the request that was sent. Nothing about it is stored or logged. */
+    var launchOutcome by mutableStateOf<com.coucou.android.core.LaunchOutcome>(com.coucou.android.core.LaunchOutcome.Idle); private set
+
+    val launchAvailability: com.coucou.android.core.LaunchAvailability
+        get() = com.coucou.android.core.LaunchFlow.availability(linkState == LinkState.CONNECTED, launchOffered, launchProjects)
+
+    private val launchRandom = java.security.SecureRandom()
+    private val launchTimeout = Runnable { launchOutcome = com.coucou.android.core.LaunchFlow.onSilence(launchOutcome) }
+
+    /**
+     * Sends the request; the lock check has already happened in the UI (BiometricGate). Only a project of the computer's list and the
+     * cleaned words go out. The words are not kept, not logged and not put in the history.
+     */
+    fun launchSend(projectId: String, prompt: String) {
+        if (launchOutcome is com.coucou.android.core.LaunchOutcome.Sending) return
+        val (project, text) = com.coucou.android.core.LaunchFlow.request(launchProjects, projectId, prompt) ?: return
+        val id = com.coucou.android.core.LaunchFlow.newId(launchRandom)
+        main.removeCallbacks(launchTimeout)
+        if (link?.launch(id, project.id, text) == true) {
+            launchOutcome = com.coucou.android.core.LaunchOutcome.Sending(id, project.name)
+            main.postDelayed(launchTimeout, com.coucou.android.core.LaunchFlow.ANSWER_WAIT_MS)
+        } else {
+            launchOutcome = com.coucou.android.core.LaunchOutcome.NotSent
+        }
+    }
+
+    /** The sheet closed, or the user starts over: the last outcome is forgotten. A request on its way is not recalled. */
+    fun launchReset() {
+        if (launchOutcome !is com.coucou.android.core.LaunchOutcome.Sending) launchOutcome = com.coucou.android.core.LaunchOutcome.Idle
+    }
+
+    override fun onProjects(projects: List<com.coucou.android.link.LaunchProject>) {
+        main.post { launchProjects = projects }
+    }
+
+    override fun onLaunchResult(id: String, ok: Boolean, reason: String) {
+        main.post {
+            val next = com.coucou.android.core.LaunchFlow.onResult(launchOutcome, id, ok, reason)
+            if (next != launchOutcome) main.removeCallbacks(launchTimeout)
+            launchOutcome = next
+        }
+    }
+
+    private fun launchLinkLost() {
+        launchOffered = false
+        launchProjects = emptyList()
+        main.removeCallbacks(launchTimeout)
+        launchOutcome = com.coucou.android.core.LaunchFlow.onSilence(launchOutcome)
+    }
+
     private fun chatLinkLost() {
+        launchLinkLost()
         detailsOffered = false
         chatOffered = false
         chatModels = emptyList()
@@ -791,6 +848,8 @@ class AppModel(private val context: Context) : LinkListener {
             chatOffered = Protocol.CAP_CHAT in caps
             detailsOffered = Protocol.CAP_DETAILS in caps
             diffsOffered = Protocol.CAP_DIFFS in caps
+            launchOffered = Protocol.CAP_LAUNCH in caps
+            if (!launchOffered) launchProjects = emptyList()
             if (Protocol.CAP_USAGE !in caps) usage = null
             if (Protocol.CAP_RECAP !in caps) recap = null
             pushGlance() // the Usage Ring says to turn it on
