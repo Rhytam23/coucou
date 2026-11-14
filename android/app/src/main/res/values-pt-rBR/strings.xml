@@ -185,7 +185,7 @@
     <string name="quiet_hours">Horário silencioso</string>
     <string name="quiet_hint">Sem som e sem pílula para agentes concluídos ou com falha. Pedidos e perguntas continuam chegando.</string>
     <string name="quiet_from">De</string>
-    <string name="quiet_to">Para</string>
+    <string name="quiet_to">Até</string>
     <string name="history_title">Atividade</string>
     <string name="history_empty">Suas decisões aparecerão aqui. Elas ficam só neste celular.</string>
     <string name="history_today">Hoje</string>

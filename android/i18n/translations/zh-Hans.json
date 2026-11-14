@@ -184,7 +184,7 @@
     "quiet_hours": "勿扰时段",
     "quiet_hint": "代理完成或失败时没有声音，也没有胶囊提示。请求和问题仍会送达。",
     "quiet_from": "从",
-    "quiet_to": "收件人",
+    "quiet_to": "至",
     "history_title": "动态",
     "history_empty": "你的决定会显示在这里，只保存在这部手机上。",
     "history_today": "今天",

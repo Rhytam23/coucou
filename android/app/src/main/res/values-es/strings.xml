@@ -185,7 +185,7 @@
     <string name="quiet_hours">Horas de silencio</string>
     <string name="quiet_hint">Sin sonido ni píldora para agentes terminados o con error. Las solicitudes y las preguntas sí llegan.</string>
     <string name="quiet_from">Desde</string>
-    <string name="quiet_to">Para</string>
+    <string name="quiet_to">Hasta</string>
     <string name="history_title">Actividad</string>
     <string name="history_empty">Tus decisiones aparecerán aquí. Se quedan en este teléfono.</string>
     <string name="history_today">Hoy</string>

@@ -185,7 +185,7 @@
     <string name="quiet_hours">शांत समय</string>
     <string name="quiet_hint">पूरे या विफल एजेंटों के लिए न आवाज़, न पिल। अनुरोध और सवाल फिर भी आते हैं।</string>
     <string name="quiet_from">से</string>
-    <string name="quiet_to">प्रति</string>
+    <string name="quiet_to">तक</string>
     <string name="history_title">गतिविधि</string>
     <string name="history_empty">आपके फ़ैसले यहाँ दिखेंगे। वे इसी फ़ोन पर रहते हैं।</string>
     <string name="history_today">आज</string>

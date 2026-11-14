@@ -184,7 +184,7 @@
     "quiet_hours": "Horas de silencio",
     "quiet_hint": "Sin sonido ni píldora para agentes terminados o con error. Las solicitudes y las preguntas sí llegan.",
     "quiet_from": "Desde",
-    "quiet_to": "Para",
+    "quiet_to": "Hasta",
     "history_title": "Actividad",
     "history_empty": "Tus decisiones aparecerán aquí. Se quedan en este teléfono.",
     "history_today": "Hoy",

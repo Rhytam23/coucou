@@ -185,7 +185,7 @@
     <string name="quiet_hours">Тихие часы</string>
     <string name="quiet_hint">Без звука и таблетки для завершивших работу или сбившихся агентов. Запросы и вопросы всё равно приходят.</string>
     <string name="quiet_from">С</string>
-    <string name="quiet_to">Кому</string>
+    <string name="quiet_to">До</string>
     <string name="history_title">Активность</string>
     <string name="history_empty">Твои решения появятся здесь. Они хранятся только на этом телефоне.</string>
     <string name="history_today">Сегодня</string>
