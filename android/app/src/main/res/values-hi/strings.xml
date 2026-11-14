@@ -150,6 +150,12 @@
     <string name="overlay_hint">जब कोई एजेंट काम करता है तो स्क्रीन के ऊपर से एक आइलैंड नीचे आता है, फिर वापस ऊपर चला जाता है।</string>
     <string name="overlay_dnd_title">डू नॉट डिस्टर्ब में आइलैंड छिपाएँ</string>
     <string name="overlay_dnd_hint">जब तक डू नॉट डिस्टर्ब चालू है, स्क्रीन के ऊपर से कुछ नीचे नहीं आता। अनुरोध फिर भी नोटिफ़िकेशन के रूप में आते हैं।</string>
+    <string name="spoken_title">बोलकर सूचना</string>
+    <string name="spoken_hint">जब किसी एजेंट को आपकी ज़रूरत हो या वह काम पूरा कर ले, तो आपका फ़ोन एक छोटा वाक्य बोलता है, जैसे “Claude Code को आपकी स्वीकृति चाहिए”। कमांड या संदेश कभी नहीं। डू नॉट डिस्टर्ब में, साइलेंट या वाइब्रेट पर, और कॉल के दौरान चुप रहता है।</string>
+    <string name="spoken_no_voice">आपके फ़ोन में इस भाषा की कोई ऑफ़लाइन आवाज़ नहीं है, इसलिए कुछ नहीं बोला जाता। आप Android की टेक्स्ट-टू-स्पीच सेटिंग में एक जोड़ सकते हैं।</string>
+    <string name="spoken_approval">%1$s को आपकी स्वीकृति चाहिए</string>
+    <string name="spoken_question">%1$s का आपसे एक सवाल है</string>
+    <string name="spoken_finished">%1$s का काम पूरा हुआ</string>
     <string name="msg_overlay_permission">Coucou के लिए \"दूसरे ऐप्स के ऊपर दिखाएँ\" की अनुमति दें, फिर वापस आएँ।</string>
     <string name="settings_title">सेटिंग</string>
     <string name="settings_sound">Mochi की आवाज़ें</string>

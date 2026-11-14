@@ -150,6 +150,12 @@
     <string name="overlay_hint">Sebuah pulau turun dari atas layar saat agen bekerja, lalu naik kembali.</string>
     <string name="overlay_dnd_title">Sembunyikan pulau saat Jangan Ganggu</string>
     <string name="overlay_dnd_hint">Selama Jangan Ganggu aktif, tidak ada yang turun dari atas layar. Permintaan tetap datang sebagai notifikasi.</string>
+    <string name="spoken_title">Peringatan suara</string>
+    <string name="spoken_hint">Ponselmu mengucapkan satu kalimat pendek saat agen membutuhkanmu atau selesai, seperti “Claude Code perlu persetujuanmu”. Tidak pernah perintah atau pesannya. Diam saat Jangan Ganggu, mode senyap atau getar, dan selama panggilan.</string>
+    <string name="spoken_no_voice">Ponselmu tidak punya suara offline untuk bahasa ini, jadi tidak ada yang diucapkan. Kamu bisa menambahkannya di setelan text-to-speech Android.</string>
+    <string name="spoken_approval">%1$s perlu persetujuanmu</string>
+    <string name="spoken_question">%1$s punya pertanyaan untukmu</string>
+    <string name="spoken_finished">%1$s sudah selesai</string>
     <string name="msg_overlay_permission">Izinkan \"tampil di atas aplikasi lain\" untuk Coucou, lalu kembali.</string>
     <string name="settings_title">Pengaturan</string>
     <string name="settings_sound">Suara Mochi</string>

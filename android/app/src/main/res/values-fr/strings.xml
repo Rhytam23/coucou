@@ -150,6 +150,12 @@
     <string name="overlay_hint">Une île descend du haut de l\'écran pendant qu\'un agent travaille, puis remonte.</string>
     <string name="overlay_dnd_title">Masquer l\'île en mode Ne pas déranger</string>
     <string name="overlay_dnd_hint">Tant que Ne pas déranger est activé, rien ne descend du haut de l\'écran. Les demandes arrivent toujours en notification.</string>
+    <string name="spoken_title">Alertes vocales</string>
+    <string name="spoken_hint">Ton téléphone dit une courte phrase quand un agent a besoin de toi ou a terminé, comme « Claude Code a besoin de ton accord ». Jamais la commande ni le message. Silencieux en mode Ne pas déranger, en silencieux ou vibreur, et pendant un appel.</string>
+    <string name="spoken_no_voice">Ton téléphone n\'a pas de voix hors ligne pour cette langue : rien n\'est dit. Tu peux en ajouter une dans les réglages de synthèse vocale d\'Android.</string>
+    <string name="spoken_approval">%1$s a besoin de ton accord</string>
+    <string name="spoken_question">%1$s a une question pour toi</string>
+    <string name="spoken_finished">%1$s a terminé</string>
     <string name="msg_overlay_permission">Autorise « l\'affichage par-dessus les autres apps » pour Coucou, puis reviens.</string>
     <string name="settings_title">Réglages</string>
     <string name="settings_sound">Sons de Mochi</string>

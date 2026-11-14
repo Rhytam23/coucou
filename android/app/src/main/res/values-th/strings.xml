@@ -150,6 +150,12 @@
     <string name="overlay_hint">แถบไอส์แลนด์จะเลื่อนลงจากด้านบนของหน้าจอขณะเอเจนต์ทำงาน แล้วเลื่อนกลับขึ้นไป</string>
     <string name="overlay_dnd_title">ซ่อนไอส์แลนด์เมื่อเปิดห้ามรบกวน</string>
     <string name="overlay_dnd_hint">ขณะที่เปิดโหมดห้ามรบกวน จะไม่มีอะไรเลื่อนลงมาจากด้านบนของหน้าจอ คำขอยังคงมาเป็นการแจ้งเตือน</string>
+    <string name="spoken_title">การแจ้งเตือนด้วยเสียงพูด</string>
+    <string name="spoken_hint">โทรศัพท์จะพูดประโยคสั้น ๆ หนึ่งประโยคเมื่อเอเจนต์ต้องการคุณหรือทำงานเสร็จ เช่น “Claude Code ต้องการการอนุมัติจากคุณ” ไม่อ่านคำสั่งหรือข้อความเด็ดขาด เงียบเมื่อเปิดห้ามรบกวน ปิดเสียงหรือสั่น และระหว่างการโทร</string>
+    <string name="spoken_no_voice">โทรศัพท์ของคุณไม่มีเสียงแบบออฟไลน์สำหรับภาษานี้ จึงไม่มีการพูด คุณเพิ่มได้ในการตั้งค่าการอ่านออกเสียงข้อความของ Android</string>
+    <string name="spoken_approval">%1$s ต้องการการอนุมัติจากคุณ</string>
+    <string name="spoken_question">%1$s มีคำถามถึงคุณ</string>
+    <string name="spoken_finished">%1$s ทำงานเสร็จแล้ว</string>
     <string name="msg_overlay_permission">อนุญาตให้ Coucou “แสดงทับแอปอื่น” แล้วกลับมาที่นี่</string>
     <string name="settings_title">การตั้งค่า</string>
     <string name="settings_sound">เสียงของ Mochi</string>

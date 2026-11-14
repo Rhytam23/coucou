@@ -311,6 +311,17 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
                         valueRange = 0f..SoundVolume.MAX, enabled = s.soundOn, label = stringResource(R.string.settings_volume),
                     )
                 }
+                RowDivider()
+                SettingSwitch(stringResource(R.string.spoken_title), stringResource(R.string.spoken_hint), s.spokenAlerts) {
+                    model.updateSettings(s.copy(spokenAlerts = it))
+                }
+                if (s.spokenAlerts && model.spokenNoVoice) {
+                    Text(
+                        stringResource(R.string.spoken_no_voice),
+                        Modifier.padding(horizontal = Spacing.INSIDE.dp).padding(bottom = 12.dp),
+                        style = TypeScale.SECONDARY.style(t.textDim.c()),
+                    )
+                }
             }
         }
 

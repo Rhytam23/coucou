@@ -150,6 +150,12 @@
     <string name="overlay_hint">Un’isola scende dall’alto dello schermo mentre un agente lavora, poi risale.</string>
     <string name="overlay_dnd_title">Nascondi l’isola con Non disturbare</string>
     <string name="overlay_dnd_hint">Con Non disturbare attivo, dall’alto dello schermo non scende nulla. Le richieste arrivano comunque come notifiche.</string>
+    <string name="spoken_title">Avvisi vocali</string>
+    <string name="spoken_hint">Il telefono dice una breve frase quando un agente ha bisogno di te o ha finito, come “Claude Code ha bisogno della tua approvazione”. Mai il comando né il messaggio. In silenzio con Non disturbare, in modalità silenziosa o vibrazione e durante una chiamata.</string>
+    <string name="spoken_no_voice">Il telefono non ha una voce offline per questa lingua, quindi non viene detto nulla. Puoi aggiungerne una nelle impostazioni di sintesi vocale di Android.</string>
+    <string name="spoken_approval">%1$s ha bisogno della tua approvazione</string>
+    <string name="spoken_question">%1$s ha una domanda per te</string>
+    <string name="spoken_finished">%1$s ha finito</string>
     <string name="msg_overlay_permission">Consenti a Coucou di mostrarsi sopra le altre app, poi torna qui.</string>
     <string name="settings_title">Impostazioni</string>
     <string name="settings_sound">I suoni di Mochi</string>

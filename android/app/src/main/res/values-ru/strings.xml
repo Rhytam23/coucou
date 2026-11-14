@@ -150,6 +150,12 @@
     <string name="overlay_hint">Пока агент работает, сверху экрана опускается «остров», а потом поднимается обратно.</string>
     <string name="overlay_dnd_title">Скрывать остров в режиме «Не беспокоить»</string>
     <string name="overlay_dnd_hint">Пока включён режим «Не беспокоить», сверху экрана ничего не опускается. Запросы по-прежнему приходят уведомлениями.</string>
+    <string name="spoken_title">Голосовые оповещения</string>
+    <string name="spoken_hint">Телефон произносит одну короткую фразу, когда агенту нужен ты или он закончил, например «Claude Code нужно твоё подтверждение». Никогда не команду и не сообщение. Молчит в режиме «Не беспокоить», в беззвучном режиме или на вибрации и во время звонка.</string>
+    <string name="spoken_no_voice">В телефоне нет офлайн-голоса для этого языка, поэтому ничего не произносится. Его можно добавить в настройках синтеза речи Android.</string>
+    <string name="spoken_approval">%1$s ждёт твоего подтверждения</string>
+    <string name="spoken_question">%1$s хочет задать тебе вопрос</string>
+    <string name="spoken_finished">%1$s: готово</string>
     <string name="msg_overlay_permission">Разреши Coucou «отображение поверх других приложений» и вернись.</string>
     <string name="settings_title">Настройки</string>
     <string name="settings_sound">Звуки Mochi</string>

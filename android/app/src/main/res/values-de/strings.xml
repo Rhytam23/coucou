@@ -150,6 +150,12 @@
     <string name="overlay_hint">Während ein Agent arbeitet, erscheint eine Insel am oberen Bildschirmrand und verschwindet danach wieder.</string>
     <string name="overlay_dnd_title">Insel bei „Bitte nicht stören“ ausblenden</string>
     <string name="overlay_dnd_hint">Solange „Bitte nicht stören“ aktiv ist, erscheint nichts am oberen Bildschirmrand. Anfragen kommen weiterhin als Benachrichtigungen an.</string>
+    <string name="spoken_title">Gesprochene Hinweise</string>
+    <string name="spoken_hint">Dein Handy sagt einen kurzen Satz, wenn ein Agent dich braucht oder fertig ist, etwa „Claude Code braucht deine Genehmigung“. Nie den Befehl oder die Nachricht. Still bei „Bitte nicht stören“, im Lautlos- oder Vibrationsmodus und während eines Anrufs.</string>
+    <string name="spoken_no_voice">Dein Handy hat keine Offline-Stimme für diese Sprache, deshalb wird nichts gesprochen. Du kannst eine in den Sprachausgabe-Einstellungen von Android hinzufügen.</string>
+    <string name="spoken_approval">%1$s braucht deine Genehmigung</string>
+    <string name="spoken_question">%1$s hat eine Frage an dich</string>
+    <string name="spoken_finished">%1$s ist fertig</string>
     <string name="msg_overlay_permission">Erlaube Coucou „Über anderen Apps einblenden“ und kehre dann zurück.</string>
     <string name="settings_title">Einstellungen</string>
     <string name="settings_sound">Mochis Klänge</string>

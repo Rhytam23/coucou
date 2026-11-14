@@ -150,6 +150,12 @@
     <string name="overlay_hint">Bir ajan çalışırken ekranın üstünden bir ada iner, ardından geri çıkar.</string>
     <string name="overlay_dnd_title">Rahatsız Etme modunda adayı gizle</string>
     <string name="overlay_dnd_hint">Rahatsız Etme açıkken ekranın üstünden hiçbir şey inmez. İstekler yine bildirim olarak gelir.</string>
+    <string name="spoken_title">Sesli uyarılar</string>
+    <string name="spoken_hint">Bir ajanın sana ihtiyacı olduğunda veya işi bittiğinde telefonun kısa bir cümle söyler, örneğin “Claude Code onayını bekliyor”. Komutu veya mesajı asla okumaz. Rahatsız Etme modunda, sessizde veya titreşimde ve arama sırasında sessiz kalır.</string>
+    <string name="spoken_no_voice">Telefonunda bu dil için çevrimdışı bir ses yok, bu yüzden hiçbir şey söylenmiyor. Android\'in metin okuma ayarlarından bir ses ekleyebilirsin.</string>
+    <string name="spoken_approval">%1$s onayını bekliyor</string>
+    <string name="spoken_question">%1$s sana bir soru soruyor</string>
+    <string name="spoken_finished">%1$s işini bitirdi</string>
     <string name="msg_overlay_permission">Coucou için “diğer uygulamaların üzerinde gösterme” iznini ver, ardından geri dön.</string>
     <string name="settings_title">Ayarlar</string>
     <string name="settings_sound">Mochi\'nin sesleri</string>

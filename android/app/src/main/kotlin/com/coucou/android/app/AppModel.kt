@@ -157,6 +157,7 @@ class AppModel(private val context: Context) : LinkListener {
         notifier.forgetOngoing()
         WidgetHub.refreshAll(context)
         pushGlance()
+        spoken.checkVoice()
     }
 
     /** What the user chose in Settings (sound, notices, quiet hours). */
@@ -176,6 +177,29 @@ class AppModel(private val context: Context) : LinkListener {
             watchDnd()
             refreshIsland()
         }
+        spoken.setEnabled(settings.spokenAlerts)
+    }
+
+    // ── Spoken alerts (Settings > Sound, off by default) ────────────────────────
+    // One short line in the phone's own voice when an agent needs the user or finishes. The rules are in SpokenAlertPolicy;
+    // the engine exists only while the switch is on.
+
+    /** The switch is on but the phone has no voice of its own for the app's language: Settings says so. */
+    var spokenNoVoice by mutableStateOf(false); private set
+    private val spoken = SpokenAlerts(context) { missing -> main.post { spokenNoVoice = missing } }
+    private val spokenBook = com.coucou.android.core.SpokenAlertBook()
+
+    /** Looks again whether there is a voice (the Settings screen opened, or the language changed). */
+    fun refreshSpokenVoice() = spoken.checkVoice()
+
+    private fun speakAlert(previous: BotState?, s: SessionInfo, minuteOfDay: Int) {
+        // A real computer only: the demo loops through every state.
+        if (mode != Mode.PAIRED || !settings.spokenAlerts) return
+        val kind = com.coucou.android.core.SpokenAlertPolicy.kind(previous, s.state) ?: return
+        val line = com.coucou.android.core.SpokenAlertPolicy.decide(
+            settings.spokenAlerts, previous, s.state, s.pillId, s.agent, settings, minuteOfDay,
+        ) { spoken.phone(dndOn()) } ?: return
+        if (spokenBook.firstTime(s.pillId, kind, android.os.SystemClock.elapsedRealtime())) spoken.say(line)
     }
 
     // ── Do Not Disturb ──────────────────────────────────────────────────────────
@@ -225,6 +249,7 @@ class AppModel(private val context: Context) : LinkListener {
         notifier.applyApprovalSettings(settings.vibration, settings.keepScreenOff)
         com.coucou.android.core.MotionState.choice = settings.motion
         watchDnd()
+        spoken.setEnabled(settings.spokenAlerts)
     }
 
     /** What the computer says Mochi wears ("auto" or an outfit); the last one it told, kept for when it is away. */
@@ -696,6 +721,7 @@ class AppModel(private val context: Context) : LinkListener {
         chatLinkLost()
         wantAllow = null
         lastState.clear()
+        spokenBook.clear()
         notifier.cancelAllStatus()
     }
 
@@ -830,6 +856,7 @@ class AppModel(private val context: Context) : LinkListener {
                 val a = StatusPolicy.announce(prev, s.state, settings, minute, inForeground, s.pillId)
                 if (a.sound && sound != null) sounds.play(sound)
                 if (a.notify) notifier.showStatus(s.pillId, name, s.state, s.statusText)
+                speakAlert(prev, s, minute)
                 IslandPlan.flash(prev, s, settings, minute, islandAllowed(), this::agentName)?.let { overlay.flash(it) }
                 // The agent moved on: the notice about the last state is stale.
                 if (prev != s.state && s.state !in NEWSWORTHY) notifier.cancelStatus(s.pillId)

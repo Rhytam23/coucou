@@ -150,6 +150,12 @@
     <string name="overlay_hint">Uma ilha desce do topo da tela enquanto um agente trabalha e depois volta a subir.</string>
     <string name="overlay_dnd_title">Ocultar a ilha no Não perturbe</string>
     <string name="overlay_dnd_hint">Enquanto o Não perturbe estiver ativado, nada desce do topo da tela. Os pedidos continuam chegando como notificações.</string>
+    <string name="spoken_title">Alertas falados</string>
+    <string name="spoken_hint">Seu celular diz uma frase curta quando um agente precisa de você ou termina, como “Claude Code precisa da sua aprovação”. Nunca o comando nem a mensagem. Fica em silêncio no Não perturbe, no modo silencioso ou vibrar, e durante uma chamada.</string>
+    <string name="spoken_no_voice">Seu celular não tem uma voz offline para este idioma, então nada é falado. Você pode adicionar uma nas configurações de conversão de texto em voz do Android.</string>
+    <string name="spoken_approval">%1$s precisa da sua aprovação</string>
+    <string name="spoken_question">%1$s tem uma pergunta para você</string>
+    <string name="spoken_finished">%1$s terminou</string>
     <string name="msg_overlay_permission">Permita «exibir sobre outros apps» para o Coucou e volte.</string>
     <string name="settings_title">Ajustes</string>
     <string name="settings_sound">Sons do Mochi</string>
