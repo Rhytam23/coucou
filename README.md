@@ -201,6 +201,7 @@ Coucou for Android, by [@Rhytam23](https://github.com/Rhytam23), is released und
 
 | Android | Date | Highlights |
 |---------|------|------------|
+| 0.6.0 | Unreleased | Start a Claude Code session on your computer from the phone, spoken alerts when an agent needs you or finishes |
 | [0.3.0](https://github.com/Louis-CFM/coucou/releases/tag/android-v0.3.0) | Oct 22, 2026 | A light theme and your phone's colours, nine more languages (Arabic right to left), quick actions, a Team widget, Share to Coucou, the weekly recap, a per-agent mute |
 | [0.2.0](https://github.com/Louis-CFM/coucou/releases/tag/android-v0.2.0) | Oct 13, 2026 | Nine home-screen widgets: Mochi, your agents, plan usage and quick buttons, coloured by state |
 | [0.1.0](https://github.com/Louis-CFM/coucou/releases/tag/android-v0.1.0) | Oct 11, 2026 | First release: your agents, approvals with your fingerprint, answers and chat, linked to Windows or Linux |
