@@ -55,6 +55,11 @@ The desktop side is in `windows/src-tauri/src/phone_link`; the protocol is `docs
 - **Island over other apps** (optional, off by default): a black island from the camera cut-out drops while an agent works, shows
   the result for 10 s and goes back up with the computer's motion. Needs Android's "Display over other apps". Rules are pure and
   tested (`core/Island*.kt`); `ui/IslandOverlay.kt` draws.
+- **Spoken alerts** (Settings > Sound, off by default): the phone says one short line with Android's own voice when an agent needs you
+  (a permission request or a question) or finishes, like "Claude Code needs your approval". The agent and the kind of event, never a
+  command, a file name or a message, and it never answers anything. Silent in Do Not Disturb, on silent or vibrate, during a call, and
+  when the phone has no offline voice for the app's language; a finish also follows the muted agents and the quiet hours. No network,
+  no library, no microphone. Rules in `core/SpokenAlerts.kt` (pure, tested); `app/SpokenAlerts.kt` speaks.
 - **Chat** (a tab, when the computer offers it), **session details**, **file changes** and **plan usage** are opt-in switches on the
   computer (Settings > Android phone), all off by default; the phone is told only what it asks for and the computer allows.
 - **Pairing**: scan the QR code with the in-app camera (CameraX + zxing, offline) or paste the link; a scan or a `coucou://pair`
